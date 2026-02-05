@@ -50,36 +50,42 @@ class ChainState extends ChangeNotifier {
       return false;
     }
 
+    _blindbitUrl = blindbitUrl;
+
     Logger().i('Connecting to blindbit: $blindbitUrl');
     try {
       final correctNetwork =
           await checkNetwork(blindbitUrl: blindbitUrl, network: _network!);
 
       if (correctNetwork) {
-        Logger().i('Network correct');
-        final tip = await getChainHeight(blindbitUrl: blindbitUrl);
+        final tip = await getChainHeight(blindbitUrl: _blindbitUrl!);
 
         Logger().i('Successfully connected to blindbit, current tip: $tip');
-        _blindbitUrl = blindbitUrl;
         _tip = tip;
-        notifyListeners();
         return true;
       } else {
-        Logger().w('Wrong network');
-        return false;
+        throw Exception('Wrong network');
       }
     } catch (e) {
-      Logger().w('Connection to blindbit failed: $e');
+      Logger().e('Connection to blindbit failed: $e');
+      _tip = null; // switch to unavailable state
       return false;
+    } finally {
+      notifyListeners();
     }
   }
 
   Future<bool> reconnect() async {
-    if (_blindbitUrl != null) {
-      return await connect(_blindbitUrl!);
+    if (!available) {
+      if (_blindbitUrl != null) {
+        return await connect(_blindbitUrl!);
+      } else {
+        Logger().e("Attempted to reconnect, but no blindbit url is known");
+        return false;
+      }
     } else {
-      Logger().w("Attempted to reconnect, but no blindbit url is known");
-      return false;
+      Logger().w("Attempted to reconnect, but blindbit is already available");
+      return true;
     }
   }
 
