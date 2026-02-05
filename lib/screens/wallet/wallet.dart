@@ -9,6 +9,7 @@ import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart'
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/spend/choose_recipient.dart';
+import 'package:danawallet/screens/home/wallet/transaction_details.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
@@ -262,9 +263,7 @@ class WalletScreenState extends State<WalletScreen> {
     String amount;
     String amountprefix;
     String amountFiat;
-    String title;
-    String text;
-    Image image;
+    Widget leadingWidget;
     Widget recipientWidget;
     String date;
 
@@ -283,13 +282,12 @@ class WalletScreenState extends State<WalletScreen> {
         amountFiat = hideAmount
             ? hideAmountFormat
             : exchangeRate.displayFiat(field0.amount);
-        title = 'Incoming transaction';
-        text = field0.toString();
-        image = Image(
+        leadingWidget = Image(
             image: const AssetImage("icons/receive.png", package: "bitcoin_ui"),
             color: Bitcoin.neutral3Dark);
       case ApiRecordedTransaction_Outgoing(:final field0):
         final paymentCode = field0.recipients[0].address;
+        final contact = contactsState.getContactByPaymentCode(paymentCode);
         recipientWidget =
             contactsState.getDisplayNameWidget(context, paymentCode);
         date = field0.confirmationHeight?.toString() ?? 'Unconfirmed';
@@ -304,11 +302,21 @@ class WalletScreenState extends State<WalletScreen> {
         amountFiat = hideAmount
             ? hideAmountFormat
             : exchangeRate.displayFiat(field0.totalOutgoing());
-        title = 'Outgoing transaction';
-        text = field0.toString();
-        image = Image(
-            image: const AssetImage("icons/send.png", package: "bitcoin_ui"),
-            color: Bitcoin.neutral3Dark);
+        // Show contact avatar if contact is known, otherwise show send icon
+        if (contact != null) {
+          leadingWidget = CircleAvatar(
+            radius: 20,
+            backgroundColor: contact.avatarColor,
+            child: Text(
+              contact.displayNameInitial,
+              style: BitcoinTextStyle.body4(Bitcoin.white).apply(fontWeightDelta: 2),
+            ),
+          );
+        } else {
+          leadingWidget = Image(
+              image: const AssetImage("icons/send.png", package: "bitcoin_ui"),
+              color: Bitcoin.neutral3Dark);
+        }
 
       case ApiRecordedTransaction_UnknownOutgoing(:final field0):
         recipientWidget = Text(
@@ -322,15 +330,13 @@ class WalletScreenState extends State<WalletScreen> {
         amountFiat = hideAmount
             ? hideAmountFormat
             : exchangeRate.displayFiat(field0.amount);
-        title = 'Parially recovered outgoing transaction';
-        text = field0.toString();
-        image = Image(
+        leadingWidget = Image(
             image: const AssetImage("icons/send.png", package: "bitcoin_ui"),
             color: Bitcoin.neutral3Dark);
     }
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-      leading: image,
+      leading: leadingWidget,
       title: Row(
         children: [
           Expanded(child: recipientWidget),
@@ -344,15 +350,84 @@ class WalletScreenState extends State<WalletScreen> {
           Text(amountFiat, style: BitcoinTextStyle.body5(Bitcoin.neutral7)),
         ],
       ),
-      trailing: InkResponse(
-          onTap: () {
-            showAlertDialog(title, text);
-          },
-          child: Image(
-            image: const AssetImage("icons/caret_right.png",
-                package: "bitcoin_ui"),
-            color: Bitcoin.neutral7,
-          )),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TransactionDetailsScreen(transaction: tx),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showFullTransactionHistory(List<ApiRecordedTransaction> transactions,
+      FiatExchangeRateState exchangeRate) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Bitcoin.neutral4,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header with close button
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'All transactions',
+                      style: BitcoinTextStyle.body2(Bitcoin.neutral8)
+                          .apply(fontWeightDelta: 2),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Icon(Icons.close, color: Bitcoin.neutral7),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Transaction list
+              Expanded(
+                child: transactions.isEmpty
+                    ? Center(
+                        child: Text('No transactions yet.',
+                            style: BitcoinTextStyle.body3(Bitcoin.neutral6)))
+                    : ListView.separated(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        separatorBuilder: (BuildContext context, int index) =>
+                            const Divider(),
+                        itemCount: transactions.length,
+                        itemBuilder: (context, index) {
+                          return toListTile(transactions[index], exchangeRate);
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -370,12 +445,24 @@ class WalletScreenState extends State<WalletScreen> {
           reverse: false,
           itemCount: transactions.length,
           itemBuilder: (context, index) {
-            return toListTile(
-                transactions[transactions.length - 1 - index], exchangeRate);
+            return toListTile(transactions[index], exchangeRate);
           });
     }
 
     return Column(children: [
+      // Arrow to expand transaction list
+      if (transactions.isNotEmpty)
+        GestureDetector(
+          onTap: () => _showFullTransactionHistory(transactions, exchangeRate),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Icon(
+              Icons.keyboard_arrow_up,
+              color: Bitcoin.neutral6,
+              size: 28,
+            ),
+          ),
+        ),
       Align(
           alignment: Alignment.centerLeft,
           child: Text(
