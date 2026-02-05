@@ -86,7 +86,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
           return;
         }
       } else {
-        // we interpret the input field as an on-chain address
+        // input could be a silent payment or legacy address
         paymentCode = textField;
       }
 
