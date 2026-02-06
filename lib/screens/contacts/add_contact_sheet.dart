@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
+import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
+import 'package:danawallet/services/dana_address_service.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
@@ -33,6 +36,9 @@ class _AddContactSheetState extends State<AddContactSheet> {
   bool _isResolving = false;
   String? _errorMessage;
   bool _hasDanaAddress = false;
+  List<Bip353Address> _remoteDanaAddresses = [];
+  bool _isSearchingRemote = false;
+  Timer? _searchDebounceTimer;
 
   @override
   void initState() {
@@ -45,17 +51,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
     if (widget.initialPaymentCode != null) {
       _paymentCodeController.text = widget.initialPaymentCode!;
     }
-    _bip353AddressController.addListener(() {
-      final hasDanaAddress = _bip353AddressController.text.trim().isNotEmpty;
-      setState(() {
-        _hasDanaAddress = hasDanaAddress;
-      });
-
-      // If dana address is filled, clear SP address field
-      if (hasDanaAddress) {
-        _paymentCodeController.clear();
-      }
-    });
+    _bip353AddressController.addListener(_onDanaAddressChanged);
 
     // Automatically resolve SP address if dana address is provided but SP address is not
     if (widget.initialDanaAddress != null &&
@@ -72,7 +68,99 @@ class _AddContactSheetState extends State<AddContactSheet> {
     _nameController.dispose();
     _bip353AddressController.dispose();
     _paymentCodeController.dispose();
+    _searchDebounceTimer?.cancel();
     super.dispose();
+  }
+
+  void _onDanaAddressChanged() {
+    final query = _bip353AddressController.text.trim();
+    final hasDanaAddress = query.isNotEmpty;
+    setState(() {
+      _hasDanaAddress = hasDanaAddress;
+    });
+
+    // If dana address is filled, clear SP address field
+    if (hasDanaAddress) {
+      _paymentCodeController.clear();
+      _nameController.clear();
+    }
+
+    _searchDebounceTimer?.cancel();
+    if (query.isEmpty) {
+      setState(() {
+        _remoteDanaAddresses = [];
+        _isSearchingRemote = false;
+      });
+      return;
+    }
+
+    if (query.contains('@')) {
+      setState(() {
+        _remoteDanaAddresses = [];
+        _isSearchingRemote = false;
+      });
+      return;
+    }
+
+    final searchPrefix = _extractSearchPrefix(query);
+    if (searchPrefix.length < 3) {
+      setState(() {
+        _remoteDanaAddresses = [];
+        _isSearchingRemote = false;
+      });
+      return;
+    }
+
+    // Debounce remote search to avoid too many API calls
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _searchRemoteAddresses(searchPrefix);
+    });
+  }
+
+  String _extractSearchPrefix(String query) {
+    final atIndex = query.indexOf('@');
+    if (atIndex > 0) {
+      return query.substring(0, atIndex).trim();
+    }
+    return query;
+  }
+
+  Future<void> _searchRemoteAddresses(String prefix) async {
+    if (prefix.length < 3) return;
+
+    final knownDanaAddresses =
+        Provider.of<ContactsState>(context, listen: false)
+            .getKnownBip353Addresses();
+
+    setState(() {
+      _isSearchingRemote = true;
+    });
+
+    try {
+      final network = Provider.of<ChainState>(context, listen: false).network;
+      final danaAddresses =
+          await DanaAddressService(network: network).searchPrefix(prefix);
+
+      if (mounted) {
+        final newAddresses = danaAddresses
+            .where((address) => !knownDanaAddresses.contains(address))
+            .take(3)
+            .toList();
+
+        setState(() {
+          _remoteDanaAddresses = newAddresses;
+          _isSearchingRemote = false;
+        });
+      }
+    } catch (e) {
+      Logger().w('Failed to search remote addresses: $e');
+      if (mounted) {
+        setState(() {
+          _remoteDanaAddresses = [];
+          _isSearchingRemote = false;
+        });
+      }
+    }
   }
 
   Future<String?> _resolveDanaAddress() async {
@@ -91,6 +179,9 @@ class _AddContactSheetState extends State<AddContactSheet> {
 
       if (mounted && resolved != null) {
         setState(() {
+          if (_nameController.text.trim().isEmpty) {
+            _nameController.text = parsed.username;
+          }
           _paymentCodeController.text = resolved;
           _isResolving = false;
         });
@@ -111,6 +202,43 @@ class _AddContactSheetState extends State<AddContactSheet> {
       }
     }
     return null;
+  }
+
+  Widget _buildDanaAddressSuggestionItem(Bip353Address danaAddress) {
+    final initial = danaAddress.toString()[0].toUpperCase();
+    const avatarColor = Colors.grey;
+
+    return ListTile(
+      dense: true,
+      leading: CircleAvatar(
+        radius: 16,
+        backgroundColor: avatarColor,
+        child: Text(
+          initial,
+          style:
+              BitcoinTextStyle.body5(Bitcoin.white).apply(fontWeightDelta: 2),
+        ),
+      ),
+      title: Text(
+        danaAddress.toString(),
+        style: BitcoinTextStyle.body5(Bitcoin.black),
+      ),
+      onTap: () async {
+        _searchDebounceTimer?.cancel();
+        setState(() {
+          _remoteDanaAddresses = [];
+          _isSearchingRemote = false;
+          _errorMessage = null;
+        });
+
+        _bip353AddressController.text = danaAddress.toString();
+        if (_nameController.text.trim().isEmpty) {
+          _nameController.text = danaAddress.username;
+        }
+        FocusScope.of(context).unfocus();
+        await _resolveDanaAddress();
+      },
+    );
   }
 
   Future<void> _onSaveContact() async {
@@ -173,6 +301,52 @@ class _AddContactSheetState extends State<AddContactSheet> {
       await Future.delayed(const Duration(milliseconds: 200));
     }
 
+    final existingContact = contactsState.getContactByPaymentCode(paymentCode);
+    if (existingContact != null) {
+      if (mounted && danaAddress != null && existingContact.bip353Address == null) {
+        final shouldUpdate = await _showUpdateExistingContactDialog(
+          existingContact,
+          danaAddress,
+        );
+        if (!shouldUpdate) {
+          setState(() {
+            _isSaving = false;
+          });
+          return;
+        }
+        try {
+          final updatedContact = Contact(
+            id: existingContact.id,
+            name: existingContact.name ?? name,
+            bip353Address: danaAddress,
+            paymentCode: existingContact.paymentCode,
+          );
+          await contactsState.updateContact(updatedContact);
+          if (mounted) {
+            Navigator.pop(context, true);
+          }
+          return;
+        } catch (e) {
+          Logger().e('Failed to update contact: $e');
+          if (mounted) {
+            setState(() {
+              _isSaving = false;
+              _errorMessage = 'Failed to update contact: $e';
+            });
+          }
+          return;
+        }
+      }
+
+      if (mounted) {
+        await _showContactAlreadyExistsDialog();
+      }
+      setState(() {
+        _isSaving = false;
+      });
+      return;
+    }
+
     try {
       final network = walletState.network;
 
@@ -195,6 +369,49 @@ class _AddContactSheetState extends State<AddContactSheet> {
         });
       }
     }
+  }
+
+  Future<bool> _showUpdateExistingContactDialog(
+      Contact existingContact, Bip353Address danaAddress) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Contact already exists'),
+            content: Text(
+              'This contact is already saved with the same static address. '
+              'Do you want to add the Dana address (${danaAddress.toString()}) to it?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Update'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<void> _showContactAlreadyExistsDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Contact already exists'),
+        content: const Text(
+          'This contact is already saved with the same static address.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -257,6 +474,27 @@ class _AddContactSheetState extends State<AddContactSheet> {
                     : null,
               ),
             ),
+            if (_bip353AddressController.text.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              if (_isSearchingRemote && _remoteDanaAddresses.isEmpty)
+                Text(
+                  'Searching...',
+                  style: BitcoinTextStyle.body5(Bitcoin.neutral6),
+                ),
+              if (_remoteDanaAddresses.isNotEmpty)
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 180),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: _remoteDanaAddresses.length,
+                    separatorBuilder: (context, index) => const Divider(),
+                    itemBuilder: (context, index) {
+                      return _buildDanaAddressSuggestionItem(
+                          _remoteDanaAddresses[index]);
+                    },
+                  ),
+                ),
+            ],
             const SizedBox(height: 16),
             // Static address field
             TextField(
