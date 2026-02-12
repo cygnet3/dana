@@ -2,8 +2,7 @@ use serde::{Deserialize, Serialize};
 use spdk_wallet::bitcoin::{absolute::Height, ScriptBuf};
 use spdk_wallet::client::OwnedOutput;
 
-use crate::api::structs::amount::ApiAmount;
-use crate::api::structs::output_spend_status::ApiOutputSpendStatus;
+use crate::api::structs::{amount::ApiAmount, output_spend_info::ApiSpendInfo};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ApiOwnedOutput {
@@ -12,7 +11,7 @@ pub struct ApiOwnedOutput {
     pub amount: ApiAmount,
     pub script: String,
     pub label: Option<String>,
-    pub spend_status: ApiOutputSpendStatus,
+    pub spend_info: ApiSpendInfo,
 }
 
 impl From<OwnedOutput> for ApiOwnedOutput {
@@ -23,7 +22,7 @@ impl From<OwnedOutput> for ApiOwnedOutput {
             amount: value.amount.into(),
             script: value.script.to_hex_string(),
             label: value.label.map(|l| l.as_string()),
-            spend_status: value.spend_status.into(),
+            spend_info: value.spend_info.into(),
         }
     }
 }
@@ -36,7 +35,7 @@ impl From<ApiOwnedOutput> for OwnedOutput {
             amount: value.amount.into(),
             script: ScriptBuf::from_hex(&value.script).unwrap(),
             label: value.label.map(|l| l.try_into().unwrap()),
-            spend_status: value.spend_status.into(),
+            spend_info: value.spend_info.into(),
         }
     }
 }
