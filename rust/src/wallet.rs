@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 use spdk_core::bitcoin::bip32::{DerivationPath, Xpriv};
 use spdk_core::bitcoin::key::Secp256k1;
 use spdk_core::bitcoin::secp256k1::SecretKey;
-use spdk_core::bitcoin::{self, Network};
+use spdk_core::bitcoin::{Network, NetworkKind};
 
 lazy_static! {
     pub static ref KEEP_SCANNING: AtomicBool = AtomicBool::new(true);
@@ -24,8 +24,8 @@ pub fn derive_keys_from_seed(seed: &[u8; 64], network: Network) -> Result<(Secre
 
 fn derive_keys_from_xprv(xprv: Xpriv) -> Result<(SecretKey, SecretKey)> {
     let (scan_path, spend_path) = match xprv.network {
-        bitcoin::Network::Bitcoin => ("m/352h/0h/0h/1h/0", "m/352h/0h/0h/0h/0"),
-        _ => ("m/352h/1h/0h/1h/0", "m/352h/1h/0h/0h/0"),
+        NetworkKind::Main => ("m/352h/0h/0h/1h/0", "m/352h/0h/0h/0h/0"),
+        NetworkKind::Test => ("m/352h/1h/0h/1h/0", "m/352h/1h/0h/0h/0"),
     };
 
     let secp = Secp256k1::signing_only();
