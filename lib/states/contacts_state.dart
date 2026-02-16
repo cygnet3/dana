@@ -4,7 +4,7 @@ import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/data/models/contact_field.dart';
 import 'package:danawallet/generated/rust/api/validate.dart';
-import 'package:danawallet/global_functions.dart';
+import 'package:danawallet/extensions/payment_code.dart';
 import 'package:danawallet/repositories/contacts_repository.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:collection/collection.dart';
@@ -164,14 +164,14 @@ class ContactsState extends ChangeNotifier {
         return contact.bip353Address!.asRichText(15.0);
       } else {
         return Text(
-            displayAddress(context, paymentCode,
+            paymentCode.chunked(context,
                 BitcoinTextStyle.body4(Bitcoin.black), 0.53),
             style: BitcoinTextStyle.body4(Bitcoin.black));
       }
     } else {
       return Text(
-        displayAddress(
-            context, paymentCode, BitcoinTextStyle.body4(Bitcoin.black), 0.53),
+        paymentCode.chunked(
+            context, BitcoinTextStyle.body4(Bitcoin.black), 0.53),
         style: BitcoinTextStyle.body4(Bitcoin.black),
       );
     }

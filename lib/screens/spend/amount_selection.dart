@@ -2,7 +2,7 @@ import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/models/recipient_form.dart';
 import 'package:danawallet/generated/rust/api/structs.dart';
-import 'package:danawallet/global_functions.dart';
+import 'package:danawallet/extensions/payment_code.dart';
 import 'package:danawallet/screens/spend/fee_selection.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/chain_state.dart';
@@ -81,7 +81,7 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
     if (recipientName == form.recipient!.paymentCode) {
       // format static address nicely
       recipientName =
-          displayAddress(context, recipientName, recipientTextStyle, 0.86);
+          recipientName.chunked(context, recipientTextStyle, 0.86);
     }
 
     return ScreenSkeleton(
