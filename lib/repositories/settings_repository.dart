@@ -1,5 +1,5 @@
 import 'package:danawallet/generated/rust/api/backup.dart';
-import 'package:danawallet/generated/rust/api/structs/fiat_currency.dart';
+import 'package:danawallet/models/fiat_currency.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const String _keyBlindbitUrl = "blindbiturl";

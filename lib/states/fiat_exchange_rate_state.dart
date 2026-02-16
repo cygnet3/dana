@@ -1,6 +1,6 @@
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
-import 'package:danawallet/generated/rust/api/structs/fiat_currency.dart';
+import 'package:danawallet/models/fiat_currency.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:flutter/material.dart';
