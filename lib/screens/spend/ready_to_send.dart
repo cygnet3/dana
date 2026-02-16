@@ -1,5 +1,6 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/models/recipient_form.dart';
+import 'package:danawallet/extensions/payment_code.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/screens/spend/transaction_sent.dart';
@@ -60,8 +61,8 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
 
     // format on-chain addresses nicely
     if (displayRecipient == form.recipient!.paymentCode) {
-      displayRecipient = displayAddress(
-          context, displayRecipient, displayRecipientStyle, 0.85);
+      displayRecipient = displayRecipient.chunked(
+          context, displayRecipientStyle, 0.85);
     }
 
     String displayAmount = form.amount!.displayBtc();
