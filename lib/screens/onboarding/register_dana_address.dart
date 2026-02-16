@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/constants.dart';
+import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
 import 'package:danawallet/screens/onboarding/onboarding_skeleton.dart';
@@ -511,7 +512,7 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
 
           // Display current dana address (custom if entered, otherwise suggested)
           if (finalDanaAddress != null)
-            danaAddressAsRichText(finalDanaAddress, 17.0)
+            Bip353Address.fromString(finalDanaAddress).asRichText(17.0)
           else
             AutoSizeText(
               'No Dana address available',

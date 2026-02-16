@@ -107,7 +107,7 @@ class WalletScreenState extends State<WalletScreen> {
                         fontFamily: 'Inter', fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 8),
-                  danaAddressAsRichText(danaAddress.toString(), 15.0),
+                  danaAddress.asRichText(15.0),
                 ],
               ),
             ),
@@ -448,7 +448,7 @@ class WalletScreenState extends State<WalletScreen> {
               children: [
                 Expanded(
                   child: isDanaAddress
-                      ? danaAddressAsRichText(address, 15.0)
+                      ? Bip353Address.fromString(address).asRichText(15.0)
                       : addressAsRichText(address, 14.0),
                 ),
                 const SizedBox(width: 8),

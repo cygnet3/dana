@@ -161,7 +161,7 @@ class ContactsState extends ChangeNotifier {
           style: BitcoinTextStyle.body4(Bitcoin.black),
         );
       } else if (contact.bip353Address != null) {
-        return danaAddressAsRichText(contact.bip353Address!.toString(), 15.0);
+        return contact.bip353Address!.asRichText(15.0);
       } else {
         return Text(
             displayAddress(context, paymentCode,
