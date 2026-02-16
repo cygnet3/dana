@@ -1,5 +1,5 @@
 import 'package:danawallet/constants.dart';
-import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/models/btc_amount.dart';
 import 'package:danawallet/models/fiat_currency.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
@@ -82,11 +82,11 @@ class FiatExchangeRateState extends ChangeNotifier {
     }
   }
 
-  String displayFiat(ApiAmount amount) {
+  String displayFiat(BtcAmount amount) {
     final symbol = currency.symbol();
     final minorUnits = currency.minorUnits();
     if (_cachedRate != null) {
-      final btcAmount = amount.field0.toDouble() / bitcoinUnits.toDouble();
+      final btcAmount = amount.toDouble() / bitcoinUnits.toDouble();
       final fiatAmount = btcAmount * _cachedRate!;
       return "$symbol ${fiatAmount.toStringAsFixed(minorUnits)}";
     } else {

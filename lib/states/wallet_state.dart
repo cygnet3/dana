@@ -5,11 +5,11 @@ import 'package:danawallet/data/models/recipient_form_filled.dart';
 import 'package:danawallet/generated/rust/api/history.dart';
 import 'package:danawallet/generated/rust/api/outputs.dart';
 import 'package:danawallet/generated/rust/api/stream.dart';
-import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:danawallet/generated/rust/api/wallet/setup.dart';
+import 'package:danawallet/models/btc_amount.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
@@ -28,8 +28,8 @@ class WalletState extends ChangeNotifier {
   late int birthday;
 
   // variables that change
-  late ApiAmount amount;
-  late ApiAmount unconfirmedChange;
+  late BtcAmount amount;
+  late BtcAmount unconfirmedChange;
   late int lastScan;
   late TxHistory txHistory;
   late OwnedOutputs ownedOutputs;
@@ -188,7 +188,7 @@ class WalletState extends ChangeNotifier {
     final unspentOutputs = ownedOutputs.getUnspentOutputs();
     final bitcoinNetwork = network.toCoreArg;
 
-    if (form.amount.field0 < amount.field0 - BigInt.from(546)) {
+    if (form.amount < amount - BigInt.from(546)) {
       return wallet.createNewTransaction(
           apiOutputs: unspentOutputs,
           apiRecipients: [

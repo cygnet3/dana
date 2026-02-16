@@ -2,7 +2,7 @@ import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/data/models/recipient_form_filled.dart';
 import 'package:danawallet/data/models/recommended_fee_model.dart';
 import 'package:danawallet/data/enums/selected_fee.dart';
-import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/models/btc_amount.dart';
 import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart';
 
 // this singleton class contains all filled data during the send flow
@@ -10,7 +10,7 @@ import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart'
 // this is very similar to using Provider, but without NotifyListeners
 class RecipientForm {
   Contact? recipient;
-  ApiAmount? amount;
+  BtcAmount? amount;
   SelectedFee? selectedFee;
   int? customFeeRate;
   RecommendedFeeResponse? currentFeeRates;

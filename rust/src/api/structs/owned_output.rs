@@ -1,17 +1,15 @@
 use serde::{Deserialize, Serialize};
-use spdk_core::{
-    bitcoin::{absolute::Height, ScriptBuf},
-    OwnedOutput,
-};
+use spdk_core::bitcoin::absolute::Height;
+use spdk_core::bitcoin::{Amount, ScriptBuf};
+use spdk_core::OwnedOutput;
 
-use crate::api::structs::amount::ApiAmount;
 use crate::api::structs::output_spend_status::ApiOutputSpendStatus;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ApiOwnedOutput {
     pub blockheight: u32,
     pub tweak: [u8; 32],
-    pub amount: ApiAmount,
+    pub amount: u64,
     pub script: String,
     pub label: Option<String>,
     pub spend_status: ApiOutputSpendStatus,
@@ -22,7 +20,7 @@ impl From<OwnedOutput> for ApiOwnedOutput {
         ApiOwnedOutput {
             blockheight: value.blockheight.to_consensus_u32(),
             tweak: value.tweak,
-            amount: value.amount.into(),
+            amount: value.amount.to_sat(),
             script: value.script.to_hex_string(),
             label: value.label.map(|l| l.as_string()),
             spend_status: value.spend_status.into(),
@@ -35,7 +33,7 @@ impl From<ApiOwnedOutput> for OwnedOutput {
         OwnedOutput {
             blockheight: Height::from_consensus(value.blockheight).unwrap(),
             tweak: value.tweak,
-            amount: value.amount.into(),
+            amount: Amount::from_sat(value.amount),
             script: ScriptBuf::from_hex(&value.script).unwrap(),
             label: value.label.map(|l| l.try_into().unwrap()),
             spend_status: value.spend_status.into(),

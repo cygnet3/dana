@@ -2,7 +2,8 @@ import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/models/recipient_form.dart';
 import 'package:danawallet/data/models/recipient_form_filled.dart';
 import 'package:danawallet/data/enums/selected_fee.dart';
-import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/extensions/api_amount.dart';
+import 'package:danawallet/models/btc_amount.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/spend/ready_to_send.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
@@ -24,7 +25,7 @@ class FeeSelectionScreen extends StatefulWidget {
 
 class FeeSelectionScreenState extends State<FeeSelectionScreen> {
   SelectedFee _selected = SelectedFee.normal;
-  final Map<SelectedFee, ApiAmount> _feeAmounts = {};
+  final Map<SelectedFee, BtcAmount> _feeAmounts = {};
   bool _isLoadingFees = true;
 
   @override
@@ -54,13 +55,13 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
           await walletState.createUnsignedTxToThisRecipient(filled);
       BigInt inputSum = BigInt.from(0);
       for (var (_, utxo) in feeEstimationTx.selectedUtxos) {
-        inputSum += utxo.amount.field0;
+        inputSum += utxo.amount;
       }
       BigInt outputSum = BigInt.from(0);
       for (var recipient in feeEstimationTx.recipients) {
-        outputSum += recipient.amount.field0;
+        outputSum += recipient.amount;
       }
-      _feeAmounts[fee] = ApiAmount(field0: inputSum - outputSum);
+      _feeAmounts[fee] = btcAmountFromSats(inputSum - outputSum);
     }
 
     if (mounted) {
@@ -71,12 +72,12 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
   }
 
   // Get the fee amount for a specific fee type
-  ApiAmount? getFeeAmount(SelectedFee fee) {
+  BtcAmount? getFeeAmount(SelectedFee fee) {
     return _feeAmounts[fee];
   }
 
   // Get the fee amount for the currently selected fee
-  ApiAmount? getCurrentSelectedFeeAmount() {
+  BtcAmount? getCurrentSelectedFeeAmount() {
     return _feeAmounts[_selected];
   }
 

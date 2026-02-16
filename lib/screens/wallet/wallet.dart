@@ -4,8 +4,8 @@ import 'package:danawallet/data/enums/network.dart';
 import 'package:danawallet/data/enums/warning_type.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/api_amount.dart';
-import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart';
+import 'package:danawallet/models/btc_amount.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/spend/choose_recipient.dart';
 import 'package:danawallet/states/chain_state.dart';
@@ -220,7 +220,7 @@ class WalletScreenState extends State<WalletScreen> {
   }
 
   Widget buildAmountDisplay(
-      ApiAmount amount, FiatExchangeRateState exchangeRate) {
+      BtcAmount amount, FiatExchangeRateState exchangeRate) {
     String btcAmount = hideAmount ? hideAmountFormat : amount.displayBtc();
 
     String fiatAmount =
@@ -574,10 +574,10 @@ class WalletScreenState extends State<WalletScreen> {
     final chainState = Provider.of<ChainState>(context);
     final danaAddress = walletState.danaAddress;
 
-    ApiAmount amount = walletState.amount + walletState.unconfirmedChange;
+    BtcAmount amount = walletState.amount + walletState.unconfirmedChange;
 
     // Check if balance is zero
-    bool isBalanceZero = amount.field0 == BigInt.zero;
+    bool isBalanceZero = amount == BigInt.zero;
     // Check if there's transaction history
     bool hasTransactionHistory =
         walletState.txHistory.toApiTransactions().isNotEmpty;

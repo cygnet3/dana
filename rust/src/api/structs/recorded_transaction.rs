@@ -2,9 +2,9 @@ use std::str::FromStr;
 
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
+use spdk_core::bitcoin::Amount;
 use spdk_core::bitcoin::{absolute::Height, OutPoint, Txid};
 
-use crate::api::structs::amount::ApiAmount;
 use crate::api::structs::recipient::ApiRecipient;
 use crate::state::constants::{
     RecordedTransaction, RecordedTransactionIncoming, RecordedTransactionOutgoing,
@@ -21,7 +21,7 @@ pub enum ApiRecordedTransaction {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ApiRecordedTransactionIncoming {
     pub txid: String,
-    pub amount: ApiAmount,
+    pub amount: u64,
     pub confirmed_at: Option<u32>,
 }
 
@@ -39,12 +39,11 @@ impl ApiRecordedTransactionOutgoing {
     }
 
     #[frb(sync)]
-    pub fn total_outgoing(&self) -> ApiAmount {
-        let sum: u64 = self.recipients.iter().map(|r| r.amount.0).sum();
-        // include fee to the total as well
-        let fee = self.fee.0;
+    pub fn total_outgoing(&self) -> u64 {
+        let sum: u64 = self.recipients.iter().map(|r| r.amount).sum();
 
-        ApiAmount(sum + fee)
+        // include fee to the total as well
+        sum + self.fee
     }
 }
 
@@ -61,13 +60,13 @@ pub struct ApiRecordedTransactionOutgoing {
     pub spent_outpoints: Vec<String>,
     pub recipients: Vec<ApiRecipient>,
     pub confirmed_at: Option<u32>,
-    pub change: ApiAmount,
-    pub fee: ApiAmount,
+    pub change: u64,
+    pub fee: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ApiRecordedTransactionUnknownOutgoing {
-    pub amount: ApiAmount,
+    pub amount: u64,
     pub confirmed_at: u32,
     pub spent_outpoints: Vec<String>,
 }
@@ -98,7 +97,7 @@ impl From<RecordedTransactionUnknownOutgoing> for ApiRecordedTransactionUnknownO
     fn from(value: RecordedTransactionUnknownOutgoing) -> Self {
         Self {
             confirmed_at: value.confirmed_at.to_consensus_u32(),
-            amount: value.amount.into(),
+            amount: value.amount.to_sat(),
             spent_outpoints: value
                 .spent_outpoints
                 .into_iter()
@@ -111,7 +110,7 @@ impl From<RecordedTransactionUnknownOutgoing> for ApiRecordedTransactionUnknownO
 impl From<ApiRecordedTransactionUnknownOutgoing> for RecordedTransactionUnknownOutgoing {
     fn from(value: ApiRecordedTransactionUnknownOutgoing) -> Self {
         Self {
-            amount: value.amount.into(),
+            amount: Amount::from_sat(value.amount),
             confirmed_at: Height::from_consensus(value.confirmed_at).unwrap(),
             spent_outpoints: value
                 .spent_outpoints
@@ -128,7 +127,7 @@ impl From<RecordedTransactionIncoming> for ApiRecordedTransactionIncoming {
 
         Self {
             txid: value.txid.to_string(),
-            amount: value.amount.into(),
+            amount: value.amount.to_sat(),
             confirmed_at,
         }
     }
@@ -142,7 +141,7 @@ impl From<ApiRecordedTransactionIncoming> for RecordedTransactionIncoming {
 
         Self {
             txid: Txid::from_str(&value.txid).unwrap(),
-            amount: value.amount.into(),
+            amount: Amount::from_sat(value.amount),
             confirmed_at,
         }
     }
@@ -161,8 +160,8 @@ impl From<RecordedTransactionOutgoing> for ApiRecordedTransactionOutgoing {
                 .collect(),
             recipients: value.recipients.into_iter().map(Into::into).collect(),
             confirmed_at,
-            change: value.change.into(),
-            fee: value.fee.into(),
+            change: value.change.to_sat(),
+            fee: value.fee.to_sat(),
         }
     }
 }
@@ -186,8 +185,8 @@ impl From<ApiRecordedTransactionOutgoing> for RecordedTransactionOutgoing {
                 .map(|r| r.try_into().unwrap())
                 .collect(),
             confirmed_at,
-            change: value.change.into(),
-            fee: value.fee.into(),
+            change: Amount::from_sat(value.change),
+            fee: Amount::from_sat(value.fee),
         }
     }
 }

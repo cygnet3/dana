@@ -2,7 +2,8 @@ import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/models/recipient_form.dart';
 import 'package:danawallet/data/models/recipient_form_filled.dart';
 import 'package:danawallet/data/enums/selected_fee.dart';
-import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/extensions/api_amount.dart';
+import 'package:danawallet/models/btc_amount.dart';
 import 'package:danawallet/screens/spend/ready_to_send.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
@@ -21,7 +22,7 @@ class CustomFeeScreen extends StatefulWidget {
 class _CustomFeeScreenState extends State<CustomFeeScreen> {
   int _selectedFeeRate = 1; // Default to 1 sat/vB
   double _sliderValue = 1.0; // Start at 1 sat/vB
-  final Map<int, ApiAmount> _feeAmounts = {};
+  final Map<int, BtcAmount> _feeAmounts = {};
   bool _isLoadingFees = true;
   String? _errorMessage;
 
@@ -52,13 +53,13 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
           await walletState.createUnsignedTxToThisRecipient(filled);
       BigInt inputSum = BigInt.from(0);
       for (var (_, utxo) in feeEstimationTx.selectedUtxos) {
-        inputSum += utxo.amount.field0;
+        inputSum += utxo.amount;
       }
       BigInt outputSum = BigInt.from(0);
       for (var recipient in feeEstimationTx.recipients) {
-        outputSum += recipient.amount.field0;
+        outputSum += recipient.amount;
       }
-      _feeAmounts[_selectedFeeRate] = ApiAmount(field0: inputSum - outputSum);
+      _feeAmounts[_selectedFeeRate] = btcAmountFromSats(inputSum - outputSum);
 
       if (mounted) {
         setState(() {

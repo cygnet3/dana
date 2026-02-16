@@ -1,5 +1,5 @@
 import 'package:danawallet/models/fiat_currency.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/material.dart';
 
 // The default blindbit backend used
 const String defaultMainnet = "https://silentpayments.dev/blindbit/mainnet";

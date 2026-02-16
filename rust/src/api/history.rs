@@ -16,7 +16,6 @@ use crate::{
     stream::StateUpdate,
 };
 
-use super::structs::amount::ApiAmount;
 use super::structs::recipient::ApiRecipient;
 use super::structs::recorded_transaction::ApiRecordedTransaction;
 use anyhow::Result;
@@ -127,8 +126,8 @@ impl TxHistory {
         txid: String,
         spent_outpoints: Vec<String>,
         recipients: Vec<ApiRecipient>,
-        change: ApiAmount,
-        fee: ApiAmount,
+        change: u64,
+        fee: u64,
     ) -> Result<()> {
         let txid = Txid::from_str(&txid)?;
         let spent_outpoints = spent_outpoints
@@ -145,8 +144,8 @@ impl TxHistory {
             txid,
             spent_outpoints,
             recipients,
-            change.into(),
-            fee.into(),
+            Amount::from_sat(change),
+            Amount::from_sat(fee),
         );
 
         Ok(())
@@ -169,7 +168,7 @@ impl TxHistory {
     }
 
     #[flutter_rust_bridge::frb(sync)]
-    pub fn get_unconfirmed_change(&self) -> ApiAmount {
+    pub fn get_unconfirmed_change(&self) -> u64 {
         self.0
             .iter()
             .filter_map(|x| match x {
@@ -179,7 +178,7 @@ impl TxHistory {
                 _ => None,
             })
             .sum::<Amount>()
-            .into()
+            .to_sat()
     }
 
     fn record_outgoing_transaction(

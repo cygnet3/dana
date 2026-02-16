@@ -1,18 +1,17 @@
-use crate::api::structs::amount::ApiAmount;
 use serde::{Deserialize, Serialize};
-use spdk_core::Recipient;
+use spdk_core::{bitcoin::Amount, Recipient};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ApiRecipient {
     pub address: String, // either old school or silent payment
-    pub amount: ApiAmount,
+    pub amount: u64,
 }
 
 impl From<Recipient> for ApiRecipient {
     fn from(value: Recipient) -> Self {
         ApiRecipient {
             address: value.address.into(),
-            amount: value.amount.into(),
+            amount: value.amount.to_sat(),
         }
     }
 }
@@ -23,7 +22,7 @@ impl TryFrom<ApiRecipient> for Recipient {
         let address = value.address.try_into()?;
         let res = Recipient {
             address,
-            amount: value.amount.into(),
+            amount: Amount::from_sat(value.amount),
         };
 
         Ok(res)

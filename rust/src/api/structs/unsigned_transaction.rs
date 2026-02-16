@@ -9,7 +9,6 @@ use spdk_core::bitcoin::{
 };
 use spdk_core::SilentPaymentUnsignedTransaction;
 
-use crate::api::structs::amount::ApiAmount;
 use crate::api::structs::owned_output::ApiOwnedOutput;
 use crate::api::structs::recipient::ApiRecipient;
 
@@ -63,49 +62,45 @@ impl From<ApiSilentPaymentUnsignedTransaction> for SilentPaymentUnsignedTransact
 
 impl ApiSilentPaymentUnsignedTransaction {
     #[frb(sync)]
-    pub fn get_send_amount(&self, change_address: String) -> ApiAmount {
+    pub fn get_send_amount(&self, change_address: String) -> u64 {
         let amount = self
             .recipients
             .iter()
             .filter_map(|r| {
                 if r.address != change_address {
-                    Some(r.amount.0)
+                    Some(r.amount)
                 } else {
                     None
                 }
             })
             .sum();
 
-        ApiAmount(amount)
+        amount
     }
 
     #[frb(sync)]
-    pub fn get_change_amount(&self, change_address: String) -> ApiAmount {
+    pub fn get_change_amount(&self, change_address: String) -> u64 {
         let amount = self
             .recipients
             .iter()
             .filter_map(|r| {
                 if r.address == change_address {
-                    Some(r.amount.0)
+                    Some(r.amount)
                 } else {
                     None
                 }
             })
             .sum();
-        ApiAmount(amount)
+        amount
     }
 
     #[frb(sync)]
-    pub fn get_fee_amount(&self) -> ApiAmount {
-        let input_sum: u64 = self
-            .selected_utxos
-            .iter()
-            .map(|(_, o)| o.amount.to_int())
-            .sum();
+    pub fn get_fee_amount(&self) -> u64 {
+        let input_sum: u64 = self.selected_utxos.iter().map(|(_, o)| o.amount).sum();
 
-        let output_sum: u64 = self.recipients.iter().map(|r| r.amount.to_int()).sum();
+        let output_sum: u64 = self.recipients.iter().map(|r| r.amount).sum();
 
-        ApiAmount(input_sum - output_sum)
+        input_sum - output_sum
     }
 
     #[frb(sync)]

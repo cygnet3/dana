@@ -1,9 +1,9 @@
 import 'package:danawallet/data/models/contact.dart';
-import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/models/btc_amount.dart';
 
 class RecipientFormFilled {
   Contact recipient;
-  ApiAmount amount;
+  BtcAmount amount;
   int feerate;
 
   RecipientFormFilled(

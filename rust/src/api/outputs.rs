@@ -12,7 +12,6 @@ use spdk_core::{
 
 use anyhow::{Error, Result};
 
-use crate::api::structs::amount::ApiAmount;
 use crate::api::structs::owned_output::ApiOwnedOutput;
 use crate::stream::StateUpdate;
 
@@ -106,12 +105,12 @@ impl OwnedOutputs {
     }
 
     #[flutter_rust_bridge::frb(sync)]
-    pub fn get_unspent_amount(&self) -> ApiAmount {
+    pub fn get_unspent_amount(&self) -> u64 {
         self.0
             .values()
             .filter(|x| x.spend_status == OutputSpendStatus::Unspent)
             .fold(Amount::ZERO, |acc, x| acc + x.amount)
-            .into()
+            .to_sat()
     }
 
     #[flutter_rust_bridge::frb(sync)]

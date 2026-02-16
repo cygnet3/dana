@@ -2,7 +2,8 @@ import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/models/recipient_form.dart';
 import 'package:danawallet/extensions/payment_code.dart';
-import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/extensions/api_amount.dart';
+import 'package:danawallet/models/btc_amount.dart';
 import 'package:danawallet/screens/spend/fee_selection.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/chain_state.dart';
@@ -22,7 +23,7 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
   final TextEditingController amountController = TextEditingController();
   String? _amountErrorText;
 
-  void onContinue(ApiAmount availableBalance) {
+  void onContinue(BtcAmount availableBalance) {
     setState(() {
       _amountErrorText = null;
     });
@@ -45,7 +46,7 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
       return;
     }
 
-    if (amount > availableBalance.field0) {
+    if (amount > availableBalance) {
       setState(() {
         _amountErrorText = 'Not enough available funds';
       });
@@ -59,7 +60,7 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
       return;
     }
 
-    RecipientForm().amount = ApiAmount(field0: amount);
+    RecipientForm().amount = btcAmountFromSats(amount);
 
     Navigator.push(context,
         MaterialPageRoute(builder: (context) => const FeeSelectionScreen()));
