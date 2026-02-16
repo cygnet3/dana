@@ -1,5 +1,4 @@
 pub mod amount;
-pub mod fiat_currency;
 pub mod network;
 pub mod output_spend_status;
 pub mod owned_output;
