@@ -1,5 +1,5 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
-import 'package:danawallet/generated/rust/api/structs/fiat_currency.dart';
+import 'package:danawallet/models/fiat_currency.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:flutter/material.dart';
