@@ -4,6 +4,7 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/enums/warning_type.dart';
 import 'package:danawallet/exceptions.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/widgets/alerts/warning_message.dart';
 import 'package:danawallet/widgets/confirmation_widget.dart';
 import 'package:danawallet/widgets/input_alert_widget.dart';
@@ -179,6 +180,22 @@ AutoSizeText addressAsRichText(String address, double? fontSize) {
 
 bool get isDevEnv {
   return appFlavor == 'dev' || appFlavor == 'local';
+}
+
+Network get getNetworkForFlavor {
+  switch (appFlavor) {
+    // only live flavor uses mainnet
+    case 'live':
+      return Network.mainnet;
+    // all other flavors use signet by default
+    case 'signet':
+    case 'dev':
+    case 'local':
+      return Network.signet;
+    default:
+      Logger().w("Unknown Flavor; defaulting to signet");
+      return Network.signet;
+  }
 }
 
 void goToScreen(BuildContext context, Widget screen) {
