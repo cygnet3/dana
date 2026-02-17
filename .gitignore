@@ -51,3 +51,7 @@ app.*.map.json
 rust/target
 
 .fvm/
+
+# ignore frb-generated files
+lib/generated/rust
+rust/src/frb_generated*.rs
