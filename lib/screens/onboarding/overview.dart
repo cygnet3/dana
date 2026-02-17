@@ -1,8 +1,9 @@
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
-import 'package:danawallet/data/enums/network.dart';
 import 'package:danawallet/exceptions.dart';
+import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/bip39.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/screens/onboarding/choose_network.dart';
@@ -100,7 +101,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
           MaterialPageRoute(builder: (context) => const ChooseNetworkScreen()));
     } else {
       // Get network from flavor
-      network = Network.getNetworkForFlavor;
+      network = getNetworkForFlavor;
     }
 
     if (!context.mounted) {
@@ -154,7 +155,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
           MaterialPageRoute(builder: (context) => const ChooseNetworkScreen()));
     } else {
       // Get network from flavor
-      network = Network.getNetworkForFlavor;
+      network = getNetworkForFlavor;
     }
 
     if (!context.mounted) {

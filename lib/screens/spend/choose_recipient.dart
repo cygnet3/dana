@@ -92,8 +92,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
 
       try {
         if (context.mounted) {
-          validateAddressWithNetwork(
-              address: paymentCode, network: network.toCoreArg);
+          validateAddressWithNetwork(address: paymentCode, network: network);
         }
       } catch (e) {
         if (e.toString().contains('network')) {

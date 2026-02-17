@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:danawallet/constants.dart';
+import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/stream.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:danawallet/repositories/settings_repository.dart';

@@ -1,5 +1,6 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
-import 'package:danawallet/data/enums/network.dart';
+import 'package:danawallet/extensions/network.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:flutter/material.dart';
@@ -18,7 +19,7 @@ class ChooseNetworkScreenState extends State<ChooseNetworkScreen> {
   @override
   void initState() {
     super.initState();
-    _selected = Network.getNetworkForFlavor;
+    _selected = getNetworkForFlavor;
   }
 
   @override
@@ -35,7 +36,7 @@ class ChooseNetworkScreenState extends State<ChooseNetworkScreen> {
           itemCount: choices.length,
           itemBuilder: (context, index) => ListTile(
             title: Text(
-              choices[index].toString(),
+              choices[index].name,
               style: BitcoinTextStyle.body3(Bitcoin.black),
             ),
             leading: Radio<Network>(

@@ -1,13 +1,14 @@
 import 'dart:async';
-import 'package:danawallet/data/enums/network.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/recipient_form_filled.dart';
+import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/history.dart';
 import 'package:danawallet/generated/rust/api/outputs.dart';
 import 'package:danawallet/generated/rust/api/stream.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:danawallet/generated/rust/api/wallet/setup.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
@@ -113,8 +114,7 @@ class WalletState extends ChangeNotifier {
     final birthday = network.defaultBirthday;
 
     final args = WalletSetupArgs(
-        setupType: WalletSetupType.mnemonic(mnemonic),
-        network: network.toCoreArg);
+        setupType: WalletSetupType.mnemonic(mnemonic), network: network);
     final setupResult = SpWallet.setupWallet(setupArgs: args);
     final wallet =
         await walletRepository.setupWallet(setupResult, network, birthday);
@@ -131,8 +131,7 @@ class WalletState extends ChangeNotifier {
     final birthday = currentTip;
 
     final args = WalletSetupArgs(
-        setupType: const WalletSetupType.newWallet(),
-        network: network.toCoreArg);
+        setupType: const WalletSetupType.newWallet(), network: network);
     final setupResult = SpWallet.setupWallet(setupArgs: args);
     final wallet =
         await walletRepository.setupWallet(setupResult, network, birthday);
@@ -186,8 +185,6 @@ class WalletState extends ChangeNotifier {
     final wallet = await getWalletFromSecureStorage();
 
     final unspentOutputs = ownedOutputs.getUnspentOutputs();
-    final bitcoinNetwork = network.toCoreArg;
-
     if (form.amount.field0 < amount.field0 - BigInt.from(546)) {
       return wallet.createNewTransaction(
           apiOutputs: unspentOutputs,
@@ -196,13 +193,13 @@ class WalletState extends ChangeNotifier {
                 address: form.recipient.paymentCode, amount: form.amount)
           ],
           feerate: form.feerate.toDouble(),
-          network: bitcoinNetwork);
+          network: network);
     } else {
       return wallet.createDrainTransaction(
           apiOutputs: unspentOutputs,
           wipeAddress: form.recipient.paymentCode,
           feerate: form.feerate.toDouble(),
-          network: bitcoinNetwork);
+          network: network);
     }
   }
 
@@ -234,8 +231,7 @@ class WalletState extends ChangeNotifier {
     try {
       switch (network) {
         case Network.mainnet:
-          txid = await SpWallet.broadcastTx(
-              tx: signedTx, network: network.toCoreArg);
+          txid = await SpWallet.broadcastTx(tx: signedTx, network: network);
           break;
         case Network.signet:
           txid = await MempoolApiRepository(network: network)

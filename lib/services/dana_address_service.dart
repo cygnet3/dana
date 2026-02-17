@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
-import 'package:danawallet/data/enums/network.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/prefix_search_response.dart';
 import 'package:danawallet/generated/rust/api/bip39.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/repositories/name_server_repository.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:logger/logger.dart';

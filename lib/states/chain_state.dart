@@ -1,6 +1,7 @@
-import 'package:danawallet/data/enums/network.dart';
 import 'package:danawallet/data/models/recommended_fee_model.dart';
+import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/chain.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
 import 'package:danawallet/services/synchronization_service.dart';
 import 'package:danawallet/states/scan_progress_notifier.dart';
@@ -50,8 +51,8 @@ class ChainState extends ChangeNotifier {
 
     Logger().i('Connecting to blindbit: $blindbitUrl');
     try {
-      final correctNetwork = await checkNetwork(
-          blindbitUrl: blindbitUrl, network: _network!.toCoreArg);
+      final correctNetwork =
+          await checkNetwork(blindbitUrl: blindbitUrl, network: _network!);
 
       if (correctNetwork) {
         Logger().i('Network correct');

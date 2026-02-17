@@ -1,8 +1,8 @@
-import 'package:danawallet/data/enums/network.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/generated/rust/api/backup.dart';
 import 'package:danawallet/generated/rust/api/history.dart';
 import 'package:danawallet/generated/rust/api/outputs.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:danawallet/generated/rust/api/wallet/setup.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -92,7 +92,7 @@ class WalletRepository {
           scanKey: scanKey,
           spendKey: spendKey,
           birthday: birthday!,
-          network: network.toCoreArg);
+          network: network);
     } else {
       return null;
     }
@@ -187,7 +187,7 @@ class WalletRepository {
         txHistory: history,
         ownedOutputs: outputs,
         seedPhrase: seedPhrase,
-        network: network.name);
+        network: network);
   }
 
   Future<void> restoreWalletBackup(WalletBackup backup) async {
@@ -198,7 +198,7 @@ class WalletRepository {
     await secureStorage.write(
         key: _keySpendKey, value: backup.spendKey.encode());
     await nonSecureStorage.setInt(_keyBirthday, backup.birthday);
-    await nonSecureStorage.setString(_keyNetwork, backup.network);
+    await nonSecureStorage.setString(_keyNetwork, backup.network.name);
 
     if (backup.seedPhrase != null) {
       await secureStorage.write(key: _keySeedPhrase, value: backup.seedPhrase);

@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:danawallet/data/enums/network.dart';
 import 'package:danawallet/data/models/mempool_prices_response.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/services/fee_api_converter.dart';
 import 'package:http/http.dart' as http;
 import 'package:danawallet/data/models/recommended_fee_model.dart';

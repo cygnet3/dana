@@ -1,8 +1,8 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
-import 'package:danawallet/data/enums/network.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/data/models/contact_field.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/extensions/payment_code.dart';
 import 'package:danawallet/repositories/contacts_repository.dart';
@@ -87,8 +87,7 @@ class ContactsState extends ChangeNotifier {
     }
 
     // verify that the payment code is valid
-    validateAddressWithNetwork(
-        address: paymentCode, network: network.toCoreArg);
+    validateAddressWithNetwork(address: paymentCode, network: network);
 
     if (!isReusablePaymentCode(address: paymentCode)) {
       throw Exception("Non-reusable payment info not allowed");
@@ -164,8 +163,8 @@ class ContactsState extends ChangeNotifier {
         return contact.bip353Address!.asRichText(15.0);
       } else {
         return Text(
-            paymentCode.chunked(context,
-                BitcoinTextStyle.body4(Bitcoin.black), 0.53),
+            paymentCode.chunked(
+                context, BitcoinTextStyle.body4(Bitcoin.black), 0.53),
             style: BitcoinTextStyle.body4(Bitcoin.black));
       }
     } else {

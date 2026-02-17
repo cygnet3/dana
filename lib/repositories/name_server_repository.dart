@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'package:danawallet/constants.dart';
-import 'package:danawallet/data/enums/network.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/name_server_info_response.dart';
 import 'package:danawallet/data/models/name_server_lookup_response.dart';
 import 'package:danawallet/data/models/name_server_register_request.dart';
 import 'package:danawallet/data/models/name_server_register_response.dart';
 import 'package:danawallet/data/models/prefix_search_response.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';

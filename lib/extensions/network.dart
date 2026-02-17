@@ -1,29 +1,11 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/constants.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:flutter/services.dart';
 import 'package:logger/logger.dart';
 
-enum Network {
-  mainnet,
-  testnet,
-  signet,
-  regtest;
-
-  @override
-  String toString() {
-    switch (this) {
-      case Network.mainnet:
-        return 'Mainnet';
-      case Network.testnet:
-        return 'Testnet';
-      case Network.signet:
-        return 'Signet';
-      case Network.regtest:
-        return 'Regtest';
-    }
-  }
-
+extension NetworkExtension on Network {
   String get defaultBlindbitUrl {
     switch (this) {
       case Network.mainnet:
@@ -32,7 +14,8 @@ enum Network {
         } else {
           return defaultMainnet;
         }
-      case Network.testnet:
+      case Network.testnet3:
+      case Network.testnet4:
         if (isDevEnv && const String.fromEnvironment("TESTNET_URL") != "") {
           return const String.fromEnvironment("TESTNET_URL");
         } else {
@@ -53,24 +36,12 @@ enum Network {
     }
   }
 
-  String get toCoreArg {
-    switch (this) {
-      case Network.mainnet:
-        return 'main';
-      case Network.testnet:
-        return 'test';
-      case Network.signet:
-        return 'signet';
-      case Network.regtest:
-        return 'regtest';
-    }
-  }
-
   Color get toColor {
     switch (this) {
       case Network.mainnet:
         return Bitcoin.orange;
-      case Network.testnet:
+      case Network.testnet3:
+      case Network.testnet4:
         return Bitcoin.green;
       case Network.signet:
         return Bitcoin.purple;
@@ -83,7 +54,8 @@ enum Network {
     switch (this) {
       case Network.mainnet:
         return defaultMainnetBirthday;
-      case Network.testnet:
+      case Network.testnet3:
+      case Network.testnet4:
         return defaultTestnetBirthday;
       case Network.signet:
         return defaultSignetBirthday;
@@ -91,35 +63,20 @@ enum Network {
         return defaultRegtestBirthday;
     }
   }
+}
 
-  static Network fromCoreArg(String network) {
-    switch (network) {
-      case 'main':
-        return Network.mainnet;
-      case 'test':
-        return Network.testnet;
-      case 'signet':
-        return Network.signet;
-      case 'regtest':
-        return Network.regtest;
-      default:
-        throw Exception('unknown network');
-    }
-  }
-
-  static Network get getNetworkForFlavor {
-    switch (appFlavor) {
-      // only live flavor uses mainnet
-      case 'live':
-        return Network.mainnet;
-      // all other flavors use signet by default
-      case 'signet':
-      case 'dev':
-      case 'local':
-        return Network.signet;
-      default:
-        Logger().w("Unknown Flavor; defaulting to signet");
-        return Network.signet;
-    }
+Network get getNetworkForFlavor {
+  switch (appFlavor) {
+    // only live flavor uses mainnet
+    case 'live':
+      return Network.mainnet;
+    // all other flavors use signet by default
+    case 'signet':
+    case 'dev':
+    case 'local':
+      return Network.signet;
+    default:
+      Logger().w("Unknown Flavor; defaulting to signet");
+      return Network.signet;
   }
 }

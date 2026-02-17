@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/frb_generated.dart';
 
 import 'package:danawallet/main.dart';

@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:danawallet/data/enums/network.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:dart_bip353/dart_bip353.dart';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
@@ -82,7 +82,9 @@ class Bip353Resolver {
       final parsed = Bip353DnsResolveResponse.fromRawQueryData(data);
       if (network == Network.mainnet && parsed.silentpayment != null) {
         return parsed.silentpayment;
-      } else if ((network == Network.testnet || network == Network.signet) &&
+      } else if ((network == Network.testnet3 ||
+              network == Network.testnet4 ||
+              network == Network.signet) &&
           parsed.testsilentpayment != null) {
         return parsed.testsilentpayment;
       } else {
