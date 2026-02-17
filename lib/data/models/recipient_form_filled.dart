@@ -1,5 +1,5 @@
 import 'package:danawallet/data/models/contact.dart';
-import 'package:danawallet/generated/rust/api/structs.dart';
+import 'package:danawallet/generated/rust/api/structs/amount.dart';
 
 class RecipientFormFilled {
   Contact recipient;

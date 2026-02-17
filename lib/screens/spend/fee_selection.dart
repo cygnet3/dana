@@ -2,7 +2,7 @@ import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/models/recipient_form.dart';
 import 'package:danawallet/data/models/recipient_form_filled.dart';
 import 'package:danawallet/data/enums/selected_fee.dart';
-import 'package:danawallet/generated/rust/api/structs.dart';
+import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/spend/ready_to_send.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';

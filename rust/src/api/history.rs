@@ -16,7 +16,9 @@ use crate::{
     stream::StateUpdate,
 };
 
-use super::structs::{ApiAmount, ApiRecipient, ApiRecordedTransaction};
+use super::structs::amount::ApiAmount;
+use super::structs::recipient::ApiRecipient;
+use super::structs::recorded_transaction::ApiRecordedTransaction;
 use anyhow::Result;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

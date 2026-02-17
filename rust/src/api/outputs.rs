@@ -12,9 +12,9 @@ use spdk_core::{
 
 use anyhow::{Error, Result};
 
-use crate::{api::structs::ApiAmount, stream::StateUpdate};
-
-use super::structs::ApiOwnedOutput;
+use crate::api::structs::amount::ApiAmount;
+use crate::api::structs::owned_output::ApiOwnedOutput;
+use crate::stream::StateUpdate;
 
 #[frb(opaque)]
 pub struct OwnedOutPoints(HashSet<OutPoint>);

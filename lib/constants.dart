@@ -1,4 +1,4 @@
-import 'package:danawallet/generated/rust/api/structs.dart';
+import 'package:danawallet/generated/rust/api/structs/fiat_currency.dart';
 import 'package:flutter/services.dart';
 
 // The default blindbit backend used

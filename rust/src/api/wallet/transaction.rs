@@ -1,8 +1,8 @@
 use std::{collections::HashMap, str::FromStr};
 
-use crate::api::structs::ApiOwnedOutput;
-use crate::api::structs::ApiRecipient;
-use crate::api::structs::ApiSilentPaymentUnsignedTransaction;
+use crate::api::structs::owned_output::ApiOwnedOutput;
+use crate::api::structs::recipient::ApiRecipient;
+use crate::api::structs::unsigned_transaction::ApiSilentPaymentUnsignedTransaction;
 use anyhow::Result;
 use backend_blindbit_v1::BlindbitClient;
 use bip39::rand::{thread_rng, RngCore};

@@ -1,4 +1,4 @@
-import 'package:danawallet/generated/rust/api/structs.dart';
+import 'package:danawallet/generated/rust/api/structs/amount.dart';
 
 extension ApiAmountExtension on ApiAmount {
   ApiAmount operator +(ApiAmount other) {

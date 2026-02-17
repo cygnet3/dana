@@ -4,7 +4,7 @@ import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/data/models/recipient_form.dart';
-import 'package:danawallet/generated/rust/api/structs.dart';
+import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart';
 import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/data/models/contact_field.dart';
@@ -588,8 +588,8 @@ class ContactDetailsScreen extends StatelessWidget {
                     const Divider(),
                     // Custom Fields Section
                     if (customFields != null && customFields.isNotEmpty) ...[
-                      ...customFields
-                          .map((field) => _buildCustomFieldItem(context, field)),
+                      ...customFields.map(
+                          (field) => _buildCustomFieldItem(context, field)),
                     ],
                     ListTile(
                       leading: Icon(Icons.add, color: Bitcoin.blue),
