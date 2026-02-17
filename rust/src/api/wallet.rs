@@ -3,12 +3,12 @@ mod scan;
 pub mod setup;
 mod transaction;
 
-use crate::wallet::WalletFingerprint;
+use crate::{api::structs::network::Network, wallet::WalletFingerprint};
 use anyhow::Result;
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
 use spdk_core::{
-    bitcoin::{absolute::Height, secp256k1::SecretKey, Network},
+    bitcoin::{absolute::Height, secp256k1::SecretKey},
     SpClient, SpendKey,
 };
 
@@ -25,12 +25,10 @@ impl SpWallet {
     pub fn new(
         scan_key: ApiScanKey,
         spend_key: ApiSpendKey,
-        network: String,
+        network: Network,
         birthday: u32,
     ) -> Result<Self> {
-        let network = Network::from_core_arg(&network)?;
-
-        let client = SpClient::new(scan_key.into(), spend_key.into(), network)?;
+        let client = SpClient::new(scan_key.into(), spend_key.into(), network.into())?;
 
         let wallet_fingerprint = client.get_client_fingerprint()?;
         let birthday = Height::from_consensus(birthday)?;

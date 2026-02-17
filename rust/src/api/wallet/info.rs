@@ -1,5 +1,7 @@
 use flutter_rust_bridge::frb;
 
+use crate::api::structs::network::Network;
+
 use super::SpWallet;
 
 impl SpWallet {
@@ -19,7 +21,7 @@ impl SpWallet {
     }
 
     #[frb(sync)]
-    pub fn get_network(&self) -> String {
-        self.client.get_network().to_core_arg().to_string()
+    pub fn get_network(&self) -> Network {
+        self.client.get_network().into()
     }
 }

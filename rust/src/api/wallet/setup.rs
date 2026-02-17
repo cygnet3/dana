@@ -1,13 +1,11 @@
 use std::str::FromStr;
 
 use spdk_core::{
-    bitcoin::{
-        secp256k1::{PublicKey, SecretKey},
-        Network,
-    },
+    bitcoin::secp256k1::{PublicKey, SecretKey},
     SpendKey,
 };
 
+use crate::api::structs::network::Network;
 use crate::wallet::derive_keys_from_seed;
 
 use super::{ApiScanKey, ApiSpendKey, SpWallet};
@@ -18,7 +16,7 @@ const PASSPHRASE: &str = "";
 
 pub struct WalletSetupArgs {
     pub setup_type: WalletSetupType,
-    pub network: String,
+    pub network: Network,
 }
 
 pub enum WalletSetupType {
@@ -42,14 +40,12 @@ impl SpWallet {
             network,
         } = setup_args;
 
-        let network = Network::from_core_arg(&network)?;
-
         match setup_type {
             WalletSetupType::NewWallet => {
                 // We create a new wallet and return the new mnemonic
                 let m = bip39::Mnemonic::generate(12)?;
                 let seed = m.to_seed(PASSPHRASE);
-                let (scan_sk, spend_sk) = derive_keys_from_seed(&seed, network)?;
+                let (scan_sk, spend_sk) = derive_keys_from_seed(&seed, network.into())?;
 
                 let scan_key = ApiScanKey(scan_sk);
                 let spend_key = ApiSpendKey(SpendKey::Secret(spend_sk));
@@ -64,7 +60,7 @@ impl SpWallet {
                 // We restore from seed
                 let m = bip39::Mnemonic::from_str(&mnemonic)?;
                 let seed = m.to_seed(PASSPHRASE);
-                let (scan_sk, spend_sk) = derive_keys_from_seed(&seed, network)?;
+                let (scan_sk, spend_sk) = derive_keys_from_seed(&seed, network.into())?;
 
                 let scan_key = ApiScanKey(scan_sk);
                 let spend_key = ApiSpendKey(SpendKey::Secret(spend_sk));

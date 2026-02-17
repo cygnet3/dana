@@ -1,13 +1,15 @@
 use std::{collections::HashMap, str::FromStr};
 
+use crate::api::structs::network::Network;
 use crate::api::structs::owned_output::ApiOwnedOutput;
 use crate::api::structs::recipient::ApiRecipient;
 use crate::api::structs::unsigned_transaction::ApiSilentPaymentUnsignedTransaction;
+
 use anyhow::Result;
 use backend_blindbit_v1::BlindbitClient;
 use bip39::rand::{thread_rng, RngCore};
 use spdk_core::{
-    bitcoin::{consensus::serialize, hex::DisplayHex, Network, OutPoint},
+    bitcoin::{consensus::serialize, hex::DisplayHex, OutPoint},
     FeeRate, OwnedOutput, Recipient, RecipientAddress, SpClient,
 };
 
@@ -20,7 +22,7 @@ impl SpWallet {
         api_outputs: HashMap<String, ApiOwnedOutput>,
         api_recipients: Vec<ApiRecipient>,
         feerate: f32,
-        network: String,
+        network: Network,
     ) -> Result<ApiSilentPaymentUnsignedTransaction> {
         let client = &self.client;
         let available_utxos: Result<Vec<(OutPoint, OwnedOutput)>> = api_outputs
@@ -34,12 +36,11 @@ impl SpWallet {
             .into_iter()
             .map(|r| r.try_into().unwrap())
             .collect();
-        let core_network = Network::from_core_arg(&network)?;
         let res = client.create_new_transaction(
             available_utxos?,
             recipients,
             FeeRate::from_sat_per_vb(feerate),
-            core_network,
+            network.into(),
         )?;
 
         Ok(res.into())
@@ -51,7 +52,7 @@ impl SpWallet {
         api_outputs: HashMap<String, ApiOwnedOutput>,
         wipe_address: String,
         feerate: f32,
-        network: String,
+        network: Network,
     ) -> Result<ApiSilentPaymentUnsignedTransaction> {
         let client = &self.client;
         let available_utxos: Result<Vec<(OutPoint, OwnedOutput)>> = api_outputs
@@ -63,12 +64,11 @@ impl SpWallet {
             .collect();
 
         let recipient_address: RecipientAddress = RecipientAddress::try_from(wipe_address)?;
-        let core_network = Network::from_core_arg(&network)?;
         let res = client.create_drain_transaction(
             available_utxos?,
             recipient_address,
             FeeRate::from_sat_per_vb(feerate),
-            core_network,
+            network.into(),
         )?;
 
         Ok(res.into())
@@ -106,19 +106,17 @@ impl SpWallet {
         Ok(res.to_string())
     }
 
-    pub async fn broadcast_tx(tx: String, network: String) -> Result<String> {
+    pub async fn broadcast_tx(tx: String, network: Network) -> Result<String> {
         let tx: pushtx::Transaction = tx.parse().unwrap();
 
         let txid = tx.txid();
 
-        let network = Network::from_core_arg(&network)?;
-
         let network = match network {
-            Network::Bitcoin => pushtx::Network::Mainnet,
-            Network::Testnet => pushtx::Network::Testnet,
+            Network::Mainnet => pushtx::Network::Mainnet,
+            Network::Testnet3 => pushtx::Network::Testnet,
+            Network::Testnet4 => pushtx::Network::Testnet,
             Network::Signet => pushtx::Network::Signet,
             Network::Regtest => pushtx::Network::Regtest,
-            _ => unreachable!(),
         };
 
         let opts = pushtx::Opts {
