@@ -18,9 +18,11 @@ import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/back_button.dart';
 import 'package:danawallet/widgets/loading_widget.dart';
+import 'package:danawallet/widgets/text/scrollable_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:text_scroll/text_scroll.dart';
 
 class ContactDetailsScreen extends StatelessWidget {
   final int contactId;
@@ -508,10 +510,10 @@ class ContactDetailsScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      contact.bip353Address!.toString(),
-                      style: BitcoinTextStyle.body4(Bitcoin.neutral7),
-                    ),
+                    Flexible(
+                        child: ScrollableText(
+                            text: contact.bip353Address!.toString(),
+                            style: BitcoinTextStyle.body4(Bitcoin.neutral7))),
                     const SizedBox(width: 8),
                     Icon(
                       Icons.copy,
