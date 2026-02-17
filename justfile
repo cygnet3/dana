@@ -4,8 +4,10 @@ default: run
 flutter := if `which fvm 2> /dev/null || true` != "" { "fvm flutter" }  else { "flutter" }
 
 run:
+    just gen
     {{flutter}} run --flavor local --target lib/main_local.dart --dart-define="GIT_HASH=$(git rev-parse HEAD)"
 run-release:
+    just gen
     {{flutter}} run --release --flavor local --target lib/main_local.dart --dart-define="GIT_HASH=$(git rev-parse HEAD)"
 
 clean-bin:
