@@ -6,9 +6,9 @@ import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/screens/spend/transaction_sent.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
+import 'package:danawallet/widgets/text/scrollable_text.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:text_scroll/text_scroll.dart';
 
 class ReadyToSendScreen extends StatefulWidget {
   const ReadyToSendScreen({super.key});
@@ -61,8 +61,8 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
 
     // format on-chain addresses nicely
     if (displayRecipient == form.recipient!.paymentCode) {
-      displayRecipient = displayRecipient.chunked(
-          context, displayRecipientStyle, 0.85);
+      displayRecipient =
+          displayRecipient.chunked(context, displayRecipientStyle, 0.85);
     }
 
     String displayAmount = form.amount!.displayBtc();
@@ -115,13 +115,8 @@ Widget entryRow(String left, String right, bool scrolling) {
       const SizedBox(width: 30),
       if (scrolling)
         Expanded(
-            child: TextScroll(right,
-                mode: TextScrollMode.bouncing,
-                delayBefore: const Duration(milliseconds: 1500),
-                pauseOnBounce: const Duration(milliseconds: 1000),
-                pauseBetween: const Duration(milliseconds: 1000),
-                textAlign: TextAlign.end,
-                style: BitcoinTextStyle.title5(Bitcoin.neutral8))),
+            child: ScrollableText(
+                text: right, style: BitcoinTextStyle.title5(Bitcoin.neutral8))),
       if (!scrolling)
         Expanded(
             child: Text(right,
