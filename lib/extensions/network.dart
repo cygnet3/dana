@@ -64,19 +64,3 @@ extension NetworkExtension on Network {
     }
   }
 }
-
-Network get getNetworkForFlavor {
-  switch (appFlavor) {
-    // only live flavor uses mainnet
-    case 'live':
-      return Network.mainnet;
-    // all other flavors use signet by default
-    case 'signet':
-    case 'dev':
-    case 'local':
-      return Network.signet;
-    default:
-      Logger().w("Unknown Flavor; defaulting to signet");
-      return Network.signet;
-  }
-}
