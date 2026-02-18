@@ -84,15 +84,11 @@ class WalletRepository {
     final spendKey = await readSpendKey();
 
     if (scanKey != null && spendKey != null) {
-      // if the scan and spend keys are present, then birthday & network should also be present
-      final birthday = await nonSecureStorage.getInt(_keyBirthday);
+      // if the scan and spend keys are present, then network should also be present
+      // network is required, since we need it to generate the receive & change payment codes
       final network = await readNetwork();
 
-      return SpWallet(
-          scanKey: scanKey,
-          spendKey: spendKey,
-          birthday: birthday!,
-          network: network);
+      return SpWallet(scanKey: scanKey, spendKey: spendKey, network: network);
     } else {
       return null;
     }
@@ -137,6 +133,11 @@ class WalletRepository {
     return TxHistory.decode(encodedHistory: encodedHistory!);
   }
 
+  Future<int> readBirthday() async {
+    final birthday = await nonSecureStorage.getInt(_keyBirthday);
+    return birthday!;
+  }
+
   Future<void> saveLastScan(int lastScan) async {
     await nonSecureStorage.setInt(_keyLastScan, lastScan);
   }
@@ -175,6 +176,7 @@ class WalletRepository {
 
   Future<WalletBackup> createWalletBackup() async {
     final wallet = await readWallet();
+    final birthday = await readBirthday();
     final history = await readHistory();
     final outputs = await readOwnedOutputs();
     final seedPhrase = await readSeedPhrase();
@@ -183,6 +185,7 @@ class WalletRepository {
 
     return WalletBackup(
         wallet: wallet!,
+        birthday: birthday,
         lastScan: lastScan,
         txHistory: history,
         ownedOutputs: outputs,

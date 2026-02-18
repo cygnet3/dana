@@ -69,7 +69,7 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<bool> initialize() async {
-    // we check if wallet str is present in database
+    // we check if wallet data is present in database
     final wallet = await walletRepository.readWallet();
 
     // if not present, we have no wallet and return false
@@ -77,25 +77,18 @@ class WalletState extends ChangeNotifier {
       return false;
     }
 
+    // since the wallet data is present, the following items must also be present
     network = await walletRepository.readNetwork();
+    birthday = await walletRepository.readBirthday();
     danaAddress = await walletRepository.readDanaAddress();
 
-    // We try to load the wallet data blob.
-    // This may fail if we make a change to the wallet data struct.
-    // This case should crash the app, rather than continue.
-    // If we continue, we risk the user accidentally
-    // deleting their seed phrase.
-    try {
-      receivePaymentCode = wallet.getReceivingAddress();
-      changePaymentCode = wallet.getChangeAddress();
-      birthday = wallet.getBirthday();
+    // we calculate these based on our wallet data (scan key, spend key, network)
+    receivePaymentCode = wallet.getReceivingAddress();
+    changePaymentCode = wallet.getChangeAddress();
 
-      await _updateWalletState();
+    await _updateWalletState();
 
-      return true;
-    } catch (e) {
-      rethrow;
-    }
+    return true;
   }
 
   @override
@@ -110,7 +103,7 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<void> restoreWallet(ApiNetwork network, String mnemonic) async {
-    // set birthday to default wallet
+    // set birthday to default for current network
     final birthday = network.defaultBirthday;
 
     final args = WalletSetupArgs(
@@ -122,7 +115,7 @@ class WalletState extends ChangeNotifier {
     // fill current state variables
     receivePaymentCode = wallet.getReceivingAddress();
     changePaymentCode = wallet.getChangeAddress();
-    this.birthday = wallet.getBirthday();
+    this.birthday = birthday;
     this.network = network;
     await _updateWalletState();
   }
@@ -139,7 +132,7 @@ class WalletState extends ChangeNotifier {
     // fill current state variables
     receivePaymentCode = wallet.getReceivingAddress();
     changePaymentCode = wallet.getChangeAddress();
-    this.birthday = wallet.getBirthday();
+    this.birthday = birthday;
     this.network = network;
     await _updateWalletState();
   }
