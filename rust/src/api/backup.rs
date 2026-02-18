@@ -180,6 +180,7 @@ impl WalletBackup {
     #[frb(sync)]
     pub fn new(
         wallet: SpWallet,
+        birthday: u32,
         network: ApiNetwork,
         tx_history: TxHistory,
         owned_outputs: OwnedOutputs,
@@ -189,7 +190,7 @@ impl WalletBackup {
         Self {
             scan_key: wallet.get_scan_key(),
             spend_key: wallet.get_spend_key(),
-            birthday: wallet.get_birthday(),
+            birthday,
             network,
             tx_history,
             owned_outputs,
