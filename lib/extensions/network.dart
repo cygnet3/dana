@@ -3,31 +3,30 @@ import 'package:danawallet/constants.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:flutter/services.dart';
-import 'package:logger/logger.dart';
 
-extension NetworkExtension on Network {
+extension NetworkExtension on ApiNetwork {
   String get defaultBlindbitUrl {
     switch (this) {
-      case Network.mainnet:
+      case ApiNetwork.mainnet:
         if (isDevEnv && const String.fromEnvironment("MAINNET_URL") != "") {
           return const String.fromEnvironment("MAINNET_URL");
         } else {
           return defaultMainnet;
         }
-      case Network.testnet3:
-      case Network.testnet4:
+      case ApiNetwork.testnet3:
+      case ApiNetwork.testnet4:
         if (isDevEnv && const String.fromEnvironment("TESTNET_URL") != "") {
           return const String.fromEnvironment("TESTNET_URL");
         } else {
           return defaultTestnet;
         }
-      case Network.signet:
+      case ApiNetwork.signet:
         if (isDevEnv && const String.fromEnvironment("SIGNET_URL") != "") {
           return const String.fromEnvironment("SIGNET_URL");
         } else {
           return defaultSignet;
         }
-      case Network.regtest:
+      case ApiNetwork.regtest:
         if (isDevEnv && const String.fromEnvironment("REGTEST_URL") != "") {
           return const String.fromEnvironment("REGTEST_URL");
         } else {
@@ -38,28 +37,28 @@ extension NetworkExtension on Network {
 
   Color get toColor {
     switch (this) {
-      case Network.mainnet:
+      case ApiNetwork.mainnet:
         return Bitcoin.orange;
-      case Network.testnet3:
-      case Network.testnet4:
+      case ApiNetwork.testnet3:
+      case ApiNetwork.testnet4:
         return Bitcoin.green;
-      case Network.signet:
+      case ApiNetwork.signet:
         return Bitcoin.purple;
-      case Network.regtest:
+      case ApiNetwork.regtest:
         return Bitcoin.blue;
     }
   }
 
   int get defaultBirthday {
     switch (this) {
-      case Network.mainnet:
+      case ApiNetwork.mainnet:
         return defaultMainnetBirthday;
-      case Network.testnet3:
-      case Network.testnet4:
+      case ApiNetwork.testnet3:
+      case ApiNetwork.testnet4:
         return defaultTestnetBirthday;
-      case Network.signet:
+      case ApiNetwork.signet:
         return defaultSignetBirthday;
-      case Network.regtest:
+      case ApiNetwork.regtest:
         return defaultRegtestBirthday;
     }
   }

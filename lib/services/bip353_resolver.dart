@@ -10,7 +10,7 @@ import 'package:dart_bip353/src/response_model.dart';
 
 class Bip353Resolver {
   static Future<bool> isBip353AddressPresent(
-      Bip353Address address, Network network) async {
+      Bip353Address address, ApiNetwork network) async {
     try {
       final paymentCode = await resolve(address, network);
       // If null or no silent payment, address is available
@@ -27,8 +27,8 @@ class Bip353Resolver {
   /// Returns [String] if the address exists and is valid
   /// Returns null if the DNS record doesn't exist (address not registered)
   /// Throws an exception for network errors, invalid responses, or malformed data
-  static Future<String?> resolve(Bip353Address address, Network network) async {
-    if (network == Network.regtest) {
+  static Future<String?> resolve(Bip353Address address, ApiNetwork network) async {
+    if (network == ApiNetwork.regtest) {
       throw Exception("regtest not allowed");
     }
 
@@ -80,11 +80,11 @@ class Bip353Resolver {
       final data = firstRecord["data"] as String;
 
       final parsed = Bip353DnsResolveResponse.fromRawQueryData(data);
-      if (network == Network.mainnet && parsed.silentpayment != null) {
+      if (network == ApiNetwork.mainnet && parsed.silentpayment != null) {
         return parsed.silentpayment;
-      } else if ((network == Network.testnet3 ||
-              network == Network.testnet4 ||
-              network == Network.signet) &&
+      } else if ((network == ApiNetwork.testnet3 ||
+              network == ApiNetwork.testnet4 ||
+              network == ApiNetwork.signet) &&
           parsed.testsilentpayment != null) {
         return parsed.testsilentpayment;
       } else {
@@ -102,7 +102,7 @@ class Bip353Resolver {
   }
 
   static Future<bool> verifyPaymentCode(
-      Bip353Address danaAddress, String paymentCode, Network network) async {
+      Bip353Address danaAddress, String paymentCode, ApiNetwork network) async {
     Logger().i("dana address to verify: $danaAddress");
 
     final resolved = await resolve(danaAddress, network);

@@ -13,7 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 class TransactionSentScreen extends StatefulWidget {
   final String txid;
-  final Network network;
+  final ApiNetwork network;
 
   const TransactionSentScreen({
     super.key,
@@ -126,24 +126,24 @@ class _TransactionSentScreenState extends State<TransactionSentScreen> {
           ]),
       footer: Column(
         children: [
-          if (widget.network != Network.regtest)
+          if (widget.network != ApiNetwork.regtest)
             FooterButtonOutlined(
               title: 'View in block explorer',
               onPressed: () async {
                 try {
                   String baseUrl;
                   switch (widget.network) {
-                    case Network.mainnet:
+                    case ApiNetwork.mainnet:
                       baseUrl = 'https://mempool.space';
                       break;
-                    case Network.testnet3:
-                    case Network.testnet4:
+                    case ApiNetwork.testnet3:
+                    case ApiNetwork.testnet4:
                       baseUrl = 'https://mempool.space/testnet';
                       break;
-                    case Network.signet:
+                    case ApiNetwork.signet:
                       baseUrl = 'https://mempool.space/signet';
                       break;
-                    case Network.regtest:
+                    case ApiNetwork.regtest:
                       return; // Should not reach here due to if condition
                   }
                   final url = Uri.parse('$baseUrl/tx/${widget.txid}');
@@ -169,7 +169,7 @@ class _TransactionSentScreenState extends State<TransactionSentScreen> {
                 }
               },
             ),
-          if (widget.network != Network.regtest)
+          if (widget.network != ApiNetwork.regtest)
             const SizedBox(
               height: 10.0,
             ),

@@ -16,7 +16,7 @@ class ChainState extends ChangeNotifier {
   // Once initialized we can check for the availability.
   // We treat these as two separate states, because we want to allow
   // a case where the app is unable to sync the chain (e.g. when there is no internet).
-  Network? _network;
+  ApiNetwork? _network;
 
   // indicates whether the chain is 'available'
   String? _blindbitUrl;
@@ -28,7 +28,7 @@ class ChainState extends ChangeNotifier {
 
   ChainState();
 
-  void initialize(Network network) {
+  void initialize(ApiNetwork network) {
     Logger().i('Initializing chain state');
     Logger().i('Network: $network');
     // network is not yet verified in this state, it gets vetified in 'connect'
@@ -97,7 +97,7 @@ class ChainState extends ChangeNotifier {
     }
   }
 
-  Network get network {
+  ApiNetwork get network {
     if (initiated) {
       return _network!;
     } else {
@@ -138,7 +138,7 @@ class ChainState extends ChangeNotifier {
   }
 
   Future<RecommendedFeeResponse> getCurrentFeeRates() async {
-    if (network == Network.regtest) {
+    if (network == ApiNetwork.regtest) {
       // for regtest, we always return 1 sat/vb
       return RecommendedFeeResponse(
           nextBlockFee: 1, halfHourFee: 1, hourFee: 1, dayFee: 1);

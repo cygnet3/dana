@@ -23,7 +23,7 @@ class WalletState extends ChangeNotifier {
   final walletRepository = WalletRepository.instance;
 
   // variables that never change (unless wallet is reset)
-  late Network network;
+  late ApiNetwork network;
   late String receivePaymentCode;
   late String changePaymentCode;
   late int birthday;
@@ -109,7 +109,7 @@ class WalletState extends ChangeNotifier {
     await walletRepository.reset();
   }
 
-  Future<void> restoreWallet(Network network, String mnemonic) async {
+  Future<void> restoreWallet(ApiNetwork network, String mnemonic) async {
     // set birthday to default wallet
     final birthday = network.defaultBirthday;
 
@@ -127,7 +127,7 @@ class WalletState extends ChangeNotifier {
     await _updateWalletState();
   }
 
-  Future<void> createNewWallet(Network network, int currentTip) async {
+  Future<void> createNewWallet(ApiNetwork network, int currentTip) async {
     final birthday = currentTip;
 
     final args = WalletSetupArgs(
@@ -230,17 +230,17 @@ class WalletState extends ChangeNotifier {
     String txid;
     try {
       switch (network) {
-        case Network.mainnet:
+        case ApiNetwork.mainnet:
           txid = await SpWallet.broadcastTx(tx: signedTx, network: network);
           break;
-        case Network.signet:
+        case ApiNetwork.signet:
           txid = await MempoolApiRepository(network: network)
               .postTransaction(signedTx);
           break;
-        case Network.regtest:
+        case ApiNetwork.regtest:
           final blindbitUrl =
               await SettingsRepository.instance.getBlindbitUrl() ??
-                  Network.regtest.defaultBlindbitUrl;
+                  ApiNetwork.regtest.defaultBlindbitUrl;
           txid = await SpWallet.broadcastUsingBlindbit(
               blindbitUrl: blindbitUrl, tx: signedTx);
           break;
@@ -304,7 +304,7 @@ class WalletState extends ChangeNotifier {
   // Return value indicates whether the caller should be directed to the dana registration screen
   Future<bool> checkDanaAddressRegistrationNeeded() async {
     // regtest networks have no dana address support
-    if (network == Network.regtest) {
+    if (network == ApiNetwork.regtest) {
       danaAddress = null;
       return false;
     }

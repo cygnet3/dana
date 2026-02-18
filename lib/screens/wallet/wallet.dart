@@ -38,7 +38,7 @@ class WalletScreenState extends State<WalletScreen> {
     // if we are on mainnet, show a warning message
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final walletState = Provider.of<WalletState>(context, listen: false);
-      if (walletState.network == Network.mainnet) {
+      if (walletState.network == ApiNetwork.mainnet) {
         showWarningDialog(mainnetWarning, WarningType.warn);
       }
     });

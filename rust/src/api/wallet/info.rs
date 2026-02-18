@@ -1,6 +1,6 @@
 use flutter_rust_bridge::frb;
 
-use crate::api::structs::network::Network;
+use crate::api::structs::network::ApiNetwork;
 
 use super::SpWallet;
 
@@ -21,7 +21,7 @@ impl SpWallet {
     }
 
     #[frb(sync)]
-    pub fn get_network(&self) -> Network {
+    pub fn get_network(&self) -> ApiNetwork {
         self.client.get_network().into()
     }
 }

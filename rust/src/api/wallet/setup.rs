@@ -5,7 +5,7 @@ use spdk_core::{
     SpendKey,
 };
 
-use crate::api::structs::network::Network;
+use crate::api::structs::network::ApiNetwork;
 use crate::wallet::derive_keys_from_seed;
 
 use super::{ApiScanKey, ApiSpendKey, SpWallet};
@@ -16,7 +16,7 @@ const PASSPHRASE: &str = "";
 
 pub struct WalletSetupArgs {
     pub setup_type: WalletSetupType,
-    pub network: Network,
+    pub network: ApiNetwork,
 }
 
 pub enum WalletSetupType {
