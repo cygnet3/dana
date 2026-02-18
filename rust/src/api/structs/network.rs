@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use spdk_core::bitcoin;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum ApiNetwork {
     Mainnet,
     Testnet3,
