@@ -13,8 +13,8 @@ class ChooseNetworkScreen extends StatefulWidget {
 }
 
 class ChooseNetworkScreenState extends State<ChooseNetworkScreen> {
-  final choices = [Network.mainnet, Network.signet, Network.regtest];
-  Network? _selected;
+  final choices = [ApiNetwork.mainnet, ApiNetwork.signet, ApiNetwork.regtest];
+  ApiNetwork? _selected;
 
   @override
   void initState() {
@@ -26,7 +26,7 @@ class ChooseNetworkScreenState extends State<ChooseNetworkScreen> {
   Widget build(BuildContext context) {
     final body = RadioGroup(
         groupValue: _selected,
-        onChanged: (Network? value) {
+        onChanged: (ApiNetwork? value) {
           setState(() {
             _selected = value;
           });
@@ -39,7 +39,7 @@ class ChooseNetworkScreenState extends State<ChooseNetworkScreen> {
               choices[index].name,
               style: BitcoinTextStyle.body3(Bitcoin.black),
             ),
-            leading: Radio<Network>(
+            leading: Radio<ApiNetwork>(
               value: choices[index],
             ),
             onTap: () {

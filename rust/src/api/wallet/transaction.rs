@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
-use crate::api::structs::network::Network;
+use crate::api::structs::network::ApiNetwork;
 use crate::api::structs::owned_output::ApiOwnedOutput;
 use crate::api::structs::recipient::ApiRecipient;
 use crate::api::structs::unsigned_transaction::ApiSilentPaymentUnsignedTransaction;
@@ -22,7 +22,7 @@ impl SpWallet {
         api_outputs: HashMap<String, ApiOwnedOutput>,
         api_recipients: Vec<ApiRecipient>,
         feerate: f32,
-        network: Network,
+        network: ApiNetwork,
     ) -> Result<ApiSilentPaymentUnsignedTransaction> {
         let client = &self.client;
         let available_utxos: Result<Vec<(OutPoint, OwnedOutput)>> = api_outputs
@@ -52,7 +52,7 @@ impl SpWallet {
         api_outputs: HashMap<String, ApiOwnedOutput>,
         wipe_address: String,
         feerate: f32,
-        network: Network,
+        network: ApiNetwork,
     ) -> Result<ApiSilentPaymentUnsignedTransaction> {
         let client = &self.client;
         let available_utxos: Result<Vec<(OutPoint, OwnedOutput)>> = api_outputs
@@ -106,17 +106,17 @@ impl SpWallet {
         Ok(res.to_string())
     }
 
-    pub async fn broadcast_tx(tx: String, network: Network) -> Result<String> {
+    pub async fn broadcast_tx(tx: String, network: ApiNetwork) -> Result<String> {
         let tx: pushtx::Transaction = tx.parse().unwrap();
 
         let txid = tx.txid();
 
         let network = match network {
-            Network::Mainnet => pushtx::Network::Mainnet,
-            Network::Testnet3 => pushtx::Network::Testnet,
-            Network::Testnet4 => pushtx::Network::Testnet,
-            Network::Signet => pushtx::Network::Signet,
-            Network::Regtest => pushtx::Network::Regtest,
+            ApiNetwork::Mainnet => pushtx::Network::Mainnet,
+            ApiNetwork::Testnet3 => pushtx::Network::Testnet,
+            ApiNetwork::Testnet4 => pushtx::Network::Testnet,
+            ApiNetwork::Signet => pushtx::Network::Signet,
+            ApiNetwork::Regtest => pushtx::Network::Regtest,
         };
 
         let opts = pushtx::Opts {

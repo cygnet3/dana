@@ -94,7 +94,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
   }
 
   Future<void> onCreateNewWallet(BuildContext context) async {
-    Network network;
+    ApiNetwork network;
     // in dev environment, allow user to choose network
     if (isDevEnv) {
       network = await Navigator.push(context,
@@ -127,7 +127,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
 
       // initialize contacts state with the user's payment code
       contactsState.initialize(walletState.receivePaymentCode, null);
-      if (network == Network.regtest && context.mounted) {
+      if (network == ApiNetwork.regtest && context.mounted) {
         // for regtest we bypass the dana address setup screen
         Navigator.pushAndRemoveUntil(
             context,
@@ -148,7 +148,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
   }
 
   Future<void> onRestoreMnemonic(BuildContext context) async {
-    Network network;
+    ApiNetwork network;
     // in dev environment, allow user to choose network
     if (isDevEnv) {
       network = await Navigator.push(context,

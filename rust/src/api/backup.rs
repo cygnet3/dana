@@ -8,7 +8,7 @@ use flutter_rust_bridge::frb;
 use rand::{rngs::OsRng, TryRngCore};
 use serde::{Deserialize, Serialize};
 
-use crate::api::structs::network::Network;
+use crate::api::structs::network::ApiNetwork;
 
 use super::{
     history::TxHistory,
@@ -169,7 +169,7 @@ pub struct WalletBackup {
     pub scan_key: ApiScanKey,
     pub spend_key: ApiSpendKey,
     pub birthday: u32,
-    pub network: Network,
+    pub network: ApiNetwork,
     pub tx_history: TxHistory,
     pub owned_outputs: OwnedOutputs,
     pub seed_phrase: Option<String>,
@@ -180,7 +180,7 @@ impl WalletBackup {
     #[frb(sync)]
     pub fn new(
         wallet: SpWallet,
-        network: Network,
+        network: ApiNetwork,
         tx_history: TxHistory,
         owned_outputs: OwnedOutputs,
         seed_phrase: Option<String>,
