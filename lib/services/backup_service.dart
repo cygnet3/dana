@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:danawallet/exceptions.dart';
-import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/backup.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/repositories/settings_repository.dart';

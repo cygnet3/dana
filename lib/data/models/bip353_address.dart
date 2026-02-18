@@ -86,9 +86,9 @@ class Bip353Address {
         if (currentWord.isNotEmpty) {
           spans.add(TextSpan(
             text: currentWord,
-            style: BitcoinTextStyle.body5(
-                    inNumber ? Bitcoin.green : Bitcoin.blue)
-                .copyWith(
+            style:
+                BitcoinTextStyle.body5(inNumber ? Bitcoin.green : Bitcoin.blue)
+                    .copyWith(
               fontSize: fontSize,
               fontFamily: 'Inter',
               letterSpacing: 1,
@@ -141,9 +141,8 @@ class Bip353Address {
     if (currentWord.isNotEmpty) {
       spans.add(TextSpan(
         text: currentWord,
-        style:
-            BitcoinTextStyle.body5(inNumber ? Bitcoin.green : Bitcoin.blue)
-                .copyWith(
+        style: BitcoinTextStyle.body5(inNumber ? Bitcoin.green : Bitcoin.blue)
+            .copyWith(
           fontSize: fontSize,
           fontFamily: 'Inter',
           letterSpacing: 1,

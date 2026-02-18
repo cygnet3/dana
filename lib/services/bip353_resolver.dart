@@ -27,7 +27,8 @@ class Bip353Resolver {
   /// Returns [String] if the address exists and is valid
   /// Returns null if the DNS record doesn't exist (address not registered)
   /// Throws an exception for network errors, invalid responses, or malformed data
-  static Future<String?> resolve(Bip353Address address, ApiNetwork network) async {
+  static Future<String?> resolve(
+      Bip353Address address, ApiNetwork network) async {
     if (network == ApiNetwork.regtest) {
       throw Exception("regtest not allowed");
     }
