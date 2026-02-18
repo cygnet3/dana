@@ -22,7 +22,6 @@ import 'package:danawallet/widgets/text/scrollable_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:text_scroll/text_scroll.dart';
 
 class ContactDetailsScreen extends StatelessWidget {
   final int contactId;
