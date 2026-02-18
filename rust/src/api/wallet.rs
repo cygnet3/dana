@@ -7,35 +7,25 @@ use crate::{api::structs::network::ApiNetwork, wallet::WalletFingerprint};
 use anyhow::Result;
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
-use spdk_core::{
-    bitcoin::{absolute::Height, secp256k1::SecretKey},
-    SpClient, SpendKey,
-};
+use spdk_core::bitcoin::secp256k1::SecretKey;
+use spdk_core::{SpClient, SpendKey};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[frb(opaque)]
 pub struct SpWallet {
     client: SpClient,
     wallet_fingerprint: WalletFingerprint,
-    birthday: Height,
 }
 
 impl SpWallet {
     #[frb(sync)]
-    pub fn new(
-        scan_key: ApiScanKey,
-        spend_key: ApiSpendKey,
-        network: ApiNetwork,
-        birthday: u32,
-    ) -> Result<Self> {
+    pub fn new(scan_key: ApiScanKey, spend_key: ApiSpendKey, network: ApiNetwork) -> Result<Self> {
         let client = SpClient::new(scan_key.into(), spend_key.into(), network.into())?;
 
         let wallet_fingerprint = client.get_client_fingerprint()?;
-        let birthday = Height::from_consensus(birthday)?;
 
         Ok(Self {
             client,
-            birthday,
             wallet_fingerprint,
         })
     }
