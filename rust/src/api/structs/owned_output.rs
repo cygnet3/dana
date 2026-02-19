@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
-use spdk_core::{
-    bitcoin::{absolute::Height, ScriptBuf},
-    OwnedOutput,
-};
+use spdk_wallet::bitcoin::{absolute::Height, ScriptBuf};
+use spdk_wallet::client::OwnedOutput;
 
 use crate::api::structs::amount::ApiAmount;
 use crate::api::structs::output_spend_status::ApiOutputSpendStatus;

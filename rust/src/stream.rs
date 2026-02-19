@@ -5,10 +5,8 @@ use std::{
 
 use crate::frb_generated::StreamSink;
 use lazy_static::lazy_static;
-use spdk_core::{
-    bitcoin::{absolute::Height, BlockHash, OutPoint},
-    OwnedOutput,
-};
+use spdk_wallet::bitcoin::{absolute::Height, BlockHash, OutPoint};
+use spdk_wallet::client::OwnedOutput;
 
 lazy_static! {
     static ref SCAN_PROGRESS_STREAM_SINK: Mutex<Option<StreamSink<ScanProgress>>> =

@@ -120,10 +120,11 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 [[package]]
 name = "backend-blindbit-v1"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#25643f6631705b8e85409801a705d51cbf47e9eb"
+source = "git+https://github.com/cygnet3/spdk?branch=master#38d517ea416484ba4109dc02a392fa9c78686756"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bitcoin 0.32.8",
  "futures",
  "hex",
  "reqwest",
@@ -1744,7 +1745,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "simplelog",
- "spdk-core",
+ "spdk-wallet",
  "tokio",
 ]
 
@@ -2021,18 +2022,30 @@ dependencies = [
 [[package]]
 name = "spdk-core"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#25643f6631705b8e85409801a705d51cbf47e9eb"
+source = "git+https://github.com/cygnet3/spdk?branch=master#38d517ea416484ba4109dc02a392fa9c78686756"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bitcoin 0.32.8",
+ "futures",
+ "serde",
+ "silentpayments",
+]
+
+[[package]]
+name = "spdk-wallet"
+version = "0.1.0"
+source = "git+https://github.com/cygnet3/spdk?branch=master#38d517ea416484ba4109dc02a392fa9c78686756"
+dependencies = [
+ "anyhow",
  "bdk_coin_select",
  "bitcoin 0.32.8",
  "futures",
  "log",
  "rayon",
  "serde",
- "serde_json",
  "silentpayments",
+ "spdk-core",
 ]
 
 [[package]]

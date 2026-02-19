@@ -1,13 +1,13 @@
 use std::str::FromStr;
 
 use flutter_rust_bridge::frb;
-use spdk_core::bitcoin::{
+use spdk_wallet::bitcoin::{
     consensus::{deserialize, serialize},
     hex::{DisplayHex, FromHex},
     secp256k1::SecretKey,
     Network, OutPoint,
 };
-use spdk_core::SilentPaymentUnsignedTransaction;
+use spdk_wallet::client::SilentPaymentUnsignedTransaction;
 
 use crate::api::structs::amount::ApiAmount;
 use crate::api::structs::owned_output::ApiOwnedOutput;

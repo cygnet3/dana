@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
-use spdk_core::{
-    bitcoin::hex::{self, DisplayHex},
-    OutputSpendStatus,
-};
+use spdk_wallet::bitcoin::hex::{self, DisplayHex};
+use spdk_wallet::client::OutputSpendStatus;
 
 type SpendingTxId = String;
 type MinedInBlock = String;

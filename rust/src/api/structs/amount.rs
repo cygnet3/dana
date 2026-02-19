@@ -1,6 +1,6 @@
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
-use spdk_core::bitcoin;
+use spdk_wallet::bitcoin;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 pub struct ApiAmount(pub u64);

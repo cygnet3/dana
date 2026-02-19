@@ -1,9 +1,7 @@
 use std::str::FromStr;
 
-use spdk_core::{
-    bitcoin::secp256k1::{PublicKey, SecretKey},
-    SpendKey,
-};
+use spdk_wallet::bitcoin::secp256k1::{PublicKey, SecretKey};
+use spdk_wallet::client::SpendKey;
 
 use crate::api::structs::network::ApiNetwork;
 use crate::wallet::derive_keys_from_seed;
