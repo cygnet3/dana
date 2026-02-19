@@ -1,4 +1,5 @@
 import 'package:danawallet/data/models/recommended_fee_model.dart';
+import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/chain.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
@@ -147,5 +148,11 @@ class ChainState extends ChangeNotifier {
       final response = await mempoolApiRepository.getCurrentFeeRate();
       return response;
     }
+  }
+
+  Future<int> getBlockHeightFromDate(DateTime date) async {
+    final mempoolApiRepository = MempoolApiRepository(network: network);
+    final block = await mempoolApiRepository.getBlockFromTimestamp(date.toSeconds());
+    return block.height;
   }
 }
