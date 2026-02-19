@@ -48,18 +48,4 @@ extension NetworkExtension on ApiNetwork {
         return Bitcoin.blue;
     }
   }
-
-  int get defaultBirthday {
-    switch (this) {
-      case ApiNetwork.mainnet:
-        return defaultMainnetBirthday;
-      case ApiNetwork.testnet3:
-      case ApiNetwork.testnet4:
-        return defaultTestnetBirthday;
-      case ApiNetwork.signet:
-        return defaultSignetBirthday;
-      case ApiNetwork.regtest:
-        return defaultRegtestBirthday;
-    }
-  }
 }

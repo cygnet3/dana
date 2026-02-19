@@ -7,12 +7,8 @@ const String defaultTestnet = "https://silentpayments.dev/blindbit/testnet";
 const String defaultSignet = "https://silentpayments.dev/blindbit/signet";
 const String defaultRegtest = "https://silentpayments.dev/blindbit/regtest";
 
-// Default birthdays used in case we can't get the block height from blindbit
-// These values are pretty arbitrary, they can be updated for newer heights later
-const int defaultMainnetBirthday = 900000;
-const int defaultTestnetBirthday = 2900000;
-const int defaultSignetBirthday = 200000;
-const int defaultRegtestBirthday = 80000;
+// Default birthdays
+final DateTime defaultBirthday = DateTime.utc(2025, 6, 1); 
 
 // default dust limit. this is used in syncing, as well as sending
 // for syncing, amounts < dust limit will be ignored
