@@ -1,6 +1,7 @@
-use crate::api::structs::amount::ApiAmount;
 use serde::{Deserialize, Serialize};
-use spdk_core::Recipient;
+use spdk_wallet::client::Recipient;
+
+use crate::api::structs::amount::ApiAmount;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ApiRecipient {

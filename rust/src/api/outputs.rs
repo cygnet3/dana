@@ -5,10 +5,9 @@ use std::{
 
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
-use spdk_core::{
-    bitcoin::{absolute::Height, hashes::Hash, hex::DisplayHex, Amount, BlockHash, OutPoint, Txid},
-    OutputSpendStatus, OwnedOutput,
-};
+use spdk_wallet::bitcoin::{self, hashes::Hash, hex::DisplayHex};
+use spdk_wallet::bitcoin::{Amount, BlockHash, OutPoint, Txid};
+use spdk_wallet::client::{OutputSpendStatus, OwnedOutput};
 
 use anyhow::{Error, Result};
 
@@ -98,7 +97,7 @@ impl OwnedOutputs {
 
     #[flutter_rust_bridge::frb(sync)]
     pub fn reset_to_height(&mut self, height: u32) -> Result<()> {
-        let blkheight = Height::from_consensus(height)?;
+        let blkheight = bitcoin::absolute::Height::from_consensus(height)?;
         // reset known outputs to height
         self.0.retain(|_, o| o.blockheight <= blkheight);
 

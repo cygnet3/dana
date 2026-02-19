@@ -3,10 +3,9 @@ use std::{
     mem,
 };
 
-use spdk_core::{
-    bitcoin::{absolute::Height, BlockHash, OutPoint},
-    OwnedOutput, Updater,
-};
+use spdk_wallet::bitcoin::{absolute::Height, BlockHash, OutPoint};
+use spdk_wallet::client::OwnedOutput;
+use spdk_wallet::Updater;
 
 use crate::stream::{send_scan_progress, send_state_update, ScanProgress, StateUpdate};
 

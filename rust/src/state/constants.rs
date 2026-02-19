@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
-use spdk_core::{
-    bitcoin::{absolute::Height, Amount, OutPoint, Txid},
-    Recipient,
-};
+use spdk_wallet::bitcoin::{absolute::Height, Amount, OutPoint, Txid};
+use spdk_wallet::client::Recipient;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum RecordedTransaction {

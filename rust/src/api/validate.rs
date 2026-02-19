@@ -1,7 +1,7 @@
 use anyhow::Result;
 use flutter_rust_bridge::frb;
-use spdk_core::silentpayments::Network as SpNetwork;
-use spdk_core::RecipientAddress;
+use spdk_wallet::client::RecipientAddress;
+use spdk_wallet::silentpayments::Network as SpNetwork;
 
 use crate::api::structs::network::ApiNetwork;
 

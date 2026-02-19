@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
-use spdk_core::bitcoin::{absolute::Height, OutPoint, Txid};
+use spdk_wallet::bitcoin::{absolute::Height, OutPoint, Txid};
 
 use crate::api::structs::amount::ApiAmount;
 use crate::api::structs::recipient::ApiRecipient;

@@ -8,7 +8,7 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 flutter_rust_bridge = "=2.11.1"
-spdk-core = { git = "https://github.com/cygnet3/spdk", branch = "master" }
+spdk-wallet = { git = "https://github.com/cygnet3/spdk", branch = "master" }
 backend-blindbit-v1 = { git = "https://github.com/cygnet3/spdk", branch = "master" }
 lazy_static = "1.4"
 anyhow = "1.0"

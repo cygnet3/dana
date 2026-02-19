@@ -7,8 +7,8 @@ use crate::{api::structs::network::ApiNetwork, wallet::WalletFingerprint};
 use anyhow::Result;
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
-use spdk_core::bitcoin::secp256k1::SecretKey;
-use spdk_core::{SpClient, SpendKey};
+use spdk_wallet::bitcoin::secp256k1::SecretKey;
+use spdk_wallet::client::{SpClient, SpendKey};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[frb(opaque)]

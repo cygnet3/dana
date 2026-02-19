@@ -2,10 +2,8 @@ use std::{collections::HashMap, str::FromStr};
 
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
-use spdk_core::{
-    bitcoin::{absolute::Height, Amount, OutPoint, Txid},
-    Recipient,
-};
+use spdk_wallet::bitcoin::{absolute::Height, Amount, OutPoint, Txid};
+use spdk_wallet::client::Recipient;
 
 use crate::{
     api::outputs::OwnedOutputs,
