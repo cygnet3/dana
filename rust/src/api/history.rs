@@ -107,7 +107,7 @@ impl TxHistory {
                     }
 
                     let entry = txs.entry(outpoint.txid).or_default();
-                    *entry += output.amount;
+                    *entry += output.value;
                 }
                 for (txid, amount) in txs {
                     self.record_incoming_transaction(txid, amount, *blkheight);

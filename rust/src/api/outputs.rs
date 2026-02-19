@@ -62,7 +62,7 @@ impl OwnedOutputs {
     pub fn process_state_update(&mut self, update: &StateUpdate) -> Result<()> {
         match update {
             StateUpdate::Update {
-                blkheight: _,
+                blkheight,
                 blkhash,
                 found_outputs,
                 found_inputs,
@@ -74,7 +74,20 @@ impl OwnedOutputs {
                 }
 
                 // record the outputs
-                self.0.extend(found_outputs.clone());
+                self.0
+                    .extend(found_outputs.iter().map(|(outpoint, output)| {
+                        (
+                            *outpoint,
+                            OwnedOutput {
+                                blockheight: *blkheight,
+                                spend_status: OutputSpendStatus::Unspent,
+                                tweak: output.tweak.to_be_bytes(),
+                                amount: output.value,
+                                script: output.script_pubkey.clone(),
+                                label: output.label.clone(),
+                            },
+                        )
+                    }))
             }
             StateUpdate::NoUpdate { .. } => (),
         }

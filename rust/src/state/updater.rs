@@ -3,9 +3,11 @@ use std::{
     mem,
 };
 
-use spdk_wallet::bitcoin::{absolute::Height, BlockHash, OutPoint};
-use spdk_wallet::client::OwnedOutput;
-use spdk_wallet::Updater;
+use spdk_wallet::updater::Updater;
+use spdk_wallet::{
+    bitcoin::{absolute::Height, BlockHash, OutPoint},
+    updater::SimplifiedOutput,
+};
 
 use crate::stream::{send_scan_progress, send_state_update, ScanProgress, StateUpdate};
 
@@ -15,7 +17,7 @@ pub struct StateUpdater {
     update: bool,
     blkhash: Option<BlockHash>,
     blkheight: Option<Height>,
-    found_outputs: HashMap<OutPoint, OwnedOutput>,
+    found_outputs: HashMap<OutPoint, SimplifiedOutput>,
     found_inputs: HashSet<OutPoint>,
 }
 
@@ -76,7 +78,7 @@ impl Updater for StateUpdater {
         &mut self,
         height: Height,
         blkhash: BlockHash,
-        found_outputs: HashMap<OutPoint, OwnedOutput>,
+        found_outputs: HashMap<OutPoint, SimplifiedOutput>,
     ) -> Result<()> {
         // may have already been written by record_block_inputs
         self.update = true;

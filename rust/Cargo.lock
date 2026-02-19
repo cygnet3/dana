@@ -120,7 +120,7 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 [[package]]
 name = "backend-blindbit-v1"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#38d517ea416484ba4109dc02a392fa9c78686756"
+source = "git+https://github.com/cygnet3/spdk?branch=master#84e5a350fe571d07ae318241819e3093692920b4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2022,7 +2022,7 @@ dependencies = [
 [[package]]
 name = "spdk-core"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#38d517ea416484ba4109dc02a392fa9c78686756"
+source = "git+https://github.com/cygnet3/spdk?branch=master#84e5a350fe571d07ae318241819e3093692920b4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2035,7 +2035,7 @@ dependencies = [
 [[package]]
 name = "spdk-wallet"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#38d517ea416484ba4109dc02a392fa9c78686756"
+source = "git+https://github.com/cygnet3/spdk?branch=master#84e5a350fe571d07ae318241819e3093692920b4"
 dependencies = [
  "anyhow",
  "bdk_coin_select",

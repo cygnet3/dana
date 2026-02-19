@@ -5,8 +5,10 @@ use std::{
 
 use crate::frb_generated::StreamSink;
 use lazy_static::lazy_static;
-use spdk_wallet::bitcoin::{absolute::Height, BlockHash, OutPoint};
-use spdk_wallet::client::OwnedOutput;
+use spdk_wallet::{
+    bitcoin::{absolute::Height, BlockHash, OutPoint},
+    updater::SimplifiedOutput,
+};
 
 lazy_static! {
     static ref SCAN_PROGRESS_STREAM_SINK: Mutex<Option<StreamSink<ScanProgress>>> =
@@ -22,7 +24,7 @@ pub enum StateUpdate {
     Update {
         blkheight: Height,
         blkhash: BlockHash,
-        found_outputs: HashMap<OutPoint, OwnedOutput>,
+        found_outputs: HashMap<OutPoint, SimplifiedOutput>,
         found_inputs: HashSet<OutPoint>,
     },
 }

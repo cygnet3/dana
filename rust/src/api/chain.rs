@@ -3,7 +3,7 @@ use std::time::Duration;
 use backend_blindbit_v1::{BlindbitBackend, BlindbitClient};
 use log::warn;
 use spdk_wallet::bitcoin;
-use spdk_wallet::ChainBackend;
+use spdk_wallet::chain::ChainBackend;
 use tokio::time::sleep;
 
 use crate::api::structs::network::ApiNetwork;
