@@ -120,7 +120,7 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 [[package]]
 name = "backend-blindbit-v1"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#84e5a350fe571d07ae318241819e3093692920b4"
+source = "git+https://github.com/cygnet3/spdk?branch=master#ca6fbbeaeeaac756f05fb2ccc5ec3b60d2ceb0ab"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1730,7 +1730,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "backend-blindbit-v1",
  "base64 0.22.1",
  "bip39",
  "flutter_rust_bridge",
@@ -1961,8 +1960,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 [[package]]
 name = "silentpayments"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "131d42e3050dd88c79e4849b27eaf0cda0625f4e910d97bf05044a1300459f85"
+source = "git+https://github.com/cygnet3/spdk?branch=master#ca6fbbeaeeaac756f05fb2ccc5ec3b60d2ceb0ab"
 dependencies = [
  "bech32 0.9.1",
  "bimap",
@@ -2022,7 +2020,7 @@ dependencies = [
 [[package]]
 name = "spdk-core"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#84e5a350fe571d07ae318241819e3093692920b4"
+source = "git+https://github.com/cygnet3/spdk?branch=master#ca6fbbeaeeaac756f05fb2ccc5ec3b60d2ceb0ab"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2035,9 +2033,10 @@ dependencies = [
 [[package]]
 name = "spdk-wallet"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#84e5a350fe571d07ae318241819e3093692920b4"
+source = "git+https://github.com/cygnet3/spdk?branch=master#ca6fbbeaeeaac756f05fb2ccc5ec3b60d2ceb0ab"
 dependencies = [
  "anyhow",
+ "backend-blindbit-v1",
  "bdk_coin_select",
  "bitcoin 0.32.8",
  "futures",

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use backend_blindbit_v1::BlindbitBackend;
+use spdk_wallet::backend_blindbit_v1::BlindbitBackend;
 use spdk_wallet::bitcoin;
 use spdk_wallet::chain::ChainBackend;
 use spdk_wallet::scanner::SpScanner;
