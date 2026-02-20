@@ -107,7 +107,7 @@ class WalletSettingsScreen extends StatelessWidget {
 
     if (context.mounted) {
       if (mnemonic != null) {
-        goToScreen(context, ViewMnemonicScreen(mnemonic: mnemonic));
+        goToScreen(context, ViewMnemonicScreen(mnemonic: mnemonic, birthday: wallet.birthday));
       } else {
         showAlertDialog("Seed phrase unknown",
             "Seed phrase unknown! Did you import from keys?");
