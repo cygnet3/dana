@@ -33,7 +33,7 @@ class WalletState extends ChangeNotifier {
   // variables that change
   late ApiAmount amount;
   late ApiAmount unconfirmedChange;
-  late int lastScan;
+  late int? lastScan;
   late TxHistory txHistory;
   late OwnedOutputs ownedOutputs;
 

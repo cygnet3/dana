@@ -82,14 +82,37 @@ class SynchronizationService {
   }
 
   Future<void> _performSynchronizationTask() async {
-    if (walletState.lastScan < chainState.tip) {
+    if (walletState.lastScan == null) {
+      // This means we just setup the wallet, or we didn't have network so far. Try to set last scan to block height of birthday
+      Logger().d("Setting last scan to block height of birthday");
+      // In case we're migrating an older wallet and we didn't have network, birthday is null and needs to be resolved first
+      if (walletState.birthday == null) {
+        Logger().d("Birthday is null, trying to resolve it");
+        await walletState.setBirthday();
+      }
+      if (walletState.birthday != null) {
+        try {
+          final height = await chainState.getBlockHeightFromDate(walletState.birthday!);
+          walletState.lastScan = height;
+        } catch (e) {
+          Logger().e("Error getting last scan: $e");
+          // We wait and try again later
+          return;
+        }
+      } else {
+        Logger().e("Birthday is still null, cannot set last scan");
+        return;
+      }
+    }
+
+    if (walletState.lastScan! < chainState.tip) {
       if (!scanProgress.scanning) {
         Logger().i("Starting sync");
         await scanProgress.scan(walletState);
       }
     }
 
-    if (chainState.tip < walletState.lastScan) {
+    if (chainState.tip < walletState.lastScan!) {
       // not sure what we should do here, that's really bad
       Logger().e('Current height is less than wallet last scan');
     }

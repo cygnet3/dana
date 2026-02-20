@@ -70,7 +70,7 @@ class WalletRepository {
     }
 
     // set default values for new wallet
-    await saveLastScan(birthday);
+    await saveLastScan(null); // We shouldn't have left over value from a previous wallet but anyway
     await saveHistory(TxHistory.empty());
     await saveOwnedOutputs(OwnedOutputs.empty());
 
@@ -143,13 +143,17 @@ class WalletRepository {
     return timestamp!.toDate();
   }
 
-  Future<void> saveLastScan(int lastScan) async {
-    await nonSecureStorage.setInt(_keyLastScan, lastScan);
+  Future<void> saveLastScan(int? lastScan) async {
+    if (lastScan != null) {
+      await nonSecureStorage.setInt(_keyLastScan, lastScan);
+    } else {
+      await nonSecureStorage.remove(_keyLastScan);
+    }
   }
 
-  Future<int> readLastScan() async {
+  Future<int?> readLastScan() async {
     final lastScan = await nonSecureStorage.getInt(_keyLastScan);
-    return lastScan!;
+    return lastScan;
   }
 
   Future<void> saveOwnedOutputs(OwnedOutputs ownedOutputs) async {
@@ -191,7 +195,7 @@ class WalletRepository {
     return WalletBackup(
         wallet: wallet!,
         birthday: birthday.toSeconds(),
-        lastScan: lastScan,
+        lastScan: lastScan!,
         txHistory: history,
         ownedOutputs: outputs,
         seedPhrase: seedPhrase,

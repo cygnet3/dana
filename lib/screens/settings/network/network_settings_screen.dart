@@ -41,6 +41,7 @@ class NetworkSettingsScreen extends StatelessWidget {
   Future<void> _onSetLastScan(BuildContext context) async {
     final walletState = Provider.of<WalletState>(context, listen: false);
     final homeState = Provider.of<HomeState>(context, listen: false);
+    final chainState = Provider.of<ChainState>(context, listen: false);
 
     TextEditingController controller = TextEditingController();
     final scanHeight = await showInputAlertDialog(
@@ -53,7 +54,9 @@ class NetworkSettingsScreen extends StatelessWidget {
       homeState.showMainScreen();
     } else if (scanHeight is bool && scanHeight) {
       final birthday = walletState.birthday;
-      await walletState.resetToScanHeight(birthday);
+      // TODO probably better and simpler to set lastScan to null and let the synchronization service set it to the birthday height
+      final height = await chainState.getBlockHeightFromDate(birthday!);
+      await walletState.resetToScanHeight(height);
       homeState.showMainScreen();
     }
   }
