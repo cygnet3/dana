@@ -69,17 +69,19 @@ class ScanProgressNotifier extends ChangeNotifier {
           walletState.network.defaultBlindbitUrl;
       final dustLimit = await settings.getDustLimit() ?? defaultDustLimit;
 
-      final lastScan = walletState.lastScan;
+      if (walletState.lastScan == null) {
+        throw Exception("Last scan is null");
+      }
 
       final ownedOutPoints =
           walletState.ownedOutputs.getUnconfirmedSpentOutpoints();
 
-      activate(walletState.lastScan);
+      activate(walletState.lastScan!);
       await wallet.scanToTip(
           blindbitUrl: blindbitUrl,
           dustLimit: BigInt.from(dustLimit),
           ownedOutpoints: ownedOutPoints,
-          lastScan: lastScan);
+          lastScan: walletState.lastScan!);
     } catch (e) {
       deactivate();
       rethrow;

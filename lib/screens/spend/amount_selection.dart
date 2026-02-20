@@ -74,7 +74,10 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
     final chainState = Provider.of<ChainState>(context, listen: false);
 
     final availableBalance = walletState.amount;
-    final blocksToScan = chainState.tip - walletState.lastScan;
+    int blocksToScan = 0;
+    if (walletState.lastScan != null) {
+      blocksToScan = chainState.tip - walletState.lastScan!;
+    }
 
     String recipientName = form.recipient!.displayName;
     TextStyle recipientTextStyle = BitcoinTextStyle.body4(Bitcoin.neutral7);
