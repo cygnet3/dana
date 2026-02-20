@@ -1,10 +1,11 @@
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
+import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/enums/warning_type.dart';
-import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
+import 'package:danawallet/screens/onboarding/recovery/birthday_picker_screen.dart';
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
@@ -40,6 +41,7 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
   late List<TextEditingController> controllers;
   late List<FocusNode> focusNodes;
   late MnemonicInputPillBox pills;
+  bool _knowsBirthday = false;
 
   Future<void> onRestore(BuildContext context) async {
     try {
@@ -50,14 +52,44 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
       final scanProgress =
           Provider.of<ScanProgressNotifier>(context, listen: false);
 
-      final blindbitUrl = widget.network.defaultBlindbitUrl;
+      // Get birthday: navigate to picker if user knows it, else use default
+      DateTime birthday = defaultBirthday;
+      if (_knowsBirthday) {
+        final pickedDate = await Navigator.push<DateTime>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const BirthdayPickerScreen(),
+          ),
+        );
+        if (!context.mounted) {
+          return; // Context lost, abort restore
+        }
+        if (pickedDate == null) {
+          return; // User pressed back, stay on seed phrase screen
+        }
+        // pickedDate is already in UTC from BirthdayPickerScreen
+        // Use 1am UTC to avoid edge issues at midnight
+        birthday = DateTime.utc(
+            pickedDate.year, pickedDate.month, pickedDate.day, 1);
+      }
 
-      final defaultBirthday = widget.network.defaultBirthday;
-      await walletState.restoreWallet(widget.network, mnemonic, defaultBirthday.toDate());
+      await walletState.restoreWallet(widget.network, mnemonic, birthday);
 
       chainState.initialize(widget.network);
-      // we can safely ignore the result of connecting, since we use the default birthday
-      await chainState.connect(blindbitUrl);
+      
+      // Try to connect, but continue even if it fails (offline mode)
+      final connected = await chainState.connect(widget.network.defaultBlindbitUrl);
+      if (!connected) {
+        // Connection failed, but continue anyway - sync will happen when network is available
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Unable to connect to network. Wallet will sync when connection is restored.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
 
       chainState.startSyncService(walletState, scanProgress, true);
 
@@ -164,6 +196,25 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
                     ],
                   ),
                   Expanded(child: pills),
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: Adaptive.h(1.5)),
+                    child: CheckboxListTile(
+                      value: _knowsBirthday,
+                      onChanged: (value) {
+                        setState(() {
+                          _knowsBirthday = value ?? false;
+                        });
+                      },
+                      title: Text(
+                        "I know when my wallet was created (birthday)",
+                        style: BitcoinTextStyle.body3(Bitcoin.neutral7).copyWith(
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
                   footer,
                 ],
               )),
