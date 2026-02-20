@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/recipient_form_filled.dart';
+import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/history.dart';
 import 'package:danawallet/generated/rust/api/outputs.dart';
@@ -26,7 +28,7 @@ class WalletState extends ChangeNotifier {
   late ApiNetwork network;
   late String receivePaymentCode;
   late String changePaymentCode;
-  late int birthday;
+  DateTime? birthday;
 
   // variables that change
   late ApiAmount amount;
@@ -79,7 +81,7 @@ class WalletState extends ChangeNotifier {
 
     // since the wallet data is present, the following items must also be present
     network = await walletRepository.readNetwork();
-    birthday = await walletRepository.readBirthday();
+    await setBirthday();
     danaAddress = await walletRepository.readDanaAddress();
 
     // we calculate these based on our wallet data (scan key, spend key, network)
@@ -102,10 +104,7 @@ class WalletState extends ChangeNotifier {
     await walletRepository.reset();
   }
 
-  Future<void> restoreWallet(ApiNetwork network, String mnemonic) async {
-    // set birthday to default for current network
-    final birthday = network.defaultBirthday;
-
+  Future<void> restoreWallet(ApiNetwork network, String mnemonic, DateTime birthday) async {
     final args = WalletSetupArgs(
         setupType: WalletSetupType.mnemonic(mnemonic), network: network);
     final setupResult = SpWallet.setupWallet(setupArgs: args);
@@ -120,19 +119,19 @@ class WalletState extends ChangeNotifier {
     await _updateWalletState();
   }
 
-  Future<void> createNewWallet(ApiNetwork network, int currentTip) async {
-    final birthday = currentTip;
+  Future<void> createNewWallet(ApiNetwork network) async {
+    final now = DateTime.now().toUtc();
 
     final args = WalletSetupArgs(
         setupType: const WalletSetupType.newWallet(), network: network);
     final setupResult = SpWallet.setupWallet(setupArgs: args);
     final wallet =
-        await walletRepository.setupWallet(setupResult, network, birthday);
+        await walletRepository.setupWallet(setupResult, network, now);
 
     // fill current state variables
     receivePaymentCode = wallet.getReceivingAddress();
     changePaymentCode = wallet.getChangeAddress();
-    this.birthday = birthday;
+    birthday = now;
     this.network = network;
     await _updateWalletState();
   }
@@ -148,6 +147,31 @@ class WalletState extends ChangeNotifier {
 
   Future<String?> getSeedPhraseFromSecureStorage() async {
     return await walletRepository.readSeedPhrase();
+  }
+
+  // Older wallets may have birthday as a block height, we apply the same check than core
+  Future<void> setBirthday() async {
+    final storedBirthday = await walletRepository.readBirthday();
+    if (storedBirthday.isAfter(defaultBirthday)) {
+      // This is a timestamp, we can use it directly
+      birthday = storedBirthday;
+    } else {
+      // This is a block height, we need to convert it to a timestamp
+      // That unfortunately requires a network call that may fail
+      try {
+        final mempoolApi = MempoolApiRepository(network: network);
+        final block = await mempoolApi.getBlockForHash(await mempoolApi.getBlockHashForHeight(storedBirthday.toSeconds()));
+        final newBirthday = block.timestamp.toDate();
+        Logger().i("Resolved block height $storedBirthday to date $newBirthday");
+        // Update the birthday value to an epoch time
+        await walletRepository.saveBirthday(newBirthday);
+        birthday = newBirthday;
+      } catch (e) {
+        Logger().e("Error resolving block height $storedBirthday to timestamp: $e");
+        birthday = null;
+      }
+    }
+
   }
 
   Future<void> resetToScanHeight(int height) async {

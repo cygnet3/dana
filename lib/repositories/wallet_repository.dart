@@ -1,4 +1,5 @@
 import 'package:danawallet/data/models/bip353_address.dart';
+import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/generated/rust/api/backup.dart';
 import 'package:danawallet/generated/rust/api/history.dart';
 import 'package:danawallet/generated/rust/api/outputs.dart';
@@ -48,7 +49,7 @@ class WalletRepository {
   }
 
   Future<SpWallet> setupWallet(
-      WalletSetupResult walletSetup, ApiNetwork network, int birthday) async {
+      WalletSetupResult walletSetup, ApiNetwork network, DateTime birthday) async {
     if ((await secureStorage.readAll()).isNotEmpty) {
       throw Exception('Previous wallet not properly deleted');
     }
@@ -61,7 +62,7 @@ class WalletRepository {
     // insert new values
     await secureStorage.write(key: _keyScanSk, value: scanKey.encode());
     await secureStorage.write(key: _keySpendKey, value: spendKey.encode());
-    await nonSecureStorage.setInt(_keyBirthday, birthday);
+    await nonSecureStorage.setInt(_keyBirthday, birthday.toSeconds());
     await nonSecureStorage.setString(_keyNetwork, network.name);
 
     if (seedPhrase != null) {
@@ -133,9 +134,13 @@ class WalletRepository {
     return TxHistory.decode(encodedHistory: encodedHistory!);
   }
 
-  Future<int> readBirthday() async {
-    final birthday = await nonSecureStorage.getInt(_keyBirthday);
-    return birthday!;
+  Future<void> saveBirthday(DateTime birthday) async {
+    await nonSecureStorage.setInt(_keyBirthday, birthday.toSeconds());
+  }
+
+  Future<DateTime> readBirthday() async {
+    final timestamp = await nonSecureStorage.getInt(_keyBirthday);
+    return timestamp!.toDate();
   }
 
   Future<void> saveLastScan(int lastScan) async {
@@ -185,7 +190,7 @@ class WalletRepository {
 
     return WalletBackup(
         wallet: wallet!,
-        birthday: birthday,
+        birthday: birthday.toSeconds(),
         lastScan: lastScan,
         txHistory: history,
         ownedOutputs: outputs,

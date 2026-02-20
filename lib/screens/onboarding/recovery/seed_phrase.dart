@@ -1,6 +1,7 @@
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/enums/warning_type.dart';
+import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
@@ -51,7 +52,8 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
 
       final blindbitUrl = widget.network.defaultBlindbitUrl;
 
-      await walletState.restoreWallet(widget.network, mnemonic);
+      final defaultBirthday = widget.network.defaultBirthday;
+      await walletState.restoreWallet(widget.network, mnemonic, defaultBirthday.toDate());
 
       chainState.initialize(widget.network);
       // we can safely ignore the result of connecting, since we use the default birthday

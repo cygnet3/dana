@@ -122,8 +122,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
     // we *must* be connected to get the wallet birthday
     if (connected) {
       chainState.startSyncService(walletState, scanProgress, false);
-      final chainTip = chainState.tip;
-      await walletState.createNewWallet(network, chainTip);
+      await walletState.createNewWallet(network);
 
       // initialize contacts state with the user's payment code
       contactsState.initialize(walletState.receivePaymentCode, null);
