@@ -11,15 +11,9 @@ import 'package:dart_bip353/src/response_model.dart';
 class Bip353Resolver {
   static Future<bool> isBip353AddressPresent(
       Bip353Address address, ApiNetwork network) async {
-    try {
-      final paymentCode = await resolve(address, network);
-      // If null or no silent payment, address is available
-      return paymentCode == null;
-    } catch (e) {
-      // If we can't resolve due to network error, assume it's taken to be safe
-      Logger().e('Error checking address availability: $e');
-      return false;
-    }
+    final paymentCode = await resolve(address, network);
+    // If null or no silent payment, address is available
+    return paymentCode == null;
   }
 
   /// Resolves a dana address to its payment information via DNS
