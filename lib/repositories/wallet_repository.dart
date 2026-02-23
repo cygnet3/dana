@@ -53,7 +53,6 @@ class WalletRepository {
   ///
   /// LEGACY: This is the ONLY place where TxHistory should be used.
   /// TxHistory is kept in Rust only for migration from old app versions.
-  /// Owned outputs are decoded from raw JSON (no Rust type dependency).
   Future<void> migrateToSqliteIfNeeded() async {
     final oldOutputs = await nonSecureStorage.getString(_keyOwnedOutputs);
     final oldHistory = await nonSecureStorage.getString(_keyTxHistory);
