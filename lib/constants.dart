@@ -1,4 +1,4 @@
-import 'package:danawallet/models/fiat_currency.dart';
+import 'package:danawallet/data/enums/fiat_currency.dart';
 import 'package:flutter/services.dart';
 
 // The default blindbit backend used
