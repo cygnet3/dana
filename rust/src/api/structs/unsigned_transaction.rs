@@ -100,10 +100,10 @@ impl ApiSilentPaymentUnsignedTransaction {
         let input_sum: u64 = self
             .selected_utxos
             .iter()
-            .map(|(_, o)| o.amount.to_int())
+            .map(|(_, o)| o.amount.0)
             .sum();
 
-        let output_sum: u64 = self.recipients.iter().map(|r| r.amount.to_int()).sum();
+        let output_sum: u64 = self.recipients.iter().map(|r| r.amount.0).sum();
 
         ApiAmount(input_sum - output_sum)
     }

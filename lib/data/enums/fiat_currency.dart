@@ -59,4 +59,3 @@ enum FiatCurrency {
     }
   }
 }
-
