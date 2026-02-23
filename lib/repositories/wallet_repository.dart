@@ -1,14 +1,13 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/generated/rust/api/backup.dart';
 import 'package:danawallet/generated/rust/api/history.dart';
-import 'package:danawallet/generated/rust/api/outputs.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/generated/rust/api/structs/discovered_output.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
-import 'package:danawallet/generated/rust/api/structs/output_spend_status.dart';
-import 'package:danawallet/generated/rust/api/structs/owned_output.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
@@ -16,6 +15,7 @@ import 'package:danawallet/generated/rust/api/wallet/setup.dart';
 import 'package:danawallet/generated/rust/lib.dart';
 import 'package:danawallet/repositories/database_helper.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -24,12 +24,11 @@ const String _keyScanSk = "scansk";
 const String _keySpendKey = "spendkey";
 const String _keySeedPhrase = "seedphrase";
 
-// non secure storage
-// this will likely replaced by an sql database in the future
+// non secure storage (SharedPreferences - will be migrated to SQLite)
 const String _keyBirthday = "birthday";
 const String _keyNetwork = "network";
 const String _keyTxHistory = "txhistory";
-const String _keyOwnedOutputs = "ownedoutputs";
+const String _keyOwnedOutputs = "ownedoutputs"; // Legacy key, only used for cleanup
 const String _keyLastScan = "lastscan";
 const String _keyDanaAddress = "danaaddress";
 
@@ -45,6 +44,111 @@ class WalletRepository {
 
   Future<Database> get _db async => await DatabaseHelper.instance.database;
 
+  // ============================================
+  // MIGRATION
+  // ============================================
+
+  /// Check if migration from SharedPreferences is needed and perform it.
+  /// Should be called on app startup before any wallet operations.
+  ///
+  /// LEGACY: This is the ONLY place where TxHistory should be used.
+  /// TxHistory is kept in Rust only for migration from old app versions.
+  /// Owned outputs are decoded from raw JSON (no Rust type dependency).
+  Future<void> migrateToSqliteIfNeeded() async {
+    final oldOutputs = await nonSecureStorage.getString(_keyOwnedOutputs);
+    final oldHistory = await nonSecureStorage.getString(_keyTxHistory);
+
+    if (oldOutputs == null && oldHistory == null) {
+      return; // No migration needed
+    }
+
+    Logger().i("Migrating wallet data from SharedPreferences to SQLite");
+
+    final db = await _db;
+
+    await db.transaction((txn) async {
+      // Migrate owned outputs (ad-hoc JSON decoding, no Rust dependency).
+      // LEGACY: can be removed once no users remain on pre-SQLite versions.
+      //
+      // The old spend_status was a serde enum:
+      //   "Unspent"              → spending_txid: null, mined_in_block: null
+      //   {"Spent": "txid"}      → spending_txid: txid, mined_in_block: null
+      //   {"Mined": "blockhash"} → spending_txid: null, mined_in_block: blockhash
+      if (oldOutputs != null) {
+        try {
+          final Map<String, dynamic> decoded = jsonDecode(oldOutputs);
+          int migrated = 0;
+
+          for (final entry in decoded.entries) {
+            final Map<String, dynamic> output = entry.value;
+            final spendStatus = output['spend_status'];
+
+            String? spendingTxid;
+            String? minedInBlock;
+
+            if (spendStatus is Map<String, dynamic>) {
+              if (spendStatus.containsKey('Spent')) {
+                spendingTxid = spendStatus['Spent'] as String?;
+              } else if (spendStatus.containsKey('Mined')) {
+                minedInBlock = spendStatus['Mined'] as String?;
+              }
+            }
+            // else: "Unspent" string — both remain null
+
+            final outpoint = _parseOutpoint(entry.key);
+            final List<dynamic> tweakList = output['tweak'];
+
+            await txn.insert('owned_outputs', {
+              'txid': outpoint.$1,
+              'vout': outpoint.$2,
+              'blockheight': output['blockheight'] as int,
+              'tweak': Uint8List.fromList(tweakList.cast<int>()),
+              'amount_sat': output['amount'] as int,
+              'script': output['script'] as String,
+              'label': output['label'] as String?,
+              'spending_txid': spendingTxid,
+              'mined_in_block': minedInBlock,
+            });
+            migrated++;
+          }
+
+          Logger().i("Migrated $migrated outputs (of ${decoded.length} total)");
+        } catch (e) {
+          Logger().e("Failed to migrate owned outputs: $e");
+          rethrow;
+        }
+      }
+
+      // Migrate transaction history
+      // LEGACY: TxHistory.decode() is only used here for migration
+      if (oldHistory != null) {
+        try {
+          final history = TxHistory.decode(encodedHistory: oldHistory);
+          final transactions = history.toApiTransactions();
+
+          for (final tx in transactions) {
+            await _insertTransactionInTxn(txn, tx);
+          }
+
+          Logger().i("Migrated ${transactions.length} transactions");
+        } catch (e) {
+          Logger().e("Failed to migrate transaction history: $e");
+          rethrow;
+        }
+      }
+    });
+
+    // Remove old keys after successful migration
+    await nonSecureStorage.remove(_keyOwnedOutputs);
+    await nonSecureStorage.remove(_keyTxHistory);
+
+    Logger().i("Migration complete");
+  }
+
+  // ============================================
+  // WALLET SETUP & RESET
+  // ============================================
+
   Future<void> reset() async {
     // delete secure storage
     await secureStorage.deleteAll();
@@ -58,6 +162,12 @@ class WalletRepository {
       _keyBirthday,
       _keyDanaAddress,
     });
+
+    // clear SQLite wallet data
+    final db = await _db;
+    await db.delete('owned_outputs');
+    await db.delete('tx_incoming');
+    await db.delete('tx_outgoing');
   }
 
   Future<SpWallet> setupWallet(WalletSetupResult walletSetup,
@@ -86,7 +196,6 @@ class WalletRepository {
 
     // set default values for new wallet
     await saveLastScan(lastScan);
-    await saveOwnedOutputs(OwnedOutputs.empty());
 
     // check if creation was successful by reading wallet
     final wallet = await readWallet();
@@ -94,54 +203,47 @@ class WalletRepository {
   }
 
   Future<SpWallet?> readWallet() async {
-    // read scan and spend key. if these are present, the entire wallet should be present
     final scanKey = await readScanKey();
     final spendKey = await readSpendKey();
 
     if (scanKey != null && spendKey != null) {
-      // if the scan and spend keys are present, then network should also be present
-      // network is required, since we need it to generate the receive & change payment codes
       final network = await readNetwork();
-
       return SpWallet(scanKey: scanKey, spendKey: spendKey, network: network);
-    } else {
-      return null;
     }
+    return null;
   }
+
+  // ============================================
+  // SECURE STORAGE (Keys)
+  // ============================================
 
   Future<ApiScanKey?> readScanKey() async {
     final encoded = await secureStorage.read(key: _keyScanSk);
-
     if (encoded != null) {
       return ApiScanKey.decode(encoded: encoded);
-    } else {
-      return null;
     }
+    return null;
   }
 
   Future<ApiSpendKey?> readSpendKey() async {
     final encoded = await secureStorage.read(key: _keySpendKey);
-
     if (encoded != null) {
       return ApiSpendKey.decode(encoded: encoded);
-    } else {
-      return null;
     }
+    return null;
   }
 
   Future<String?> readSeedPhrase() async {
     return await secureStorage.read(key: _keySeedPhrase);
   }
 
+  // ============================================
+  // SHARED PREFERENCES (Simple values)
+  // ============================================
+
   Future<ApiNetwork> readNetwork() async {
     final networkStr = await nonSecureStorage.getString(_keyNetwork);
-
     return ApiNetwork.values.byName(networkStr!);
-  }
-
-  Future<TxHistory> readHistory() async {
-    final encodedHistory = await nonSecureStorage.getString(_keyTxHistory);
-    return TxHistory.decode(encodedHistory: encodedHistory!);
   }
 
   Future<void> saveBirthday(DateTime birthday) async {
@@ -166,15 +268,6 @@ class WalletRepository {
     return lastScan;
   }
 
-  Future<void> saveOwnedOutputs(OwnedOutputs ownedOutputs) async {
-    await nonSecureStorage.setString(_keyOwnedOutputs, ownedOutputs.encode());
-  }
-
-  Future<OwnedOutputs> readOwnedOutputs() async {
-    final encodedOutputs = await nonSecureStorage.getString(_keyOwnedOutputs);
-    return OwnedOutputs.decode(encodedOutputs: encodedOutputs!);
-  }
-
   Future<void> saveDanaAddress(Bip353Address? danaAddress) async {
     if (danaAddress != null) {
       return await nonSecureStorage.setString(
@@ -188,9 +281,8 @@ class WalletRepository {
     final retrieved = await nonSecureStorage.getString(_keyDanaAddress);
     if (retrieved != null) {
       return Bip353Address.fromString(retrieved);
-    } else {
-      return null;
     }
+    return null;
   }
 
   // ============================================
@@ -209,17 +301,17 @@ class WalletRepository {
   }
 
   /// Get all unspent outputs for spending.
-  Future<Map<String, ApiOwnedOutput>> getUnspentOutputs() async {
+  Future<Map<String, ApiDiscoveredOutput>> getUnspentOutputs() async {
     final db = await _db;
     final rows = await db.query(
       'owned_outputs',
       where: 'spending_txid IS NULL AND mined_in_block IS NULL',
     );
 
-    final result = <String, ApiOwnedOutput>{};
+    final result = <String, ApiDiscoveredOutput>{};
     for (final row in rows) {
       final outpoint = '${row['txid']}:${row['vout']}';
-      result[outpoint] = _rowToApiOwnedOutput(row);
+      result[outpoint] = _rowToApiDiscoveredOutput(row);
     }
     return result;
   }
@@ -615,26 +707,12 @@ class WalletRepository {
     return (parts[0], int.parse(parts[1]));
   }
 
-  ApiOwnedOutput _rowToApiOwnedOutput(Map<String, Object?> row) {
-    final spendingTxid = row['spending_txid'] as String?;
-    final minedInBlock = row['mined_in_block'] as String?;
-
-    ApiOutputSpendStatus spendStatus;
-    if (spendingTxid == null && minedInBlock == null) {
-      spendStatus = const ApiOutputSpendStatus.unspent();
-    } else if (spendingTxid != null) {
-      spendStatus = ApiOutputSpendStatus.spent(spendingTxid);
-    } else {
-      spendStatus = ApiOutputSpendStatus.mined(minedInBlock!);
-    }
-
-    return ApiOwnedOutput(
-      blockheight: row['blockheight'] as int,
+  ApiDiscoveredOutput _rowToApiDiscoveredOutput(Map<String, Object?> row) {
+    return ApiDiscoveredOutput(
       tweak: U8Array32(row['tweak'] as Uint8List),
-      amount: ApiAmount(field0: BigInt.from(row['amount_sat'] as int)),
-      script: row['script'] as String,
+      value: ApiAmount(field0: BigInt.from(row['amount_sat'] as int)),
+      scriptPubkey: row['script'] as String,
       label: row['label'] as String?,
-      spendStatus: spendStatus,
     );
   }
 
@@ -707,18 +785,20 @@ class WalletRepository {
   Future<WalletBackup> createWalletBackup() async {
     final wallet = await readWallet();
     final birthday = await readBirthday();
-    final history = await readHistory();
-    final outputs = await readOwnedOutputs();
     final seedPhrase = await readSeedPhrase();
     final lastScan = await readLastScan();
     final network = await readNetwork();
+
+    // LEGACY: TxHistory is deprecated — wallet recovery relies on seed phrase (rescan from birthday).
+    // TxHistory.empty() is only used here for backup compatibility.
+    // TODO: Remove TxHistory from backup format entirely.
+    final history = TxHistory.empty();
 
     return WalletBackup(
         wallet: wallet!,
         birthday: birthday?.toSeconds(),
         lastScan: lastScan!,
         txHistory: history,
-        ownedOutputs: outputs,
         seedPhrase: seedPhrase,
         network: network);
   }
@@ -726,7 +806,6 @@ class WalletRepository {
   Future<void> restoreWalletBackup(WalletBackup backup) async {
     await reset();
 
-    // insert new values
     await secureStorage.write(key: _keyScanSk, value: backup.scanKey.encode());
     await secureStorage.write(
         key: _keySpendKey, value: backup.spendKey.encode());
@@ -740,7 +819,8 @@ class WalletRepository {
       await secureStorage.write(key: _keySeedPhrase, value: backup.seedPhrase);
     }
 
-    await saveOwnedOutputs(backup.ownedOutputs);
     await saveLastScan(backup.lastScan);
+
+    // TODO insert history and owned outputs
   }
 }

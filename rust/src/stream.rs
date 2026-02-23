@@ -9,7 +9,6 @@ use crate::{
 };
 use flutter_rust_bridge::frb;
 use lazy_static::lazy_static;
-use spdk_wallet::bitcoin::{absolute::Height, BlockHash};
 
 lazy_static! {
     static ref SCAN_PROGRESS_STREAM_SINK: Mutex<Option<StreamSink<u32>>> = Mutex::new(None);
