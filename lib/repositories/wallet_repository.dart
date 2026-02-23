@@ -1,13 +1,23 @@
+import 'dart:typed_data';
+
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/generated/rust/api/backup.dart';
 import 'package:danawallet/generated/rust/api/history.dart';
 import 'package:danawallet/generated/rust/api/outputs.dart';
+import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
+import 'package:danawallet/generated/rust/api/structs/output_spend_status.dart';
+import 'package:danawallet/generated/rust/api/structs/owned_output.dart';
+import 'package:danawallet/generated/rust/api/structs/recipient.dart';
+import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:danawallet/generated/rust/api/wallet/setup.dart';
+import 'package:danawallet/generated/rust/lib.dart';
+import 'package:danawallet/repositories/database_helper.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 
 // secure storage
 const String _keyScanSk = "scansk";
@@ -32,6 +42,8 @@ class WalletRepository {
 
   // singleton class
   static final instance = WalletRepository._();
+
+  Future<Database> get _db async => await DatabaseHelper.instance.database;
 
   Future<void> reset() async {
     // delete secure storage
@@ -74,7 +86,6 @@ class WalletRepository {
 
     // set default values for new wallet
     await saveLastScan(lastScan);
-    await saveHistory(TxHistory.empty());
     await saveOwnedOutputs(OwnedOutputs.empty());
 
     // check if creation was successful by reading wallet
@@ -126,10 +137,6 @@ class WalletRepository {
     final networkStr = await nonSecureStorage.getString(_keyNetwork);
 
     return ApiNetwork.values.byName(networkStr!);
-  }
-
-  Future<void> saveHistory(TxHistory history) async {
-    return await nonSecureStorage.setString(_keyTxHistory, history.encode());
   }
 
   Future<TxHistory> readHistory() async {
@@ -186,6 +193,517 @@ class WalletRepository {
     }
   }
 
+  // ============================================
+  // OWNED OUTPUTS - READ
+  // ============================================
+
+  /// Get total balance of unspent outputs in satoshis.
+  Future<int> getUnspentBalance() async {
+    final db = await _db;
+    final result = await db.rawQuery('''
+      SELECT COALESCE(SUM(amount_sat), 0) as total 
+      FROM owned_outputs 
+      WHERE spending_txid IS NULL AND mined_in_block IS NULL
+    ''');
+    return result.first['total'] as int;
+  }
+
+  /// Get all unspent outputs for spending.
+  Future<Map<String, ApiOwnedOutput>> getUnspentOutputs() async {
+    final db = await _db;
+    final rows = await db.query(
+      'owned_outputs',
+      where: 'spending_txid IS NULL AND mined_in_block IS NULL',
+    );
+
+    final result = <String, ApiOwnedOutput>{};
+    for (final row in rows) {
+      final outpoint = '${row['txid']}:${row['vout']}';
+      result[outpoint] = _rowToApiOwnedOutput(row);
+    }
+    return result;
+  }
+
+  /// Get outpoints that are not yet mined (for scanning).
+  Future<List<String>> getNotMinedOutpoints() async {
+    final db = await _db;
+    final rows = await db.query(
+      'owned_outputs',
+      columns: ['txid', 'vout'],
+      where: 'mined_in_block IS NULL',
+    );
+
+    return rows.map((row) => '${row['txid']}:${row['vout']}').toList();
+  }
+
+  /// Get amount for a specific outpoint.
+  Future<int?> getOutputAmount(String txid, int vout) async {
+    final db = await _db;
+    final rows = await db.rawQuery('''
+      SELECT amount_sat FROM owned_outputs 
+      WHERE txid = ? AND vout = ?
+    ''', [txid, vout]);
+
+    if (rows.isEmpty) return null;
+    return rows.first['amount_sat'] as int;
+  }
+
+  // ============================================
+  // OWNED OUTPUTS - WRITE
+  // ============================================
+
+  /// Insert a new output (during scanning).
+  Future<void> insertOutput({
+    required String txid,
+    required int vout,
+    required int blockheight,
+    required Uint8List tweak,
+    required int amountSat,
+    required String script,
+    String? label,
+  }) async {
+    final db = await _db;
+    await db.insert(
+        'owned_outputs',
+        {
+          'txid': txid,
+          'vout': vout,
+          'blockheight': blockheight,
+          'tweak': tweak,
+          'amount_sat': amountSat,
+          'script': script,
+          'label': label,
+          'spending_txid': null,
+          'mined_in_block': null,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore);
+  }
+
+  /// Mark an output as spent (when user broadcasts a transaction).
+  Future<void> markOutputSpent(String txid, int vout, String spendingTxid) async {
+    final db = await _db;
+    await db.update(
+      'owned_outputs',
+      {'spending_txid': spendingTxid},
+      where: 'txid = ? AND vout = ?',
+      whereArgs: [txid, vout],
+    );
+  }
+
+  /// Mark an output as mined (during scanning).
+  Future<void> markOutputMined(String txid, int vout, String minedInBlock,
+      {String? spendingTxid}) async {
+    final db = await _db;
+    final updates = <String, Object?>{'mined_in_block': minedInBlock};
+    if (spendingTxid != null) {
+      updates['spending_txid'] = spendingTxid;
+    }
+    await db.update(
+      'owned_outputs',
+      updates,
+      where: 'txid = ? AND vout = ?',
+      whereArgs: [txid, vout],
+    );
+  }
+
+  /// Delete outputs above a certain blockheight (for resetToHeight).
+  Future<void> deleteOutputsAboveHeight(int height) async {
+    final db = await _db;
+    await db.delete(
+      'owned_outputs',
+      where: 'blockheight > ?',
+      whereArgs: [height],
+    );
+  }
+
+  // ============================================
+  // TRANSACTION HISTORY - READ
+  // ============================================
+
+  /// Get all transactions for UI display.
+  Future<List<ApiRecordedTransaction>> getAllTransactions() async {
+    final db = await _db;
+
+    // Get all incoming transactions
+    final incomingRows = await db.query(
+      'tx_incoming',
+      orderBy: 'COALESCE(confirmation_height, 9999999999) DESC, created_at DESC',
+    );
+
+    // Get all outgoing transactions
+    final outgoingRows = await db.query(
+      'tx_outgoing',
+      orderBy: 'COALESCE(confirmation_height, 9999999999) DESC, created_at DESC',
+    );
+
+    final result = <ApiRecordedTransaction>[];
+
+    // Process incoming transactions
+    for (final row in incomingRows) {
+      final txid = row['txid'] as String;
+
+      result.add(ApiRecordedTransaction.incoming(
+        ApiRecordedTransactionIncoming(
+          txid: txid,
+          amount: ApiAmount(
+              field0: BigInt.from(row['amount_received_sat'] as int)),
+          confirmationHeight: row['confirmation_height'] as int?,
+          confirmationBlockhash: row['confirmation_blockhash'] as String?,
+        ),
+      ));
+    }
+
+    // Process outgoing transactions
+    for (final row in outgoingRows) {
+      final txid = row['txid'] as String;
+
+      // Fetch spent outpoints
+      final spentRows = await db.query(
+        'tx_spent_outpoints',
+        where: 'txid = ?',
+        whereArgs: [txid],
+      );
+      final spentOutpoints = spentRows
+          .map((r) => '${r['outpoint_txid']}:${r['outpoint_vout']}')
+          .toList();
+
+      // Fetch recipients
+      final recipientRows = await db.query(
+        'tx_recipients',
+        where: 'txid = ?',
+        whereArgs: [txid],
+      );
+      final recipients = recipientRows
+          .map((r) => ApiRecipient(
+                address: r['address'] as String,
+                amount: ApiAmount(field0: BigInt.from(r['amount_sat'] as int)),
+              ))
+          .toList();
+
+      result.add(ApiRecordedTransaction.outgoing(
+        ApiRecordedTransactionOutgoing(
+          txid: txid,
+          spentOutpoints: spentOutpoints,
+          recipients: recipients,
+          confirmationHeight: row['confirmation_height'] as int?,
+          confirmationBlockhash: row['confirmation_blockhash'] as String?,
+          change: ApiAmount(field0: BigInt.from(row['change_sat'] as int? ?? 0)),
+          fee: ApiAmount(field0: BigInt.from(row['fee_sat'] as int? ?? 0)),
+        ),
+      ));
+    }
+
+    // Sort by confirmation height (most recent first)
+    result.sort((a, b) {
+      int getConfirmationHeight(ApiRecordedTransaction tx) {
+        return switch (tx) {
+          ApiRecordedTransaction_Incoming(:final field0) =>
+            field0.confirmationHeight ?? 9999999999,
+          ApiRecordedTransaction_Outgoing(:final field0) =>
+            field0.confirmationHeight ?? 9999999999,
+          ApiRecordedTransaction_UnknownOutgoing(:final field0) =>
+            field0.confirmationHeight,
+        };
+      }
+
+      final aHeight = getConfirmationHeight(a);
+      final bHeight = getConfirmationHeight(b);
+      return bHeight.compareTo(aHeight);
+    });
+
+    return result;
+  }
+
+  /// Get sum of unconfirmed change from outgoing transactions.
+  Future<int> getUnconfirmedChange() async {
+    final db = await _db;
+    final result = await db.rawQuery('''
+      SELECT COALESCE(SUM(change_sat), 0) as total 
+      FROM tx_outgoing 
+      WHERE confirmation_height IS NULL
+    ''');
+    return result.first['total'] as int;
+  }
+
+  /// Check if a txid is from an outgoing transaction we sent (self-send check).
+  Future<bool> isOwnOutgoingTx(String txid) async {
+    final db = await _db;
+    final result = await db.rawQuery('''
+      SELECT 1 FROM tx_outgoing 
+      WHERE txid = ?
+      LIMIT 1
+    ''', [txid]);
+    return result.isNotEmpty;
+  }
+
+  // ============================================
+  // TRANSACTION HISTORY - WRITE
+  // ============================================
+
+  /// Add an incoming transaction.
+  Future<void> addIncomingTransaction({
+    required String txid,
+    required int amountSat,
+    required int confirmationHeight,
+    required String confirmationBlockhash,
+  }) async {
+    final db = await _db;
+    await db.insert(
+      'tx_incoming',
+      {
+        'txid': txid,
+        'amount_received_sat': amountSat,
+        'confirmation_height': confirmationHeight,
+        'confirmation_blockhash': confirmationBlockhash,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Add an outgoing transaction (when user sends).
+  Future<void> addOutgoingTransaction({
+    required String txid,
+    required List<(String, int, int)> spentOutpoints, // (txid, vout, amount)
+    required List<ApiRecipient> recipients,
+    required int changeSat,
+    required int feeSat,
+  }) async {
+    final db = await _db;
+
+    await db.transaction((txn) async {
+      final totalAmount =
+          recipients.fold<int>(0, (sum, r) => sum + r.amount.field0.toInt());
+
+      await txn.insert(
+        'tx_outgoing',
+        {
+          'txid': txid,
+          'amount_spent_sat': totalAmount + feeSat + changeSat,
+          'confirmation_height': null,
+          'confirmation_blockhash': null,
+          'change_sat': changeSat,
+          'fee_sat': feeSat,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      for (final (outTxid, outVout, _) in spentOutpoints) {
+        await txn.insert('tx_spent_outpoints', {
+          'txid': txid,
+          'outpoint_txid': outTxid,
+          'outpoint_vout': outVout,
+        });
+      }
+
+      for (final recipient in recipients) {
+        await txn.insert('tx_recipients', {
+          'txid': txid,
+          'address': recipient.address,
+          'amount_sat': recipient.amount.field0.toInt(),
+        });
+      }
+    });
+  }
+
+  /// Mark outputs as spent without creating history entry (unknown spend case).
+  /// Used when outputs are spent from another device/wallet.
+  Future<void> markOutputsSpentUnknown({
+    required List<(String, int, int)> spentOutpoints, // (txid, vout, amount)
+    required String minedInBlock,
+  }) async {
+    final db = await _db;
+
+    await db.transaction((txn) async {
+      for (final (outTxid, outVout, _) in spentOutpoints) {
+        await txn.update(
+          'owned_outputs',
+          {
+            'spending_txid': null, // Unknown txid
+            'mined_in_block': minedInBlock,
+          },
+          where: 'txid = ? AND vout = ?',
+          whereArgs: [outTxid, outVout],
+        );
+      }
+    });
+  }
+
+  /// Confirm an outgoing transaction (during scan when we see it mined).
+  Future<bool> confirmOutgoingTransaction({
+    required String spentOutpointTxid,
+    required int spentOutpointVout,
+    required int confirmationHeight,
+    required String confirmationBlockhash,
+  }) async {
+    final db = await _db;
+
+    final result = await db.rawQuery('''
+      SELECT h.txid 
+      FROM tx_outgoing h
+      JOIN tx_spent_outpoints s ON s.txid = h.txid
+      WHERE s.outpoint_txid = ? 
+        AND s.outpoint_vout = ?
+      LIMIT 1
+    ''', [spentOutpointTxid, spentOutpointVout]);
+
+    if (result.isEmpty) {
+      return false; // No matching outgoing transaction found
+    }
+
+    final txid = result.first['txid'] as String;
+    await db.update(
+      'tx_outgoing',
+      {
+        'confirmation_height': confirmationHeight,
+        'confirmation_blockhash': confirmationBlockhash,
+      },
+      where: 'txid = ?',
+      whereArgs: [txid],
+    );
+
+    return true;
+  }
+
+  /// Delete transactions above a certain blockheight (for resetToHeight).
+  Future<void> deleteTransactionsAboveHeight(int height) async {
+    final db = await _db;
+    await db.transaction((txn) async {
+      await txn.delete(
+        'tx_incoming',
+        where: 'confirmation_height IS NOT NULL AND confirmation_height > ?',
+        whereArgs: [height],
+      );
+      await txn.delete(
+        'tx_outgoing',
+        where: 'confirmation_height IS NOT NULL AND confirmation_height > ?',
+        whereArgs: [height],
+      );
+    });
+  }
+
+  /// Reset wallet data to a specific height.
+  Future<void> resetToHeight(int height) async {
+    final db = await _db;
+    await db.transaction((txn) async {
+      await txn.delete(
+        'owned_outputs',
+        where: 'blockheight > ?',
+        whereArgs: [height],
+      );
+
+      await txn.delete(
+        'tx_incoming',
+        where: 'confirmation_height IS NOT NULL AND confirmation_height > ?',
+        whereArgs: [height],
+      );
+      await txn.delete(
+        'tx_outgoing',
+        where: 'confirmation_height IS NOT NULL AND confirmation_height > ?',
+        whereArgs: [height],
+      );
+    });
+
+    await saveLastScan(height);
+  }
+
+  // ============================================
+  // HELPER METHODS
+  // ============================================
+
+  (String, int) _parseOutpoint(String outpoint) {
+    final parts = outpoint.split(':');
+    return (parts[0], int.parse(parts[1]));
+  }
+
+  ApiOwnedOutput _rowToApiOwnedOutput(Map<String, Object?> row) {
+    final spendingTxid = row['spending_txid'] as String?;
+    final minedInBlock = row['mined_in_block'] as String?;
+
+    ApiOutputSpendStatus spendStatus;
+    if (spendingTxid == null && minedInBlock == null) {
+      spendStatus = const ApiOutputSpendStatus.unspent();
+    } else if (spendingTxid != null) {
+      spendStatus = ApiOutputSpendStatus.spent(spendingTxid);
+    } else {
+      spendStatus = ApiOutputSpendStatus.mined(minedInBlock!);
+    }
+
+    return ApiOwnedOutput(
+      blockheight: row['blockheight'] as int,
+      tweak: U8Array32(row['tweak'] as Uint8List),
+      amount: ApiAmount(field0: BigInt.from(row['amount_sat'] as int)),
+      script: row['script'] as String,
+      label: row['label'] as String?,
+      spendStatus: spendStatus,
+    );
+  }
+
+  Future<void> _insertTransactionInTxn(
+      Transaction txn, ApiRecordedTransaction tx) async {
+    switch (tx) {
+      case ApiRecordedTransaction_Incoming(:final field0):
+        await txn.insert('tx_incoming', {
+          'txid': field0.txid,
+          'amount_received_sat': field0.amount.field0.toInt(),
+          'confirmation_height': field0.confirmationHeight,
+          'confirmation_blockhash': field0.confirmationBlockhash,
+        });
+        break;
+
+      case ApiRecordedTransaction_Outgoing(:final field0):
+        final totalAmount = field0.recipients
+            .fold<int>(0, (sum, r) => sum + r.amount.field0.toInt());
+
+        await txn.insert('tx_outgoing', {
+          'txid': field0.txid,
+          'amount_spent_sat': totalAmount + field0.fee.field0.toInt(),
+          'confirmation_height': field0.confirmationHeight?.toInt(),
+          'confirmation_blockhash': field0.confirmationBlockhash?.toString(),
+          'change_sat': field0.change.field0.toInt(),
+          'fee_sat': field0.fee.field0.toInt(),
+        });
+
+        for (final outpoint in field0.spentOutpoints) {
+          final (outTxid, outVout) = _parseOutpoint(outpoint);
+          await txn.insert('tx_spent_outpoints', {
+            'txid': field0.txid,
+            'outpoint_txid': outTxid,
+            'outpoint_vout': outVout,
+          });
+        }
+
+        for (final recipient in field0.recipients) {
+          await txn.insert('tx_recipients', {
+            'txid': field0.txid,
+            'address': recipient.address,
+            'amount_sat': recipient.amount.field0.toInt(),
+          });
+        }
+        break;
+
+      case ApiRecordedTransaction_UnknownOutgoing(:final field0):
+        // Don't create history entry for unknown outgoing
+        // Just mark the outputs as spent with unknown txid
+        for (final outpoint in field0.spentOutpoints) {
+          final (outTxid, outVout) = _parseOutpoint(outpoint);
+          await txn.update(
+            'owned_outputs',
+            {
+              'spending_txid': null,
+              'mined_in_block': field0.confirmationBlockhash,
+            },
+            where: 'txid = ? AND vout = ?',
+            whereArgs: [outTxid, outVout],
+          );
+        }
+        break;
+    }
+  }
+
+  // ============================================
+  // BACKUP & RESTORE
+  // ============================================
+
   Future<WalletBackup> createWalletBackup() async {
     final wallet = await readWallet();
     final birthday = await readBirthday();
@@ -222,7 +740,6 @@ class WalletRepository {
       await secureStorage.write(key: _keySeedPhrase, value: backup.seedPhrase);
     }
 
-    await saveHistory(backup.txHistory);
     await saveOwnedOutputs(backup.ownedOutputs);
     await saveLastScan(backup.lastScan);
   }
