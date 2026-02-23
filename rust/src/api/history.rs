@@ -2,7 +2,7 @@ use std::{collections::HashMap, str::FromStr};
 
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
-use spdk_wallet::bitcoin::{absolute::Height, Amount, OutPoint, Txid};
+use spdk_wallet::bitcoin::{absolute::Height, Amount, BlockHash, OutPoint, Txid};
 use spdk_wallet::client::Recipient;
 
 use crate::{
@@ -58,13 +58,13 @@ impl TxHistory {
             blkheight,
             found_outputs,
             found_inputs,
-            ..
+            blkhash
         } = update;
 
         let mut unknown_spent_outpoints = vec![];
         for outpoint in found_inputs {
             // this may confirm the same tx multiple times, but this shouldn't be a problem
-            if !self.confirm_recorded_outgoing_transaction(*outpoint, *blkheight) {
+            if !self.confirm_recorded_outgoing_transaction(*outpoint, *blkheight, *blkhash) {
                 // if we're unable to confirm the spent outpoint, it means we don't know
                 // the spending transaction because of a history desync. To keep the
                 // history consistent we make a new 'unknown' spent output for these.
@@ -82,6 +82,7 @@ impl TxHistory {
                 unknown_spent_outpoints,
                 unknown_sum,
                 *blkheight,
+                *blkhash
             )?;
         }
 
@@ -110,7 +111,7 @@ impl TxHistory {
             *entry += output.value;
         }
         for (txid, amount) in txs {
-            self.record_incoming_transaction(txid, amount, *blkheight);
+            self.record_incoming_transaction(txid, amount, *blkheight, *blkhash);
         }
 
         Ok(())
@@ -152,12 +153,12 @@ impl TxHistory {
         let blkheight = Height::from_consensus(height)?;
         self.0.retain(|tx| match tx {
             RecordedTransaction::Incoming(incoming) => {
-                incoming.confirmed_at.is_some_and(|x| x <= blkheight)
+                incoming.confirmation_height.is_some_and(|x| x <= blkheight)
             }
             RecordedTransaction::Outgoing(outgoing) => {
-                outgoing.confirmed_at.is_some_and(|x| x <= blkheight)
+                outgoing.confirmation_height.is_some_and(|x| x <= blkheight)
             }
-            RecordedTransaction::UnknownOutgoing(unknown) => unknown.confirmed_at <= blkheight,
+            RecordedTransaction::UnknownOutgoing(unknown) => unknown.confirmation_height <= blkheight,
         });
 
         Ok(())
@@ -168,7 +169,7 @@ impl TxHistory {
         self.0
             .iter()
             .filter_map(|x| match x {
-                RecordedTransaction::Outgoing(outgoing) if outgoing.confirmed_at.is_none() => {
+                RecordedTransaction::Outgoing(outgoing) if outgoing.confirmation_height.is_none() => {
                     Some(outgoing.change)
                 }
                 _ => None,
@@ -190,7 +191,8 @@ impl TxHistory {
                 txid,
                 spent_outpoints,
                 recipients,
-                confirmed_at: None,
+                confirmation_height: None,
+                confirmation_blockhash: None,
                 change,
                 fee,
             }))
@@ -200,13 +202,15 @@ impl TxHistory {
         &mut self,
         outpoint: OutPoint,
         blkheight: Height,
+        blkhash: BlockHash,
     ) -> bool {
         for recorded_tx in self.0.iter_mut() {
             match recorded_tx {
                 RecordedTransaction::Outgoing(outgoing)
                     if (outgoing.spent_outpoints.contains(&outpoint)) =>
                 {
-                    outgoing.confirmed_at = Some(blkheight);
+                    outgoing.confirmation_height = Some(blkheight);
+                    outgoing.confirmation_blockhash = Some(blkhash);
                     return true;
                 }
                 _ => (),
@@ -221,24 +225,27 @@ impl TxHistory {
         &mut self,
         spent_outpoints: Vec<OutPoint>,
         amount: Amount,
-        confirmed_at: Height,
+        confirmation_height: Height,
+        confirmation_blockhash: BlockHash,
     ) -> Result<()> {
         self.0.push(RecordedTransaction::UnknownOutgoing(
             RecordedTransactionUnknownOutgoing {
                 spent_outpoints,
                 amount,
-                confirmed_at,
+                confirmation_height,
+                confirmation_blockhash,
             },
         ));
         Ok(())
     }
 
-    fn record_incoming_transaction(&mut self, txid: Txid, amount: Amount, confirmed_at: Height) {
+    fn record_incoming_transaction(&mut self, txid: Txid, amount: Amount, confirmation_height: Height, confirmation_blockhash: BlockHash) {
         self.0
             .push(RecordedTransaction::Incoming(RecordedTransactionIncoming {
                 txid,
                 amount,
-                confirmed_at: Some(confirmed_at),
+                confirmation_height: Some(confirmation_height),
+                confirmation_blockhash: Some(confirmation_blockhash),
             }))
     }
 

@@ -276,7 +276,7 @@ class WalletScreenState extends State<WalletScreen> {
           'Incoming',
           style: BitcoinTextStyle.body4(Bitcoin.black),
         );
-        date = field0.confirmedAt?.toString() ?? 'Unconfirmed';
+        date = field0.confirmationHeight?.toString() ?? 'Unconfirmed';
         color = Bitcoin.green;
         amount = hideAmount ? hideAmountFormat : field0.amount.displayBtc();
         amountprefix = '+';
@@ -292,8 +292,8 @@ class WalletScreenState extends State<WalletScreen> {
         final paymentCode = field0.recipients[0].address;
         recipientWidget =
             contactsState.getDisplayNameWidget(context, paymentCode);
-        date = field0.confirmedAt?.toString() ?? 'Unconfirmed';
-        if (field0.confirmedAt == null) {
+        date = field0.confirmationHeight?.toString() ?? 'Unconfirmed';
+        if (field0.confirmationHeight == null) {
           color = Bitcoin.neutral4;
         } else {
           color = Bitcoin.red;
@@ -315,7 +315,7 @@ class WalletScreenState extends State<WalletScreen> {
           'Unknown',
           style: BitcoinTextStyle.body4(Bitcoin.black),
         );
-        date = field0.confirmedAt.toString();
+        date = field0.confirmationHeight.toString();
         color = Bitcoin.red;
         amount = hideAmount ? hideAmountFormat : field0.amount.displayBtc();
         amountprefix = '-';
