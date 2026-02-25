@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:danawallet/data/models/dana_backup.dart';
 import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
+import 'package:danawallet/services/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 
 class BackupService {
@@ -15,7 +17,8 @@ class BackupService {
     final settingsRepository = SettingsRepository.instance;
 
     final wallet = await walletRepository.createWalletBackup();
-    final transactionData = await walletRepository.createTransactionDataBackup();
+    final transactionData =
+        await walletRepository.createTransactionDataBackup();
     final settings = await settingsRepository.createSettingsBackup();
 
     return DanaBackup(
@@ -42,44 +45,44 @@ class BackupService {
     await settingsRepository.restoreSettingsBackup(backup.settings);
   }
 
-  // TODO: Phase 2 — replace with proper encryption (PBKDF2 + AES-256-GCM)
+  /// Encrypt and save backup to a user-selected file.
   static Future<bool> backupToFile(String password) async {
     final backup = await _createBackup();
-    final plaintext = backup.encode();
-
-    // Temporary: write plaintext JSON (encryption will be added in Phase 2)
-    final bytes = utf8.encode(plaintext);
+    final plaintext = utf8.encode(backup.encode());
+    final encrypted =
+        await BackupCrypto.encrypt(Uint8List.fromList(plaintext), password);
 
     final outputFilePath = await FilePicker.platform.saveFile(
         dialogTitle: 'Please select an output file:',
-        fileName: 'danawallet',
-        bytes: bytes);
+        fileName: 'danawallet.bak',
+        bytes: encrypted);
 
     if (Platform.isLinux && outputFilePath != null) {
       final file = File(outputFilePath);
-      await file.writeAsBytes(bytes);
+      await file.writeAsBytes(encrypted);
       return true;
     }
 
     return outputFilePath != null;
   }
 
-  // TODO: Phase 2 — replace with proper decryption
-  static Future<String?> getBackupFromFile() async {
+  /// Pick a backup file and return the raw encrypted bytes.
+  static Future<Uint8List?> getBackupFromFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles();
 
     if (result != null) {
       File file = File(result.files.single.path!);
-      return utf8.decode(await file.readAsBytes());
+      return await file.readAsBytes();
     } else {
       return null;
     }
   }
 
-  // TODO: Phase 2 — replace with proper decryption
+  /// Decrypt and restore from encrypted backup bytes.
   static Future<void> restoreFromFile(
-      String encodedBackup, String password) async {
-    final backup = DanaBackup.decode(encodedBackup);
+      Uint8List encryptedBackup, String password) async {
+    final plaintext = await BackupCrypto.decrypt(encryptedBackup, password);
+    final backup = DanaBackup.decode(utf8.decode(plaintext));
     await _restoreBackup(backup);
   }
 }
