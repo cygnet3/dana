@@ -67,7 +67,7 @@ class WalletBackup {
   final String? seedPhrase;
 
   /// Wallet birthday as unix timestamp in seconds
-  final int birthday;
+  final int? birthday;
 
   /// Network name (e.g. "mainnet", "signet", "regtest")
   final String network;
@@ -82,7 +82,7 @@ class WalletBackup {
     required this.scanKey,
     required this.spendKey,
     this.seedPhrase,
-    required this.birthday,
+    this.birthday,
     required this.network,
     this.lastScan,
     this.danaAddress,

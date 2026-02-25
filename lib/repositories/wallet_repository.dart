@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:danawallet/data/models/bip353_address.dart';
+import 'package:danawallet/data/models/dana_backup.dart';
 import 'package:danawallet/extensions/date_time.dart';
-import 'package:danawallet/generated/rust/api/backup.dart';
 import 'package:danawallet/generated/rust/api/history.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/discovered_output.dart';
@@ -781,45 +781,175 @@ class WalletRepository {
   // BACKUP & RESTORE
   // ============================================
 
+  /// Gather wallet data from Secure Storage & SharedPreferences.
   Future<WalletBackup> createWalletBackup() async {
-    final wallet = await readWallet();
-    final birthday = await readBirthday();
+    final scanKeyEncoded = await secureStorage.read(key: _keyScanSk);
+    final spendKeyEncoded = await secureStorage.read(key: _keySpendKey);
     final seedPhrase = await readSeedPhrase();
+    final birthday = await readBirthday();
     final lastScan = await readLastScan();
     final network = await readNetwork();
-
-    // LEGACY: TxHistory is deprecated — wallet recovery relies on seed phrase (rescan from birthday).
-    // TxHistory.empty() is only used here for backup compatibility.
-    // TODO: Remove TxHistory from backup format entirely.
-    final history = TxHistory.empty();
+    final danaAddress = await readDanaAddress();
 
     return WalletBackup(
-        wallet: wallet!,
-        birthday: birthday?.toSeconds(),
-        lastScan: lastScan!,
-        txHistory: history,
-        seedPhrase: seedPhrase,
-        network: network);
+      scanKey: scanKeyEncoded!,
+      spendKey: spendKeyEncoded!,
+      seedPhrase: seedPhrase,
+      birthday: birthday?.toSeconds(),
+      network: network.name,
+      lastScan: lastScan,
+      danaAddress: danaAddress?.toString(),
+    );
   }
 
-  Future<void> restoreWalletBackup(WalletBackup backup) async {
+  /// Gather all transaction data from SQLite (outputs + transaction history).
+  Future<TransactionDataBackup> createTransactionDataBackup() async {
+    final db = await _db;
+
+    // Owned outputs — raw rows, no conversion to Api types
+    final outputRows = await db.query('owned_outputs');
+    final outputs =
+        outputRows.map((row) => OwnedOutputBackup.fromRow(row)).toList();
+
+    // Incoming transactions
+    final incomingRows = await db.query('tx_incoming');
+    final incoming =
+        incomingRows.map((row) => IncomingTxBackup.fromRow(row)).toList();
+
+    // Outgoing transactions with their spent outpoints and recipients
+    final outgoingRows = await db.query('tx_outgoing');
+    final outgoing = <OutgoingTxBackup>[];
+
+    for (final row in outgoingRows) {
+      final txid = row['txid'] as String;
+
+      final spentRows = await db.query(
+        'tx_spent_outpoints',
+        where: 'txid = ?',
+        whereArgs: [txid],
+      );
+      final spentOutpoints = spentRows
+          .map((r) => '${r['outpoint_txid']}:${r['outpoint_vout']}')
+          .toList();
+
+      final recipientRows = await db.query(
+        'tx_recipients',
+        where: 'txid = ?',
+        whereArgs: [txid],
+      );
+      final recipients = recipientRows
+          .map((r) => RecipientBackup(
+                address: r['address'] as String,
+                amountSat: r['amount_sat'] as int,
+              ))
+          .toList();
+
+      outgoing.add(OutgoingTxBackup(
+        txid: txid,
+        amountSpentSat: row['amount_spent_sat'] as int,
+        changeSat: row['change_sat'] as int? ?? 0,
+        feeSat: row['fee_sat'] as int? ?? 0,
+        confirmationHeight: row['confirmation_height'] as int?,
+        confirmationBlockhash: row['confirmation_blockhash'] as String?,
+        userNote: row['user_note'] as String?,
+        spentOutpoints: spentOutpoints,
+        recipients: recipients,
+      ));
+    }
+
+    return TransactionDataBackup(
+      ownedOutputs: outputs,
+      incomingTransactions: incoming,
+      outgoingTransactions: outgoing,
+    );
+  }
+
+  /// Restore wallet to Secure Storage & SharedPreferences.
+  Future<void> restoreWallet(WalletBackup wallet) async {
     await reset();
 
-    await secureStorage.write(key: _keyScanSk, value: backup.scanKey.encode());
-    await secureStorage.write(
-        key: _keySpendKey, value: backup.spendKey.encode());
-    await nonSecureStorage.setString(_keyNetwork, backup.network.name);
+    await secureStorage.write(key: _keyScanSk, value: wallet.scanKey);
+    await secureStorage.write(key: _keySpendKey, value: wallet.spendKey);
+    if (wallet.birthday != null) {
+      await nonSecureStorage.setInt(_keyBirthday, wallet.birthday!);
+    }
+    await nonSecureStorage.setString(_keyNetwork, wallet.network);
 
-    if (backup.birthday != null) {
-      await nonSecureStorage.setInt(_keyBirthday, backup.birthday!);
+    if (wallet.seedPhrase != null) {
+      await secureStorage.write(
+          key: _keySeedPhrase, value: wallet.seedPhrase);
     }
 
-    if (backup.seedPhrase != null) {
-      await secureStorage.write(key: _keySeedPhrase, value: backup.seedPhrase);
+    await saveLastScan(wallet.lastScan);
+
+    if (wallet.danaAddress != null) {
+      await saveDanaAddress(Bip353Address.fromString(wallet.danaAddress!));
     }
+  }
 
-    await saveLastScan(backup.lastScan);
+  /// Restore all transaction data into SQLite (outputs + transaction history).
+  Future<void> restoreTransactionData(TransactionDataBackup data) async {
+    final db = await _db;
 
-    // TODO insert history and owned outputs
+    await db.transaction((txn) async {
+      // Restore owned outputs
+      for (final output in data.ownedOutputs) {
+        await txn.insert(
+          'owned_outputs',
+          output.toRow(),
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+
+      // Restore incoming transactions
+      for (final tx in data.incomingTransactions) {
+        await txn.insert(
+          'tx_incoming',
+          tx.toRow(),
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+
+      // Restore outgoing transactions with spent outpoints and recipients
+      for (final tx in data.outgoingTransactions) {
+        await txn.insert(
+          'tx_outgoing',
+          {
+            'txid': tx.txid,
+            'amount_spent_sat': tx.amountSpentSat,
+            'change_sat': tx.changeSat,
+            'fee_sat': tx.feeSat,
+            'confirmation_height': tx.confirmationHeight,
+            'confirmation_blockhash': tx.confirmationBlockhash,
+            'user_note': tx.userNote,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+
+        for (final outpoint in tx.spentOutpoints) {
+          final parts = outpoint.split(':');
+          await txn.insert(
+            'tx_spent_outpoints',
+            {
+              'txid': tx.txid,
+              'outpoint_txid': parts[0],
+              'outpoint_vout': int.parse(parts[1]),
+            },
+            conflictAlgorithm: ConflictAlgorithm.ignore,
+          );
+        }
+
+        for (final recipient in tx.recipients) {
+          await txn.insert(
+            'tx_recipients',
+            {
+              'txid': tx.txid,
+              'address': recipient.address,
+              'amount_sat': recipient.amountSat,
+            },
+          );
+        }
+      }
+    });
   }
 }
