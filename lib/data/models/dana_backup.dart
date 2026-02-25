@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart';
+import 'package:danawallet/generated/rust/stream.dart';
+
 /// Self-contained backup of all wallet data.
 ///
 /// Captures everything from Secure Storage, SharedPreferences, and SQLite
@@ -67,13 +70,13 @@ class WalletBackup {
   final String? seedPhrase;
 
   /// Wallet birthday as unix timestamp in seconds
-  final int birthday;
+  final int? birthday;
 
   /// Network name (e.g. "mainnet", "signet", "regtest")
   final String network;
 
   /// Last scanned block height
-  final int? lastScan;
+  final int? lastSync;
 
   /// Dana address (BIP353)
   final String? danaAddress;
@@ -82,9 +85,9 @@ class WalletBackup {
     required this.scanKey,
     required this.spendKey,
     this.seedPhrase,
-    required this.birthday,
+    this.birthday,
     required this.network,
-    this.lastScan,
+    this.lastSync,
     this.danaAddress,
   });
 
@@ -94,7 +97,7 @@ class WalletBackup {
         'seed_phrase': seedPhrase,
         'birthday': birthday,
         'network': network,
-        'last_scan': lastScan,
+        'last_sync': lastSync,
         'dana_address': danaAddress,
       };
 
@@ -105,7 +108,7 @@ class WalletBackup {
       seedPhrase: json['seed_phrase'] as String?,
       birthday: json['birthday'] as int,
       network: json['network'] as String,
-      lastScan: json['last_scan'] as int?,
+      lastSync: json['last_sync'] as int?,
       danaAddress: json['dana_address'] as String?,
     );
   }
@@ -228,6 +231,20 @@ class OwnedOutputBackup {
       minedInBlock: json['mined_in_block'] as String?,
     );
   }
+
+  factory OwnedOutputBackup.fromOwnedOutput(OwnedOutput output) {
+    return OwnedOutputBackup(
+      txid: output.txid,
+      vout: output.vout,
+      blockheight: output.blockheight,
+      tweakHex: _bytesToHex(Uint8List.fromList(output.tweak)),
+      amountSat: output.amountSat.toInt(),
+      script: output.script,
+      label: output.label,
+      spendingTxid: output.spendingTxid,
+      minedInBlock: output.minedInBlock,
+    );
+  }
 }
 
 class IncomingTxBackup {
@@ -280,6 +297,16 @@ class IncomingTxBackup {
       confirmationHeight: json['confirmation_height'] as int?,
       confirmationBlockhash: json['confirmation_blockhash'] as String?,
       userNote: json['user_note'] as String?,
+    );
+  }
+
+  factory IncomingTxBackup.fromApiIncoming(
+      ApiRecordedTransactionIncoming tx) {
+    return IncomingTxBackup(
+      txid: tx.txid,
+      amountReceivedSat: tx.amount.field0.toInt(),
+      confirmationHeight: tx.confirmationHeight,
+      confirmationBlockhash: tx.confirmationBlockhash,
     );
   }
 }
@@ -335,6 +362,28 @@ class OutgoingTxBackup {
       spentOutpoints: (json['spent_outpoints'] as List).cast<String>(),
       recipients: (json['recipients'] as List)
           .map((r) => RecipientBackup.fromJson(r as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  factory OutgoingTxBackup.fromApiOutgoing(
+      ApiRecordedTransactionOutgoing tx) {
+    final recipientSum = tx.recipients
+        .fold<int>(0, (sum, r) => sum + r.amount.field0.toInt());
+    return OutgoingTxBackup(
+      txid: tx.txid,
+      amountSpentSat:
+          recipientSum + tx.change.field0.toInt() + tx.fee.field0.toInt(),
+      changeSat: tx.change.field0.toInt(),
+      feeSat: tx.fee.field0.toInt(),
+      confirmationHeight: tx.confirmationHeight,
+      confirmationBlockhash: tx.confirmationBlockhash,
+      spentOutpoints: List<String>.from(tx.spentOutpoints),
+      recipients: tx.recipients
+          .map((r) => RecipientBackup(
+                address: r.address,
+                amountSat: r.amount.field0.toInt(),
+              ))
           .toList(),
     );
   }

@@ -1,12 +1,16 @@
 import 'package:danawallet/data/models/bip353_address.dart';
+import 'package:danawallet/data/models/dana_backup.dart';
 import 'package:danawallet/extensions/date_time.dart';
-import 'package:danawallet/generated/rust/api/backup.dart';
-import 'package:danawallet/generated/rust/api/history.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
+import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:danawallet/generated/rust/api/wallet/setup.dart';
+import 'package:danawallet/repositories/database_helper.dart';
+import 'package:danawallet/repositories/owned_outputs_repository.dart';
+import 'package:danawallet/repositories/tx_history_repository.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 
 // secure storage
 const String _keyScanSk = "scansk";
@@ -159,43 +163,147 @@ class WalletRepository {
   }
 
   Future<WalletBackup> createWalletBackup() async {
-    final wallet = await readWallet();
-    final birthday = await readBirthday();
+    final scanKeyEncoded = await secureStorage.read(key: _keyScanSk);
+    final spendKeyEncoded = await secureStorage.read(key: _keySpendKey);
     final seedPhrase = await readSeedPhrase();
+    final birthday = await readBirthday();
     final lastSync = await readLastSync();
     final network = await readNetwork();
-
-    // LEGACY: TxHistory is deprecated — wallet recovery relies on seed phrase (rescan from birthday).
-    // TxHistory.empty() is only used here for backup compatibility.
-    // TODO: Remove TxHistory from backup format entirely.
-    final history = TxHistory.empty();
+    final danaAddress = await readDanaAddress();
 
     return WalletBackup(
-        wallet: wallet!,
-        birthday: birthday?.toSeconds(),
-        lastScan: lastSync!,
-        txHistory: history,
-        seedPhrase: seedPhrase,
-        network: network);
+      scanKey: scanKeyEncoded!,
+      spendKey: spendKeyEncoded!,
+      seedPhrase: seedPhrase,
+      birthday: birthday?.toSeconds(),
+      network: network.name,
+      lastSync: lastSync,
+      danaAddress: danaAddress?.toString(),
+    );
   }
 
-  Future<void> restoreWalletBackup(WalletBackup backup) async {
+  /// Gather all transaction data from SQLite (outputs + transaction history).
+  Future<TransactionDataBackup> createTransactionDataBackup() async {
+    final allOwnedOutputs =
+        await OwnedOutputsRepository.instance.getAllOwnedOutputs();
+    final ownedOutputsBackup =
+        allOwnedOutputs.map(OwnedOutputBackup.fromOwnedOutput).toList();
+
+    final allTransactions =
+        await TxHistoryRepository.instance.getAllTransactions();
+
+    final incoming = <IncomingTxBackup>[];
+    final outgoing = <OutgoingTxBackup>[];
+
+    for (final tx in allTransactions) {
+      switch (tx) {
+        case ApiRecordedTransaction_Incoming(:final field0):
+          incoming.add(IncomingTxBackup.fromApiIncoming(field0));
+        case ApiRecordedTransaction_Outgoing(:final field0):
+          outgoing.add(OutgoingTxBackup.fromApiOutgoing(field0));
+        case ApiRecordedTransaction_UnknownOutgoing():
+          // Unknown outgoing transactions have no txid and are not recorded in
+          // tx history, so they cannot be backed up as outgoing entries.
+          // The associated owned_outputs rows (with mined_in_block set) are
+          // captured in ownedOutputsBackup above.
+          break;
+      }
+    }
+
+    return TransactionDataBackup(
+      ownedOutputs: ownedOutputsBackup,
+      incomingTransactions: incoming,
+      outgoingTransactions: outgoing,
+    );
+  }
+
+  /// Restore wallet to Secure Storage & SharedPreferences.
+  Future<void> restoreWallet(WalletBackup wallet) async {
     await reset();
 
-    await secureStorage.write(key: _keyScanSk, value: backup.scanKey.encode());
-    await secureStorage.write(
-        key: _keySpendKey, value: backup.spendKey.encode());
-    await nonSecureStorage.setString(_keyNetwork, backup.network.name);
+    await secureStorage.write(key: _keyScanSk, value: wallet.scanKey);
+    await secureStorage.write(key: _keySpendKey, value: wallet.spendKey);
+    if (wallet.birthday != null) {
+      await nonSecureStorage.setInt(_keyBirthday, wallet.birthday!);
+    }
+    await nonSecureStorage.setString(_keyNetwork, wallet.network);
 
-    if (backup.birthday != null) {
-      await nonSecureStorage.setInt(_keyBirthday, backup.birthday!);
+    if (wallet.seedPhrase != null) {
+      await secureStorage.write(
+          key: _keySeedPhrase, value: wallet.seedPhrase);
     }
 
-    if (backup.seedPhrase != null) {
-      await secureStorage.write(key: _keySeedPhrase, value: backup.seedPhrase);
-    }
+    await saveLastSync(wallet.lastSync);
 
-    await saveLastSync(backup.lastScan); 
+    if (wallet.danaAddress != null) {
+      await saveDanaAddress(Bip353Address.fromString(wallet.danaAddress!));
+    }
+  }
+
+  /// Restore all transaction data into SQLite (outputs + transaction history).
+  Future<void> restoreTransactionData(TransactionDataBackup data) async {
+    final db = await DatabaseHelper.instance.database;
+
+    await db.transaction((txn) async {
+      // Restore owned outputs
+      for (final output in data.ownedOutputs) {
+        await txn.insert(
+          'owned_outputs',
+          output.toRow(),
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+
+      // Restore incoming transactions
+      for (final tx in data.incomingTransactions) {
+        await txn.insert(
+          'tx_incoming',
+          tx.toRow(),
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+
+      // Restore outgoing transactions with spent outpoints and recipients
+      for (final tx in data.outgoingTransactions) {
+        await txn.insert(
+          'tx_outgoing',
+          {
+            'txid': tx.txid,
+            'amount_spent_sat': tx.amountSpentSat,
+            'change_sat': tx.changeSat,
+            'fee_sat': tx.feeSat,
+            'confirmation_height': tx.confirmationHeight,
+            'confirmation_blockhash': tx.confirmationBlockhash,
+            'user_note': tx.userNote,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+
+        for (final outpoint in tx.spentOutpoints) {
+          final parts = outpoint.split(':');
+          await txn.insert(
+            'tx_spent_outpoints',
+            {
+              'txid': tx.txid,
+              'outpoint_txid': parts[0],
+              'outpoint_vout': int.parse(parts[1]),
+            },
+            conflictAlgorithm: ConflictAlgorithm.ignore,
+          );
+        }
+
+        for (final recipient in tx.recipients) {
+          await txn.insert(
+            'tx_recipients',
+            {
+              'txid': tx.txid,
+              'address': recipient.address,
+              'amount_sat': recipient.amountSat,
+            },
+          );
+        }
+      }
+    });
   }
 
 }
