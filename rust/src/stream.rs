@@ -4,9 +4,7 @@ use std::{
 };
 
 use crate::{
-    api::structs::{
-        owned_output::ApiOwnedOutput,
-    },
+    api::structs::discovered_output::ApiDiscoveredOutput,
     frb_generated::StreamSink,
 };
 use flutter_rust_bridge::frb;
@@ -31,7 +29,7 @@ pub struct StateUpdate {
 #[frb]
 pub struct FoundOutput {
     pub outpoint: String, // "txid:vout"
-    pub output: ApiOwnedOutput,
+    pub output: ApiDiscoveredOutput,
 }
 
 pub fn create_scan_progress_stream(s: StreamSink<u32>) {

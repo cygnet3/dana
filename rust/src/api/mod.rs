@@ -6,7 +6,6 @@ pub mod backup;
 pub mod bip39;
 pub mod chain;
 pub mod history; // Legacy - only for migration
-pub mod outputs;
 pub mod simple;
 pub mod stream;
 pub mod structs;

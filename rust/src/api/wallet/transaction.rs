@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str::FromStr};
 
 use crate::api::structs::network::ApiNetwork;
-use crate::api::structs::owned_output::ApiOwnedOutput;
+use crate::api::structs::discovered_output::ApiDiscoveredOutput;
 use crate::api::structs::recipient::ApiRecipient;
 use crate::api::structs::unsigned_transaction::ApiSilentPaymentUnsignedTransaction;
 
@@ -18,7 +18,7 @@ impl SpWallet {
     #[flutter_rust_bridge::frb(sync)]
     pub fn create_new_transaction(
         &self,
-        api_outputs: HashMap<String, ApiOwnedOutput>,
+        api_outputs: HashMap<String, ApiDiscoveredOutput>,
         api_recipients: Vec<ApiRecipient>,
         feerate: f32,
         network: ApiNetwork,
@@ -48,7 +48,7 @@ impl SpWallet {
     #[flutter_rust_bridge::frb(sync)]
     pub fn create_drain_transaction(
         &self,
-        api_outputs: HashMap<String, ApiOwnedOutput>,
+        api_outputs: HashMap<String, ApiDiscoveredOutput>,
         wipe_address: String,
         feerate: f32,
         network: ApiNetwork,
