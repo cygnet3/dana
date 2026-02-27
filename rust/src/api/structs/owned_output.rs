@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
+use spdk_wallet::bitcoin::secp256k1::Scalar;
 use spdk_wallet::bitcoin::{absolute::Height, ScriptBuf};
-use spdk_wallet::client::OwnedOutput;
+use spdk_wallet::updater::DiscoveredOutput;
 
+use crate::api::outputs::OwnedOutput;
 use crate::api::structs::amount::ApiAmount;
 use crate::api::structs::output_spend_status::ApiOutputSpendStatus;
 
@@ -37,6 +39,17 @@ impl From<ApiOwnedOutput> for OwnedOutput {
             script: ScriptBuf::from_hex(&value.script).unwrap(),
             label: value.label.map(|l| l.try_into().unwrap()),
             spend_status: value.spend_status.into(),
+        }
+    }
+}
+
+impl From<ApiOwnedOutput> for DiscoveredOutput {
+    fn from(value: ApiOwnedOutput) -> Self {
+        Self {
+            tweak: Scalar::from_be_bytes(value.tweak).unwrap(),
+            value: value.amount.into(),
+            script_pubkey: ScriptBuf::from_hex(&value.script).unwrap(),
+            label: value.label.map(|l| l.try_into().unwrap()),
         }
     }
 }
