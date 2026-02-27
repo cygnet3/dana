@@ -9,7 +9,8 @@ use anyhow::Result;
 use bip39::rand::{thread_rng, RngCore};
 use spdk_wallet::backend_blindbit_v1::BlindbitClient;
 use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex, OutPoint};
-use spdk_wallet::client::{FeeRate, OwnedOutput, Recipient, RecipientAddress, SpClient};
+use spdk_wallet::client::{FeeRate, Recipient, RecipientAddress, SpClient};
+use spdk_wallet::updater::DiscoveredOutput;
 
 use super::SpWallet;
 
@@ -23,7 +24,7 @@ impl SpWallet {
         network: ApiNetwork,
     ) -> Result<ApiSilentPaymentUnsignedTransaction> {
         let client = &self.client;
-        let available_utxos: Result<Vec<(OutPoint, OwnedOutput)>> = api_outputs
+        let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = api_outputs
             .into_iter()
             .map(|(string, output)| {
                 let outpoint = OutPoint::from_str(&string)?;
@@ -53,7 +54,7 @@ impl SpWallet {
         network: ApiNetwork,
     ) -> Result<ApiSilentPaymentUnsignedTransaction> {
         let client = &self.client;
-        let available_utxos: Result<Vec<(OutPoint, OwnedOutput)>> = api_outputs
+        let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = api_outputs
             .into_iter()
             .map(|(string, output)| {
                 let outpoint = OutPoint::from_str(&string)?;

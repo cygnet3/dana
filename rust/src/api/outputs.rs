@@ -6,14 +6,41 @@ use std::{
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
 use spdk_wallet::bitcoin::{self, hashes::Hash, hex::DisplayHex};
-use spdk_wallet::bitcoin::{Amount, BlockHash, OutPoint, Txid};
-use spdk_wallet::client::{OutputSpendStatus, OwnedOutput};
+use spdk_wallet::bitcoin::{absolute::Height, Amount, BlockHash, OutPoint, ScriptBuf, Txid};
 
 use anyhow::{Error, Result};
 
 use crate::api::structs::amount::ApiAmount;
 use crate::api::structs::owned_output::ApiOwnedOutput;
 use crate::stream::StateUpdate;
+
+// Local definition of OwnedOutput and OutputSpendStatus.
+// These types were removed from spdk-wallet; kept here temporarily
+// so that the existing OwnedOutputs serialization/storage code still works.
+// TODO: remove when OwnedOutputs is replaced by SQLite storage.
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub(crate) enum OutputSpendStatus {
+    Unspent,
+    Spent([u8; 32]),
+    Mined([u8; 32]),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct OwnedOutput {
+    pub(crate) blockheight: Height,
+    pub(crate) tweak: [u8; 32],
+    pub(crate) amount: Amount,
+    pub(crate) script: ScriptBuf,
+    pub(crate) label: Option<String>,
+    pub(crate) spend_status: OutputSpendStatus,
+}
+
+impl OwnedOutput {
+    pub fn is_unspent(&self) -> bool {
+        self.spend_status == OutputSpendStatus::Unspent
+    }
+}
 
 #[frb(opaque)]
 pub struct OwnedOutPoints(HashSet<OutPoint>);
@@ -84,7 +111,7 @@ impl OwnedOutputs {
                                 tweak: output.tweak.to_be_bytes(),
                                 amount: output.value,
                                 script: output.script_pubkey.clone(),
-                                label: output.label.clone(),
+                                label: output.label.as_ref().map(|l| l.as_string()),
                             },
                         )
                     }))

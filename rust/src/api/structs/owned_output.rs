@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
-use spdk_wallet::bitcoin::{absolute::Height, ScriptBuf};
-use spdk_wallet::client::OwnedOutput;
+use spdk_wallet::bitcoin::{absolute::Height, secp256k1::Scalar, ScriptBuf};
+use spdk_wallet::updater::DiscoveredOutput;
 
-use crate::api::structs::amount::ApiAmount;
-use crate::api::structs::output_spend_status::ApiOutputSpendStatus;
+use crate::api::outputs::OwnedOutput;
+use crate::api::structs::{amount::ApiAmount, output_spend_status::ApiOutputSpendStatus};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ApiOwnedOutput {
@@ -15,6 +15,8 @@ pub struct ApiOwnedOutput {
     pub spend_status: ApiOutputSpendStatus,
 }
 
+// Conversions to/from local OwnedOutput (for OwnedOutputs serialization)
+
 impl From<OwnedOutput> for ApiOwnedOutput {
     fn from(value: OwnedOutput) -> Self {
         ApiOwnedOutput {
@@ -22,7 +24,7 @@ impl From<OwnedOutput> for ApiOwnedOutput {
             tweak: value.tweak,
             amount: value.amount.into(),
             script: value.script.to_hex_string(),
-            label: value.label.map(|l| l.as_string()),
+            label: value.label,
             spend_status: value.spend_status.into(),
         }
     }
@@ -35,8 +37,34 @@ impl From<ApiOwnedOutput> for OwnedOutput {
             tweak: value.tweak,
             amount: value.amount.into(),
             script: ScriptBuf::from_hex(&value.script).unwrap(),
-            label: value.label.map(|l| l.try_into().unwrap()),
+            label: value.label,
             spend_status: value.spend_status.into(),
+        }
+    }
+}
+
+// Conversions to/from DiscoveredOutput (for SpClient transaction API)
+
+impl From<DiscoveredOutput> for ApiOwnedOutput {
+    fn from(value: DiscoveredOutput) -> Self {
+        ApiOwnedOutput {
+            blockheight: 0, // not available in DiscoveredOutput
+            tweak: value.tweak.to_be_bytes(),
+            amount: value.value.into(),
+            script: value.script_pubkey.to_hex_string(),
+            label: value.label.map(|l| l.as_string()),
+            spend_status: ApiOutputSpendStatus::Unspent,
+        }
+    }
+}
+
+impl From<ApiOwnedOutput> for DiscoveredOutput {
+    fn from(value: ApiOwnedOutput) -> Self {
+        DiscoveredOutput {
+            tweak: Scalar::from_be_bytes(value.tweak).unwrap(),
+            value: value.amount.into(),
+            script_pubkey: ScriptBuf::from_hex(&value.script).unwrap(),
+            label: value.label.map(|l| l.try_into().unwrap()),
         }
     }
 }
