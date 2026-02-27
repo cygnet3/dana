@@ -55,7 +55,7 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
           await walletState.createUnsignedTxToThisRecipient(filled);
       BigInt inputSum = BigInt.from(0);
       for (var (_, utxo) in feeEstimationTx.selectedUtxos) {
-        inputSum += utxo.amount.field0;
+        inputSum += utxo.value.field0;
       }
       BigInt outputSum = BigInt.from(0);
       for (var recipient in feeEstimationTx.recipients) {

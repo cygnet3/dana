@@ -1,15 +1,13 @@
 use serde::{Deserialize, Serialize};
 use spdk_wallet::bitcoin::hex::{self, DisplayHex};
-use spdk_wallet::client::OutputSpendStatus;
 
-type SpendingTxId = String;
-type MinedInBlock = String;
+use crate::api::outputs::OutputSpendStatus;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum ApiOutputSpendStatus {
     Unspent,
-    Spent(SpendingTxId),
-    Mined(MinedInBlock),
+    Spent(String),
+    Mined(String),
 }
 
 impl From<OutputSpendStatus> for ApiOutputSpendStatus {
