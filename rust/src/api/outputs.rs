@@ -5,9 +5,9 @@ use std::{
 
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
-use spdk_wallet::bitcoin::{self, hashes::Hash, hex::DisplayHex};
+use spdk_wallet::bitcoin::{self, absolute::Height, hashes::Hash, hex::DisplayHex, ScriptBuf};
 use spdk_wallet::bitcoin::{Amount, BlockHash, OutPoint, Txid};
-use spdk_wallet::client::{OutputSpendStatus, OwnedOutput};
+use spdk_wallet::silentpayments::receiving::Label;
 
 use anyhow::{Error, Result};
 
@@ -24,7 +24,24 @@ impl OwnedOutPoints {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub(crate) struct OwnedOutput {
+    pub(crate) blockheight: Height,
+    pub(crate) tweak: [u8; 32], // scalar in big endian format
+    pub(crate) amount: Amount,
+    pub(crate) script: ScriptBuf,
+    pub(crate) label: Option<Label>,
+    pub(crate) spend_status: OutputSpendStatus,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub(crate) enum OutputSpendStatus {
+    Unspent,
+    Spent([u8; 32]),
+    Mined([u8; 32]),
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[frb(opaque)]
 pub struct OwnedOutputs(HashMap<OutPoint, OwnedOutput>);
 

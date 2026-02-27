@@ -8,11 +8,10 @@ use flutter_rust_bridge::frb;
 use rand::{rngs::OsRng, TryRngCore};
 use serde::{Deserialize, Serialize};
 
-use crate::api::structs::network::ApiNetwork;
+use crate::api::{outputs::OwnedOutputs, structs::network::ApiNetwork};
 
 use super::{
     history::TxHistory,
-    outputs::OwnedOutputs,
     wallet::{ApiScanKey, ApiSpendKey, SpWallet},
 };
 

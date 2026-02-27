@@ -10,11 +10,11 @@ use spdk_wallet::bitcoin::{
 use spdk_wallet::client::SilentPaymentUnsignedTransaction;
 
 use crate::api::structs::amount::ApiAmount;
-use crate::api::structs::owned_output::ApiOwnedOutput;
+use crate::api::structs::discovered_output::ApiDiscoveredOutput;
 use crate::api::structs::recipient::ApiRecipient;
 
 pub struct ApiSilentPaymentUnsignedTransaction {
-    pub selected_utxos: Vec<(String, ApiOwnedOutput)>,
+    pub selected_utxos: Vec<(String, ApiDiscoveredOutput)>,
     pub recipients: Vec<ApiRecipient>,
     pub partial_secret: [u8; 32],
     pub unsigned_tx: Option<String>,
@@ -97,11 +97,7 @@ impl ApiSilentPaymentUnsignedTransaction {
 
     #[frb(sync)]
     pub fn get_fee_amount(&self) -> ApiAmount {
-        let input_sum: u64 = self
-            .selected_utxos
-            .iter()
-            .map(|(_, o)| o.amount.0)
-            .sum();
+        let input_sum: u64 = self.selected_utxos.iter().map(|(_, o)| o.value.0).sum();
 
         let output_sum: u64 = self.recipients.iter().map(|r| r.amount.0).sum();
 

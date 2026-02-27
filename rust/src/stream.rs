@@ -7,7 +7,7 @@ use crate::frb_generated::StreamSink;
 use lazy_static::lazy_static;
 use spdk_wallet::{
     bitcoin::{absolute::Height, BlockHash, OutPoint},
-    updater::SimplifiedOutput,
+    updater::DiscoveredOutput,
 };
 
 lazy_static! {
@@ -24,7 +24,7 @@ pub enum StateUpdate {
     Update {
         blkheight: Height,
         blkhash: BlockHash,
-        found_outputs: HashMap<OutPoint, SimplifiedOutput>,
+        found_outputs: HashMap<OutPoint, DiscoveredOutput>,
         found_inputs: HashSet<OutPoint>,
     },
 }
