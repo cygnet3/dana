@@ -47,6 +47,7 @@ void main() async {
 
   final walletState = await WalletState.create();
   final scanNotifier = await ScanProgressNotifier.create();
+  walletState.onOutputsFound = scanNotifier.incrementOutputsFound;
   final chainState = ChainState();
   final contactsState = ContactsState();
   final fiatExchangeRate = await FiatExchangeRateState.create();

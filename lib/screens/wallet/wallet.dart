@@ -8,6 +8,7 @@ import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
+import 'package:danawallet/screens/home/scan_details_screen.dart';
 import 'package:danawallet/screens/spend/choose_recipient.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
@@ -45,37 +46,46 @@ class WalletScreenState extends State<WalletScreen> {
   }
 
   Widget buildScanProgress(double? scanProgress) {
-    return Row(
-      children: [
-        if (scanProgress != null)
-          SizedBox(
-              width: 40,
-              child: Text('${(scanProgress * 100.0).toStringAsFixed(0)} %',
-                  textAlign: TextAlign.right,
-                  style: BitcoinTextStyle.body5(Bitcoin.neutral7))),
-        const SizedBox(
-          width: 5,
-        ),
-        Expanded(
-          child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                valueColor: AlwaysStoppedAnimation(Bitcoin.blue),
-                backgroundColor: Bitcoin.neutral4,
-                value: scanProgress,
-                minHeight: 6.0,
-              )),
-        ),
-        const SizedBox(
-          width: 20,
-        ),
-        Image(
-          width: 20.0,
-          image: const AssetImage("icons/2.0x/caret_right.png",
-              package: "bitcoin_ui"),
-          color: Bitcoin.neutral7,
-        )
-      ],
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => const ScanDetailsScreen()),
+        );
+      },
+      child: Row(
+        children: [
+          if (scanProgress != null)
+            SizedBox(
+                width: 40,
+                child: Text('${(scanProgress * 100.0).toStringAsFixed(0)} %',
+                    textAlign: TextAlign.right,
+                    style: BitcoinTextStyle.body5(Bitcoin.neutral7))),
+          const SizedBox(
+            width: 5,
+          ),
+          Expanded(
+            child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation(Bitcoin.blue),
+                  backgroundColor: Bitcoin.neutral4,
+                  value: scanProgress,
+                  minHeight: 6.0,
+                )),
+          ),
+          const SizedBox(
+            width: 20,
+          ),
+          Image(
+            width: 20.0,
+            image: const AssetImage("icons/2.0x/caret_right.png",
+                package: "bitcoin_ui"),
+            color: Bitcoin.neutral7,
+          )
+        ],
+      ),
     );
   }
 
