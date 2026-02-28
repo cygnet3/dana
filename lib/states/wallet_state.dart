@@ -28,7 +28,7 @@ class WalletState extends ChangeNotifier {
   late ApiNetwork network;
   late String receivePaymentCode;
   late String changePaymentCode;
-  DateTime? birthday;
+  late DateTime birthday;
 
   // variables that change
   late ApiAmount amount;
@@ -81,7 +81,7 @@ class WalletState extends ChangeNotifier {
 
     // since the wallet data is present, the following items must also be present
     network = await walletRepository.readNetwork();
-    await setBirthday();
+    birthday = await _getBirthday();
     danaAddress = await walletRepository.readDanaAddress();
 
     // we calculate these based on our wallet data (scan key, spend key, network)
@@ -149,26 +149,32 @@ class WalletState extends ChangeNotifier {
     return await walletRepository.readSeedPhrase();
   }
 
-  // Older wallets may have birthday as a block height, we apply the same check than core
-  Future<void> setBirthday() async {
+  Future<DateTime> _getBirthday() async {
     final storedBirthday = await walletRepository.readBirthday();
-    if (storedBirthday.isAfter(defaultBirthday)) {
+    if (storedBirthday.isAfter(minimumAllowedBirthday)) {
       // This is a timestamp, we can use it directly
-      birthday = storedBirthday;
+      return storedBirthday;
     } else {
-      // This is a block height, we need to convert it to a timestamp
-      // That unfortunately requires a network call that may fail
+      // if the birthday is older than the minimum allowed birthday,
+      // this value must be from an earlier version where we stored the birthday as a block height.
+      // to fix this, we convert the stored birthday back to an integer,
+      // and fetch the date from that block
+      final blockHeight = storedBirthday.toSeconds();
       try {
         final mempoolApi = MempoolApiRepository(network: network);
-        final block = await mempoolApi.getBlockForHash(await mempoolApi.getBlockHashForHeight(storedBirthday.toSeconds()));
+        final block = await mempoolApi.getBlockForHash(
+            await mempoolApi.getBlockHashForHeight(blockHeight));
         final newBirthday = block.timestamp.toDate();
-        Logger().i("Resolved block height $storedBirthday to date $newBirthday");
-        // Update the birthday value to an epoch time
+        Logger().i("Resolved block height $blockHeight to date $newBirthday");
+        // store converted birthday in persistent storage before returning
         await walletRepository.saveBirthday(newBirthday);
-        birthday = newBirthday;
+        return newBirthday;
       } catch (e) {
-        Logger().e("Error resolving block height $storedBirthday to timestamp: $e");
-        birthday = null;
+        Logger()
+            .w("Error resolving block height $storedBirthday to timestamp: $e");
+        // if this process fails, just use the default birthday.
+        // this value isn't crucial to enough to fail over
+        return defaultBirthday;
       }
     }
 
