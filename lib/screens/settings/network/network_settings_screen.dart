@@ -4,8 +4,6 @@ import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/chain_state.dart';
-import 'package:danawallet/states/home_state.dart';
-import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
@@ -23,44 +21,12 @@ class NetworkSettingsScreen extends StatelessWidget {
       ),
       if (isDevEnv)
         _NetworkSettingsItem(
-          icon: Icons.schedule,
-          title: 'Set scan height',
-          subtitle: 'Reset blockchain scan position',
-          onTap: () => _onSetLastScan(context),
-        ),
-      if (isDevEnv)
-        _NetworkSettingsItem(
           icon: Icons.filter_list,
           title: 'Set dust threshold',
           subtitle: 'Ignore payments below this value',
           onTap: () => _onSetDustLimit(context),
         ),
     ];
-  }
-
-  Future<void> _onSetLastScan(BuildContext context) async {
-    final walletState = Provider.of<WalletState>(context, listen: false);
-    final homeState = Provider.of<HomeState>(context, listen: false);
-    final chainState = Provider.of<ChainState>(context, listen: false);
-
-    TextEditingController controller = TextEditingController();
-    final scanHeight = await showInputAlertDialog(
-        controller,
-        TextInputType.number,
-        'Enter scan height',
-        'Enter current scan height (numeric value)');
-    if (scanHeight is int) {
-      await walletState.resetToScanHeight(scanHeight);
-      chainState.clearSyncHistory();
-      homeState.showMainScreen();
-    } else if (scanHeight is bool && scanHeight) {
-      final birthday = walletState.birthday;
-      // TODO probably better and simpler to set lastScan to null and let the synchronization service set it to the birthday height
-      final height = await chainState.getBlockHeightFromDate(birthday!);
-      await walletState.resetToScanHeight(height);
-      chainState.clearSyncHistory();
-      homeState.showMainScreen();
-    }
   }
 
   Future<void> _onSetBlindbitUrl(BuildContext context) async {
