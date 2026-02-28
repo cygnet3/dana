@@ -28,7 +28,7 @@ class WalletState extends ChangeNotifier {
   late ApiNetwork network;
   late String receivePaymentCode;
   late String changePaymentCode;
-  late DateTime birthday;
+  DateTime? birthday; // birthday may not be known
 
   // variables that change
   late ApiAmount amount;
@@ -105,7 +105,7 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<void> restoreWallet(
-      ApiNetwork network, String mnemonic, DateTime birthday) async {
+      ApiNetwork network, String mnemonic, DateTime? birthday) async {
     final args = WalletSetupArgs(
         setupType: WalletSetupType.mnemonic(mnemonic), network: network);
     final setupResult = SpWallet.setupWallet(setupArgs: args);
@@ -155,8 +155,13 @@ class WalletState extends ChangeNotifier {
     return await walletRepository.readSeedPhrase();
   }
 
-  Future<DateTime> _getBirthday() async {
+  Future<DateTime?> _getBirthday() async {
     final storedBirthday = await walletRepository.readBirthday();
+    if (storedBirthday == null) {
+      // birthday is unknown (not provided during wallet recovery)
+      return null;
+    }
+
     if (storedBirthday.isAfter(minimumAllowedBirthday)) {
       // This is a timestamp, we can use it directly
       return storedBirthday;
@@ -177,10 +182,8 @@ class WalletState extends ChangeNotifier {
         return newBirthday;
       } catch (e) {
         Logger()
-            .w("Error resolving block height $storedBirthday to timestamp: $e");
-        // if this process fails, just use the default birthday.
-        // this value isn't crucial to enough to fail over
-        return defaultBirthday;
+            .w("Error resolving block height $blockHeight to timestamp: $e");
+        return null;
       }
     }
   }

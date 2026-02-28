@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:danawallet/constants.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/scan_progress_notifier.dart';
@@ -107,8 +108,10 @@ class SynchronizationService {
   }
 
   Future<void> _initializeLastScan() async {
-    final blockHeight =
-        await chainState.getBlockHeightFromDate(walletState.birthday);
+    // if wallet birthday isn't known, use the default birthday timestamp
+    final timestamp = walletState.birthday ?? defaultBirthday;
+
+    final blockHeight = await chainState.getBlockHeightFromDate(timestamp);
 
     walletState.lastScan = blockHeight;
   }
