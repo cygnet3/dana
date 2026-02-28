@@ -1,6 +1,5 @@
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
-import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/enums/warning_type.dart';
 import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
@@ -54,8 +53,8 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
       final scanProgress =
           Provider.of<ScanProgressNotifier>(context, listen: false);
 
-      // Get birthday: navigate to picker if user knows it, else use default
-      DateTime birthday = defaultBirthday;
+      // Get birthday: navigate to picker if user knows it, else null
+      DateTime? birthday;
       if (_knowsBirthday) {
         final pickedDate = await Navigator.push<DateTime>(
           context,

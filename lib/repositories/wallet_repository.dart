@@ -49,7 +49,7 @@ class WalletRepository {
   }
 
   Future<SpWallet> setupWallet(WalletSetupResult walletSetup,
-      ApiNetwork network, DateTime birthday, int? lastScan) async {
+      ApiNetwork network, DateTime? birthday, int? lastScan) async {
     if ((await secureStorage.readAll()).isNotEmpty) {
       throw Exception('Previous wallet not properly deleted');
     }
@@ -62,8 +62,11 @@ class WalletRepository {
     // insert new values
     await secureStorage.write(key: _keyScanSk, value: scanKey.encode());
     await secureStorage.write(key: _keySpendKey, value: spendKey.encode());
-    await nonSecureStorage.setInt(_keyBirthday, birthday.toSeconds());
     await nonSecureStorage.setString(_keyNetwork, network.name);
+
+    if (birthday != null) {
+      await nonSecureStorage.setInt(_keyBirthday, birthday.toSeconds());
+    }
 
     if (seedPhrase != null) {
       await secureStorage.write(key: _keySeedPhrase, value: seedPhrase);
@@ -138,9 +141,9 @@ class WalletRepository {
     await nonSecureStorage.setInt(_keyBirthday, birthday.toSeconds());
   }
 
-  Future<DateTime> readBirthday() async {
+  Future<DateTime?> readBirthday() async {
     final timestamp = await nonSecureStorage.getInt(_keyBirthday);
-    return timestamp!.toDate();
+    return timestamp?.toDate();
   }
 
   Future<void> saveLastScan(int? lastScan) async {
@@ -194,7 +197,7 @@ class WalletRepository {
 
     return WalletBackup(
         wallet: wallet!,
-        birthday: birthday.toSeconds(),
+        birthday: birthday?.toSeconds(),
         lastScan: lastScan!,
         txHistory: history,
         ownedOutputs: outputs,
@@ -209,8 +212,11 @@ class WalletRepository {
     await secureStorage.write(key: _keyScanSk, value: backup.scanKey.encode());
     await secureStorage.write(
         key: _keySpendKey, value: backup.spendKey.encode());
-    await nonSecureStorage.setInt(_keyBirthday, backup.birthday);
     await nonSecureStorage.setString(_keyNetwork, backup.network.name);
+
+    if (backup.birthday != null) {
+      await nonSecureStorage.setInt(_keyBirthday, backup.birthday!);
+    }
 
     if (backup.seedPhrase != null) {
       await secureStorage.write(key: _keySeedPhrase, value: backup.seedPhrase);
