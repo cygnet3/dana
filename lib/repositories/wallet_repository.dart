@@ -48,8 +48,8 @@ class WalletRepository {
     });
   }
 
-  Future<SpWallet> setupWallet(
-      WalletSetupResult walletSetup, ApiNetwork network, DateTime birthday) async {
+  Future<SpWallet> setupWallet(WalletSetupResult walletSetup,
+      ApiNetwork network, DateTime birthday, int? lastScan) async {
     if ((await secureStorage.readAll()).isNotEmpty) {
       throw Exception('Previous wallet not properly deleted');
     }
@@ -70,7 +70,7 @@ class WalletRepository {
     }
 
     // set default values for new wallet
-    await saveLastScan(null); // We shouldn't have left over value from a previous wallet but anyway
+    await saveLastScan(lastScan);
     await saveHistory(TxHistory.empty());
     await saveOwnedOutputs(OwnedOutputs.empty());
 

@@ -104,35 +104,41 @@ class WalletState extends ChangeNotifier {
     await walletRepository.reset();
   }
 
-  Future<void> restoreWallet(ApiNetwork network, String mnemonic, DateTime birthday) async {
+  Future<void> restoreWallet(
+      ApiNetwork network, String mnemonic, DateTime birthday) async {
     final args = WalletSetupArgs(
         setupType: WalletSetupType.mnemonic(mnemonic), network: network);
     final setupResult = SpWallet.setupWallet(setupArgs: args);
-    final wallet =
-        await walletRepository.setupWallet(setupResult, network, birthday);
+    final wallet = await walletRepository.setupWallet(
+        setupResult, network, birthday, null);
 
     // fill current state variables
     receivePaymentCode = wallet.getReceivingAddress();
     changePaymentCode = wallet.getChangeAddress();
     this.birthday = birthday;
     this.network = network;
+
+    // lastScan will be initialized by chainState synchronization service
+    lastScan = null;
+
     await _updateWalletState();
   }
 
-  Future<void> createNewWallet(ApiNetwork network) async {
+  Future<void> createNewWallet(ApiNetwork network, int? currentTip) async {
     final now = DateTime.now().toUtc();
 
     final args = WalletSetupArgs(
         setupType: const WalletSetupType.newWallet(), network: network);
     final setupResult = SpWallet.setupWallet(setupArgs: args);
-    final wallet =
-        await walletRepository.setupWallet(setupResult, network, now);
+    final wallet = await walletRepository.setupWallet(
+        setupResult, network, now, currentTip);
 
     // fill current state variables
     receivePaymentCode = wallet.getReceivingAddress();
     changePaymentCode = wallet.getChangeAddress();
     birthday = now;
     this.network = network;
+    lastScan = currentTip;
     await _updateWalletState();
   }
 
@@ -177,7 +183,6 @@ class WalletState extends ChangeNotifier {
         return defaultBirthday;
       }
     }
-
   }
 
   Future<void> resetToScanHeight(int height) async {
