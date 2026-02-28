@@ -1,5 +1,6 @@
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
+import 'package:danawallet/constants.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:flutter/material.dart';
@@ -49,7 +50,7 @@ class _BirthdayPickerScreenState extends State<BirthdayPickerScreen> {
           child: SingleChildScrollView(
             child: CalendarDatePicker(
               initialDate: _selectedDate,
-              firstDate: DateTime.utc(2009, 1, 3), // Bitcoin genesis
+              firstDate: minimumAllowedBirthday,
               lastDate: DateTime.now().toUtc(),
               currentDate: DateTime.now().toUtc(),
               onDateChanged: (date) {
