@@ -188,6 +188,12 @@ class WalletState extends ChangeNotifier {
     }
   }
 
+  Future<void> updateBirthday(DateTime newBirthday) async {
+    birthday = newBirthday;
+    await walletRepository.saveBirthday(newBirthday);
+    notifyListeners();
+  }
+
   Future<void> resetToScanHeight(int height) async {
     lastScan = height;
 
