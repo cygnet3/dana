@@ -154,6 +154,17 @@ class ChainState extends ChangeNotifier {
     }
   }
 
+  /// Cancel the current sync timer, trigger a sync immediately, then reschedule.
+  Future<void> interruptSyncService() async {
+    await _synchronizationService.interruptScan();
+    _synchronizationService.stopSyncTimer();
+  }
+
+  /// Make sure to call stopSyncService before calling this method.
+  Future<void> requestSync() async {
+    await _synchronizationService.startSyncTimer(true);
+  }
+
   Future<int> getBlockHeightFromDate(DateTime date) async {
     final mempoolApiRepository = MempoolApiRepository(network: network);
     final block =
