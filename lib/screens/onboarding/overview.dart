@@ -119,11 +119,13 @@ class _OverviewScreenState extends State<OverviewScreen> {
     chainState.initialize(network);
     final connected = await chainState.connect(blindbitUrl);
 
-    // we *must* be connected to get the wallet birthday
+    // we *must* be connected to get the current block height
     if (connected) {
-      chainState.startSyncService(walletState, scanProgress, false);
-      await walletState.createNewWallet(network);
+      final currentTip = chainState.tip;
+      await walletState.createNewWallet(network, currentTip);
 
+      // start chain sync service only *after* we created the wallet
+      chainState.startSyncService(walletState, scanProgress, false);
       // initialize contacts state with the user's payment code
       contactsState.initialize(walletState.receivePaymentCode, null);
       if (network == ApiNetwork.regtest && context.mounted) {
