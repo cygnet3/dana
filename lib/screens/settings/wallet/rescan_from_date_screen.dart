@@ -40,7 +40,10 @@ class _RescanFromDateScreenState extends State<RescanFromDateScreen> {
           _selectedDate.year, _selectedDate.month, _selectedDate.day, 1);
 
       final height = await chainState.getBlockHeightFromDate(date);
+      // First interrupt a sync if any
+      await chainState.interruptSyncService();
       await walletState.resetToScanHeight(height);
+      await chainState.requestSync();
 
       if (mounted) {
         displayNotification("Rescanning from selected date");

@@ -41,8 +41,11 @@ class _ChangeBirthdayScreenState extends State<ChangeBirthdayScreen> {
           _selectedDate.year, _selectedDate.month, _selectedDate.day, 1);
 
       final height = await chainState.getBlockHeightFromDate(birthday);
+      // First interrupt a sync if any
+      await chainState.interruptSyncService();
       await walletState.updateBirthday(birthday);
       await walletState.resetToScanHeight(height);
+      await chainState.requestSync();
 
       if (mounted) {
         displayNotification("Wallet birthday updated");
