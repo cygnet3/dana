@@ -12,9 +12,7 @@ class ScanProgressNotifier extends ChangeNotifier {
   Completer? _completer;
   double? progress;
   late int startHeight;
-  late int currentHeight;
   late int endHeight;
-  int outputsFound = 0;
 
   late StreamSubscription scanProgressSubscription;
 
@@ -25,7 +23,7 @@ class ScanProgressNotifier extends ChangeNotifier {
 
   Future<void> _initialize() async {
     scanProgressSubscription = createScanProgressStream().listen(((current) {
-      double scanned = (currentHeight - startHeight).toDouble();
+      double scanned = (current - startHeight).toDouble();
       double total = (endHeight - startHeight).toDouble();
       double progress = scanned / total;
       if (current != endHeight) {
@@ -34,11 +32,6 @@ class ScanProgressNotifier extends ChangeNotifier {
         notifyListeners();
       }
     }));
-  }
-
-  void incrementOutputsFound(int count) {
-    outputsFound += count;
-    notifyListeners();
   }
 
   static Future<ScanProgressNotifier> create() async {
