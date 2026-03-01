@@ -119,32 +119,30 @@ class _OverviewScreenState extends State<OverviewScreen> {
     chainState.initialize(network);
     final connected = await chainState.connect(blindbitUrl);
 
-    // we *must* be connected to get the current block height
+    // if we are connected, get the current block height
+    // if we're not connected, we'll fetch the block height later in the chain sync serivce
+    int? currentTip;
     if (connected) {
-      final currentTip = chainState.tip;
-      await walletState.createNewWallet(network, currentTip);
+      currentTip = chainState.tip;
+    }
 
-      // start chain sync service only *after* we created the wallet
-      chainState.startSyncService(walletState, scanProgress, false);
-      // initialize contacts state with the user's payment code
-      contactsState.initialize(walletState.receivePaymentCode, null);
-      if (network == ApiNetwork.regtest && context.mounted) {
-        // for regtest we bypass the dana address setup screen
-        Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => const PinGuard()),
-            (Route<dynamic> route) => false);
+    await walletState.createNewWallet(network, currentTip);
+
+    // start chain sync service only *after* we created the wallet
+    chainState.startSyncService(walletState, scanProgress, false);
+    // initialize contacts state with the user's payment code
+    contactsState.initialize(walletState.receivePaymentCode, null);
+    if (context.mounted) {
+      // skip the dana address registration if we are currently offline, or using regtest
+      Widget nextScreen;
+      if (!connected || network == ApiNetwork.regtest) {
+        nextScreen = const PinGuard();
       } else {
-        if (context.mounted) {
-          Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                  builder: (context) => const RegisterDanaAddressScreen()),
-              (Route<dynamic> route) => false);
-        }
+        nextScreen = const RegisterDanaAddressScreen();
       }
-    } else {
-      displayWarning("Unable to create a new wallet; internet access required");
+
+      // clear path (don't allow users to go back to registration screen by pressing 'back')
+      goToScreenAndResetPath(context, nextScreen);
     }
   }
 
