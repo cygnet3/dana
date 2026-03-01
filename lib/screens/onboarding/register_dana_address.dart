@@ -74,6 +74,7 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
   String? _suggestedUsername;
   String? _domain;
   DanaAddressService? _danaAddressService;
+  bool _isLoadingDomain = true;
 
   @override
   void initState() {
@@ -83,29 +84,34 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
     _focusNode.addListener(_onFocusChange);
 
     // initialize username and domain
-    loadUsernameAndDomain();
+    _loadUsernameAndDomain();
   }
 
-  Future<void> loadUsernameAndDomain() async {
+  Future<void> _loadUsernameAndDomain() async {
+    setState(() {
+      _isLoadingDomain = true;
+    });
+
     final walletState = Provider.of<WalletState>(context, listen: false);
     final addressService = DanaAddressService(network: walletState.network);
 
-    while (true) {
-      try {
-        final suggestedUsername = await walletState.createSuggestedUsername();
-        final domain = await addressService.danaAddressDomain;
+    try {
+      final suggestedUsername = await walletState.createSuggestedUsername();
+      final domain = await addressService.danaAddressDomain;
 
-        setState(() {
-          _danaAddressService = addressService;
-          _suggestedUsername = suggestedUsername;
-          _domain = domain;
-        });
-        return;
-      } catch (e) {
-        displayError("Failed to read domain", e);
-      }
-      // keep trying if we have no internet connection
-      await Future.delayed(const Duration(seconds: 5));
+      if (!mounted) return;
+      setState(() {
+        _danaAddressService = addressService;
+        _suggestedUsername = suggestedUsername;
+        _domain = domain;
+        _isLoadingDomain = false;
+      });
+    } catch (e) {
+      Logger().w('Failed to load dana address info: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoadingDomain = false;
+      });
     }
   }
 
@@ -379,8 +385,39 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
   @override
   Widget build(BuildContext context) {
     // if we're still loading, show an indicator
-    if (_domain == null) {
+    if (_isLoadingDomain) {
       return const LoadingWidget();
+    }
+
+    // loading finished but failed (no domain info)
+    if (_domain == null) {
+      return PopScope(
+        canPop: false,
+        child: OnboardingSkeleton(
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.cloud_off, size: 48, color: Bitcoin.neutral6),
+                const SizedBox(height: 16),
+                Text(
+                  'Unable to load registration info.\nPlease check your connection.',
+                  textAlign: TextAlign.center,
+                  style: BitcoinTextStyle.body3(Bitcoin.neutral7),
+                ),
+              ],
+            ),
+          ),
+          footer: Column(
+            children: [
+              FooterButton(
+                  title: 'Retry', onPressed: _loadUsernameAndDomain),
+              SizedBox(height: Adaptive.h(2)),
+              FooterButtonOutlined(title: 'Skip', onPressed: _onSkip),
+            ],
+          ),
+        ),
+      );
     }
 
     // Determine which username will be registered
