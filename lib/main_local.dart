@@ -19,7 +19,6 @@ import 'package:danawallet/states/scan_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/pin_guard.dart';
 import 'package:flutter/material.dart';
-import 'package:logger/logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -74,13 +73,9 @@ void main() async {
         network.defaultBlindbitUrl;
 
     chainState.initialize(network);
+    chainState.setBlindbitUrl(blindbitUrl);
 
-    // Continue without chain sync - wallet still usable for local operations
-    final connected = await chainState.connect(blindbitUrl);
-    if (!connected) {
-      Logger().w("Failed to connect");
-    }
-
+    // Connection will be attempted by the sync service in the background
     chainState.startSyncService(walletState, scanNotifier, true);
 
     final addressRegistrationNeeded =

@@ -56,13 +56,10 @@ class _OverviewScreenState extends State<OverviewScreen> {
 
           await walletState.initialize();
           final network = walletState.network;
-          final blindbitUrl =
-              await SettingsRepository.instance.getBlindbitUrl() ??
-                  network.defaultBlindbitUrl;
           chainState.initialize(network);
 
           // we can safely ignore the result of connecting, since we get the birthday from the backup
-          await chainState.connect(blindbitUrl);
+          await chainState.connect();
 
           chainState.startSyncService(walletState, scanProgress, true);
 
@@ -114,10 +111,8 @@ class _OverviewScreenState extends State<OverviewScreen> {
     final scanProgress =
         Provider.of<ScanProgressNotifier>(context, listen: false);
 
-    final blindbitUrl = network.defaultBlindbitUrl;
-
     chainState.initialize(network);
-    final connected = await chainState.connect(blindbitUrl);
+    final connected = await chainState.connect();
 
     // if we are connected, get the current block height
     // if we're not connected, we'll fetch the block height later in the chain sync serivce

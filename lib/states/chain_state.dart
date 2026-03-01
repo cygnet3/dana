@@ -36,6 +36,12 @@ class ChainState extends ChangeNotifier {
     _network = network;
   }
 
+  /// Store the blindbit URL without attempting to connect.
+  /// The sync service will pick it up via [reconnect] on its next tick.
+  void setBlindbitUrl(String url) {
+    _blindbitUrl = url;
+  }
+
   void startSyncService(WalletState walletState,
       ScanProgressNotifier scanProgress, bool immediate) {
     // start sync service & timer
@@ -45,17 +51,15 @@ class ChainState extends ChangeNotifier {
   }
 
   /// Try connecting to blindbit service
-  Future<bool> connect(String blindbitUrl) async {
+  Future<bool> connect() async {
     if (!initiated) {
       return false;
     }
 
-    _blindbitUrl = blindbitUrl;
-
-    Logger().i('Connecting to blindbit: $blindbitUrl');
+    Logger().i('Connecting to blindbit: $_blindbitUrl');
     try {
       final correctNetwork =
-          await checkNetwork(blindbitUrl: blindbitUrl, network: _network!);
+          await checkNetwork(blindbitUrl: _blindbitUrl!, network: _network!);
 
       if (correctNetwork) {
         final tip = await getChainHeight(blindbitUrl: _blindbitUrl!);
@@ -78,7 +82,7 @@ class ChainState extends ChangeNotifier {
   Future<bool> reconnect() async {
     if (!available) {
       if (_blindbitUrl != null) {
-        return await connect(_blindbitUrl!);
+        return await connect();
       } else {
         Logger().e("Attempted to reconnect, but no blindbit url is known");
         return false;
@@ -145,7 +149,8 @@ class ChainState extends ChangeNotifier {
     Logger().i('Updating blindbit url');
     Logger().i('Old blindbit url: $_blindbitUrl');
     Logger().i('New blindbit url: $newUrl');
-    return await connect(newUrl);
+    _blindbitUrl = newUrl;
+    return await connect();
   }
 
   Future<RecommendedFeeResponse> getCurrentFeeRates() async {
