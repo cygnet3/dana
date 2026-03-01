@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/extensions/network.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/frb_generated.dart';
 
 import 'package:danawallet/global_functions.dart';
@@ -75,8 +76,10 @@ void main() async {
     // Connection will be attempted by the sync service in the background
     chainState.startSyncService(walletState, scanNotifier, true);
 
+    // Local-only check: danaAddress was already read from storage by initialize().
+    // Network-based verification/lookup is skipped to avoid blocking startup.
     final addressRegistrationNeeded =
-        await walletState.checkDanaAddressRegistrationNeeded();
+        network != ApiNetwork.regtest && walletState.danaAddress == null;
 
     // initialize contacts with the 'you' contact
     contactsState.initialize(
