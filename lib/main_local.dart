@@ -48,13 +48,8 @@ void main() async {
   final contactsState = ContactsState();
   final fiatExchangeRate = await FiatExchangeRateState.create();
 
-  // Try to update exchange rate, but don't crash if it fails
-  try {
-    await fiatExchangeRate.updateExchangeRate();
-  } catch (e) {
-    Logger().w('Failed to update exchange rate during startup: $e');
-    // Continue with no data - UI will handle it
-  }
+  // Start periodic exchange rate updates (non-blocking)
+  fiatExchangeRate.startPeriodicUpdate();
 
   await precacheImages();
 

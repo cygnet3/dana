@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/data/enums/fiat_currency.dart';
@@ -11,6 +13,8 @@ class FiatExchangeRateState extends ChangeNotifier {
 
   late FiatCurrency currency;
   double? _cachedRate; // Make nullable to represent "no data available"
+  Timer? _timer;
+  static const _updateInterval = Duration(minutes: 20);
 
   // private constructor, create class using static async 'create' instead
   FiatExchangeRateState._();
@@ -20,16 +24,22 @@ class FiatExchangeRateState extends ChangeNotifier {
     final currency =
         await SettingsRepository.instance.getFiatCurrency() ?? defaultCurrency;
     instance.currency = currency;
-
-    try {
-      final rate = await instance._fetchExchangeRate(currency);
-      instance._cachedRate = rate;
-    } catch (e) {
-      Logger().w('Failed to fetch exchange rate: $e');
-      instance._cachedRate = null;
-    }
-
     return instance;
+  }
+
+  /// Starts periodic exchange rate updates.
+  /// Performs an immediate (non-blocking) update, then refreshes every [_updateInterval].
+  void startPeriodicUpdate() {
+    updateExchangeRate();
+    _timer = Timer.periodic(_updateInterval, (_) {
+      updateExchangeRate();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   double? get exchangeRate {
