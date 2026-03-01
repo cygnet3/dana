@@ -202,6 +202,13 @@ void goToScreen(BuildContext context, Widget screen) {
   Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
 }
 
+void goToScreenAndResetPath(BuildContext context, Widget screen) {
+  Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => screen),
+      (Route<dynamic> route) => false);
+}
+
 void goBack(BuildContext context) {
   Navigator.of(context).pop();
 }
