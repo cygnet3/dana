@@ -167,7 +167,7 @@ impl DanaBackup {
 pub struct WalletBackup {
     pub scan_key: ApiScanKey,
     pub spend_key: ApiSpendKey,
-    pub birthday: u32,
+    pub birthday: Option<u32>,
     pub network: ApiNetwork,
     pub tx_history: TxHistory,
     pub owned_outputs: OwnedOutputs,
@@ -179,7 +179,7 @@ impl WalletBackup {
     #[frb(sync)]
     pub fn new(
         wallet: SpWallet,
-        birthday: u32,
+        birthday: Option<u32>,
         network: ApiNetwork,
         tx_history: TxHistory,
         owned_outputs: OwnedOutputs,
