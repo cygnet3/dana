@@ -48,8 +48,14 @@ class WalletScreenState extends State<WalletScreen> {
     return Row(
       children: [
         if (scanProgress != null)
-          Text('Scanning: ${(scanProgress * 100.0).toStringAsFixed(0)} %  ',
-              style: BitcoinTextStyle.body5(Bitcoin.neutral7)),
+          SizedBox(
+              width: 40,
+              child: Text('${(scanProgress * 100.0).toStringAsFixed(0)} %',
+                  textAlign: TextAlign.right,
+                  style: BitcoinTextStyle.body5(Bitcoin.neutral7))),
+        const SizedBox(
+          width: 5,
+        ),
         Expanded(
           child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
