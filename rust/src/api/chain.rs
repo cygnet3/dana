@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use log::warn;
-use spdk_wallet::backend_blindbit_v1::{BlindbitBackend, BlindbitClient};
+use spdk_wallet::backend_blindbit_v1::BlindbitClient;
 use spdk_wallet::bitcoin;
 use tokio::time::sleep;
 
