@@ -58,9 +58,12 @@ class ScanProgressNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> scan(WalletState walletState, int start, int end) async {
+  Future<void> scan(WalletState walletState, int start, int chainTip) async {
     this.start = start;
-    this.end = end;
+    end = chainTip;
+
+    // start syncing from the first block after our last sync
+    final fromHeight = walletState.lastScan! + 1;
 
     try {
       final wallet = await walletState.getWalletFromSecureStorage();
@@ -77,11 +80,13 @@ class ScanProgressNotifier extends ChangeNotifier {
           walletState.ownedOutputs.getUnconfirmedSpentOutpoints();
 
       activate();
-      await wallet.scanToTip(
-          blindbitUrl: blindbitUrl,
-          dustLimit: BigInt.from(dustLimit),
-          ownedOutpoints: ownedOutPoints,
-          lastScan: walletState.lastScan!);
+      await wallet.syncToHeight(
+        fromHeight: fromHeight,
+        toHeight: chainTip,
+        blindbitUrl: blindbitUrl,
+        dustLimit: BigInt.from(dustLimit),
+        ownedOutpoints: ownedOutPoints,
+      );
     } catch (e) {
       deactivate();
       rethrow;
