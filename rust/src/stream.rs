@@ -11,8 +11,7 @@ use spdk_wallet::{
 };
 
 lazy_static! {
-    static ref SCAN_PROGRESS_STREAM_SINK: Mutex<Option<StreamSink<ScanProgress>>> =
-        Mutex::new(None);
+    static ref SCAN_PROGRESS_STREAM_SINK: Mutex<Option<StreamSink<u32>>> = Mutex::new(None);
     static ref STATE_UPDATE_STREAM_SINK: Mutex<Option<StreamSink<StateUpdate>>> = Mutex::new(None);
 }
 
@@ -29,13 +28,7 @@ pub enum StateUpdate {
     },
 }
 
-pub struct ScanProgress {
-    pub start: u32,
-    pub current: u32,
-    pub end: u32,
-}
-
-pub fn create_scan_progress_stream(s: StreamSink<ScanProgress>) {
+pub fn create_scan_progress_stream(s: StreamSink<u32>) {
     let mut stream_sink = SCAN_PROGRESS_STREAM_SINK.lock().unwrap();
     *stream_sink = Some(s);
 }
@@ -45,7 +38,7 @@ pub fn create_scan_update_stream(s: StreamSink<StateUpdate>) {
     *stream_sink = Some(s);
 }
 
-pub(crate) fn send_scan_progress(scan_progress: ScanProgress) {
+pub(crate) fn send_scan_progress(scan_progress: u32) {
     let stream_sink = SCAN_PROGRESS_STREAM_SINK.lock().unwrap();
     if let Some(stream_sink) = stream_sink.as_ref() {
         stream_sink.add(scan_progress).unwrap();
