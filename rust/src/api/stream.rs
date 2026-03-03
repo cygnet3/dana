@@ -23,9 +23,6 @@ pub fn create_scan_result_stream(s: StreamSink<StateUpdate>) {
 impl StateUpdate {
     #[flutter_rust_bridge::frb(sync)]
     pub fn get_height(&self) -> u32 {
-        match self {
-            StateUpdate::Update { blkheight, .. } => blkheight.to_consensus_u32(),
-            StateUpdate::NoUpdate { blkheight } => blkheight.to_consensus_u32(),
-        }
+        self.blkheight.to_consensus_u32()
     }
 }

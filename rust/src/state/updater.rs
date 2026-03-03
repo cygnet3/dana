@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    mem,
+    time::{Duration, Instant},
 };
 
 use spdk_wallet::updater::Updater;
@@ -13,99 +13,57 @@ use crate::stream::{send_scan_progress, send_state_update, StateUpdate};
 
 use anyhow::Result;
 
+const MAX_TIME_BETWEEN_UPDATES: Duration = Duration::from_secs(30);
+
 pub struct StateUpdater {
-    update: bool,
-    blkhash: Option<BlockHash>,
-    blkheight: Option<Height>,
-    found_outputs: HashMap<OutPoint, DiscoveredOutput>,
-    found_inputs: HashSet<OutPoint>,
+    last_update: Instant,
+    final_update_height: Height,
 }
 
 impl StateUpdater {
-    pub fn new() -> Self {
+    pub fn new(final_update_height: Height) -> Self {
         Self {
-            update: false,
-            blkheight: None,
-            blkhash: None,
-            found_outputs: HashMap::new(),
-            found_inputs: HashSet::new(),
-        }
-    }
-
-    pub fn to_update(&mut self) -> Result<StateUpdate> {
-        let blkheight = self
-            .blkheight
-            .ok_or(anyhow::Error::msg("blkheight not filled"))?;
-
-        if self.update {
-            self.update = false;
-
-            let blkhash = self.blkhash.ok_or(anyhow::Error::msg("blkhash not set"))?;
-
-            self.blkheight = None;
-            self.blkhash = None;
-
-            // take results, and insert new empty values
-            let found_inputs = mem::take(&mut self.found_inputs);
-            let found_outputs = mem::take(&mut self.found_outputs);
-
-            Ok(StateUpdate::Update {
-                blkheight,
-                blkhash,
-                found_outputs,
-                found_inputs,
-            })
-        } else {
-            Ok(StateUpdate::NoUpdate { blkheight })
+            last_update: Instant::now(),
+            final_update_height,
         }
     }
 }
 
 impl Updater for StateUpdater {
-    fn record_scan_progress(
-        &mut self,
-        _start: Height,
-        current: Height,
-        _end: Height,
-    ) -> Result<()> {
-        self.blkheight = Some(current);
-
-        send_scan_progress(current.to_consensus_u32());
-
-        Ok(())
-    }
-
-    fn record_block_outputs(
-        &mut self,
-        height: Height,
-        blkhash: BlockHash,
-        found_outputs: HashMap<OutPoint, DiscoveredOutput>,
-    ) -> Result<()> {
-        // may have already been written by record_block_inputs
-        self.update = true;
-        self.found_outputs = found_outputs;
-        self.blkhash = Some(blkhash);
-        self.blkheight = Some(height);
-
-        Ok(())
-    }
-
-    fn record_block_inputs(
+    fn record_block_scan_result(
         &mut self,
         blkheight: Height,
         blkhash: BlockHash,
-        found_inputs: HashSet<OutPoint>,
+        discovered_inputs: HashSet<OutPoint>,
+        discovered_outputs: HashMap<OutPoint, DiscoveredOutput>,
     ) -> Result<()> {
-        self.update = true;
-        self.blkheight = Some(blkheight);
-        self.blkhash = Some(blkhash);
-        self.found_inputs = found_inputs;
+        // we send a state update in 3 cases:
+        // - we have found new spent inputs or discovered outputs
+        // - the maximum delay between updates has been reached
+        // - we're sending the final update
+        let new_discoveries = !discovered_inputs.is_empty() || !discovered_outputs.is_empty();
+        let is_final_block_update = blkheight == self.final_update_height;
+        let max_delay_reached = self.last_update.elapsed() > MAX_TIME_BETWEEN_UPDATES;
 
-        Ok(())
-    }
+        if new_discoveries || is_final_block_update || max_delay_reached {
+            // sending a state update always implies we are writing to persistent storage
+            let update = StateUpdate {
+                blkheight,
+                blkhash,
+                found_outputs: discovered_outputs,
+                found_inputs: discovered_inputs,
+            };
 
-    fn save_to_persistent_storage(&mut self) -> Result<()> {
-        send_state_update(self.to_update()?);
+            send_state_update(update);
+
+            self.last_update = Instant::now();
+        }
+
+        // whether we update or not, we always notify the progress notifier
+        // note: the scan progress notifyer is purely to show scan progress to the user,
+        // it does not affect persistent storage
+        send_scan_progress(blkheight.to_consensus_u32());
+
         Ok(())
     }
 }
