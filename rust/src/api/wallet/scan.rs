@@ -1,7 +1,6 @@
 use anyhow::Result;
-use spdk_wallet::backend_blindbit_v1::BlindbitBackend;
+use spdk_wallet::backend_blindbit_v1::{BlindbitBackend, BlindbitClient};
 use spdk_wallet::bitcoin;
-use spdk_wallet::chain::ChainBackend;
 use spdk_wallet::scanner::SpScanner;
 
 use crate::{api::outputs::OwnedOutPoints, state::StateUpdater, wallet::KEEP_SCANNING};
@@ -24,12 +23,13 @@ impl SpWallet {
         dust_limit: u64,
         owned_outpoints: OwnedOutPoints,
     ) -> Result<()> {
-        let backend = BlindbitBackend::new(blindbit_url)?;
+        let client = BlindbitClient::new(&blindbit_url)?;
+        let backend = BlindbitBackend::new(client.clone());
 
         let dust_limit = bitcoin::Amount::from_sat(dust_limit);
 
         let start = bitcoin::absolute::Height::from_consensus(last_scan + 1)?;
-        let end = backend.block_height().await?;
+        let end = client.block_height().await?;
 
         let sp_client = self.client.clone();
         let updater = StateUpdater::new();
