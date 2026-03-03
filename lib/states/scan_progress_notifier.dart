@@ -11,8 +11,8 @@ import 'package:flutter/material.dart';
 class ScanProgressNotifier extends ChangeNotifier {
   Completer? _completer;
   double progress = 0.0;
-  late int start;
-  late int end;
+  late int startHeight;
+  late int endHeight;
 
   late StreamSubscription scanProgressSubscription;
 
@@ -23,10 +23,10 @@ class ScanProgressNotifier extends ChangeNotifier {
 
   Future<void> _initialize() async {
     scanProgressSubscription = createScanProgressStream().listen(((current) {
-      double scanned = (current - start).toDouble();
-      double total = (end - start).toDouble();
+      double scanned = (current - startHeight).toDouble();
+      double total = (endHeight - startHeight).toDouble();
       double progress = scanned / total;
-      if (current != end) {
+      if (current != endHeight) {
         this.progress = progress;
 
         notifyListeners();
@@ -58,12 +58,14 @@ class ScanProgressNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> scan(WalletState walletState, int start, int chainTip) async {
-    this.start = start;
-    end = chainTip;
+  Future<void> scan(WalletState walletState, int startHeight, int chainTip) async {
+    this.startHeight = startHeight;
+    endHeight = chainTip;
 
     // start syncing from the first block after our last sync
+    // we ignore the startHeight here, because we may be continuing from another sync
     final fromHeight = walletState.lastScan! + 1;
+    final toHeight = chainTip;
 
     try {
       final wallet = await walletState.getWalletFromSecureStorage();
@@ -82,7 +84,7 @@ class ScanProgressNotifier extends ChangeNotifier {
       activate();
       await wallet.syncToHeight(
         fromHeight: fromHeight,
-        toHeight: chainTip,
+        toHeight: toHeight,
         blindbitUrl: blindbitUrl,
         dustLimit: BigInt.from(dustLimit),
         ownedOutpoints: ownedOutPoints,

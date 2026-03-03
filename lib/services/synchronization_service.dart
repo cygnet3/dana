@@ -13,6 +13,12 @@ class SynchronizationService {
   ChainState chainState;
   ScanProgressNotifier scanProgress;
 
+  // first sync will set the start height, all other syncs will keep the same height
+  // this is useful if we receive an error while syncing, and restart the sync process.
+  // this way, we make it explicit that we're continuing from the last sync,
+  // instead of completely restarting.
+  int? _startHeight;
+
   Timer? _timer;
   final Duration _interval = const Duration(seconds: 10);
 
@@ -97,9 +103,11 @@ class SynchronizationService {
     if (walletState.lastScan! < chainState.tip) {
       if (!scanProgress.scanning) {
         Logger().i("Starting sync");
-        final start = walletState.lastScan!;
-        final chainTip = chainState.tip;
-        await scanProgress.scan(walletState, start, chainTip);
+
+        // set start height if not yet set
+        _startHeight ??= walletState.lastScan!;
+
+        await scanProgress.scan(walletState, _startHeight!, chainState.tip);
       }
     }
 
