@@ -101,7 +101,7 @@ class SynchronizationService {
     }
 
     if (walletState.lastScan! < chainState.tip) {
-      if (!scanProgress.scanning) {
+      if (!scanProgress.isScanning) {
         Logger().i("Starting sync");
 
         // set start height if not yet set

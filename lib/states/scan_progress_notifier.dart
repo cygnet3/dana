@@ -10,13 +10,13 @@ import 'package:flutter/material.dart';
 
 class ScanProgressNotifier extends ChangeNotifier {
   Completer? _completer;
-  double progress = 0.0;
+  double? progress;
   late int startHeight;
   late int endHeight;
 
   late StreamSubscription scanProgressSubscription;
 
-  bool get scanning => _completer != null && !_completer!.isCompleted;
+  bool get isScanning => _completer != null && !_completer!.isCompleted;
 
   // private constructor
   ScanProgressNotifier._();
@@ -48,13 +48,13 @@ class ScanProgressNotifier extends ChangeNotifier {
 
   void activate() {
     _completer = Completer();
-    progress = 0.0;
+    progress = null;
     notifyListeners();
   }
 
   void deactivate() {
     _completer?.complete();
-    progress = 0.0;
+    progress = null;
     notifyListeners();
   }
 
@@ -98,7 +98,7 @@ class ScanProgressNotifier extends ChangeNotifier {
   }
 
   Future<void> interruptScan() async {
-    if (scanning) {
+    if (isScanning) {
       SpWallet.interruptScanning();
 
       // this makes sure the scan function has been terminated
