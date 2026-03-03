@@ -58,7 +58,8 @@ class ScanProgressNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> scan(WalletState walletState, int startHeight, int chainTip) async {
+  Future<void> scan(
+      WalletState walletState, int startHeight, int chainTip) async {
     this.startHeight = startHeight;
     endHeight = chainTip;
 

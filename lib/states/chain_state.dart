@@ -83,6 +83,10 @@ class ChainState extends ChangeNotifier {
     }
   }
 
+  void clearSyncHistory() {
+    _synchronizationService.clearSyncHistory();
+  }
+
   void reset() {
     _synchronizationService.stopSyncTimer();
     _tip = null;
@@ -152,7 +156,8 @@ class ChainState extends ChangeNotifier {
 
   Future<int> getBlockHeightFromDate(DateTime date) async {
     final mempoolApiRepository = MempoolApiRepository(network: network);
-    final block = await mempoolApiRepository.getBlockFromTimestamp(date.toSeconds());
+    final block =
+        await mempoolApiRepository.getBlockFromTimestamp(date.toSeconds());
     return block.height;
   }
 }
