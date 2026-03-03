@@ -9,7 +9,7 @@ use spdk_wallet::{
     updater::DiscoveredOutput,
 };
 
-use crate::stream::{send_scan_progress, send_state_update, ScanProgress, StateUpdate};
+use crate::stream::{send_scan_progress, send_state_update, StateUpdate};
 
 use anyhow::Result;
 
@@ -62,14 +62,15 @@ impl StateUpdater {
 }
 
 impl Updater for StateUpdater {
-    fn record_scan_progress(&mut self, start: Height, current: Height, end: Height) -> Result<()> {
+    fn record_scan_progress(
+        &mut self,
+        _start: Height,
+        current: Height,
+        _end: Height,
+    ) -> Result<()> {
         self.blkheight = Some(current);
 
-        send_scan_progress(ScanProgress {
-            start: start.to_consensus_u32(),
-            current: current.to_consensus_u32(),
-            end: end.to_consensus_u32(),
-        });
+        send_scan_progress(current.to_consensus_u32());
 
         Ok(())
     }

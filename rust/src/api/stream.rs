@@ -1,7 +1,7 @@
 use crate::{
     frb_generated::StreamSink,
     logger::{self, LogEntry, LogLevel},
-    stream::{self, ScanProgress, StateUpdate},
+    stream::{self, StateUpdate},
 };
 
 #[flutter_rust_bridge::frb(sync)]
@@ -11,7 +11,7 @@ pub fn create_log_stream(s: StreamSink<LogEntry>, level: LogLevel, log_dependenc
 }
 
 #[flutter_rust_bridge::frb(sync)]
-pub fn create_scan_progress_stream(s: StreamSink<ScanProgress>) {
+pub fn create_scan_progress_stream(s: StreamSink<u32>) {
     stream::create_scan_progress_stream(s);
 }
 

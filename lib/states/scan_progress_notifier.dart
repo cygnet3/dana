@@ -11,7 +11,8 @@ import 'package:flutter/material.dart';
 class ScanProgressNotifier extends ChangeNotifier {
   Completer? _completer;
   double progress = 0.0;
-  int current = 0;
+  late int start;
+  late int end;
 
   late StreamSubscription scanProgressSubscription;
 
@@ -21,10 +22,7 @@ class ScanProgressNotifier extends ChangeNotifier {
   ScanProgressNotifier._();
 
   Future<void> _initialize() async {
-    scanProgressSubscription = createScanProgressStream().listen(((event) {
-      int start = event.start;
-      current = event.current;
-      int end = event.end;
+    scanProgressSubscription = createScanProgressStream().listen(((current) {
       double scanned = (current - start).toDouble();
       double total = (end - start).toDouble();
       double progress = scanned / total;
@@ -48,10 +46,9 @@ class ScanProgressNotifier extends ChangeNotifier {
     super.dispose();
   }
 
-  void activate(int start) {
+  void activate() {
     _completer = Completer();
     progress = 0.0;
-    current = start;
     notifyListeners();
   }
 
@@ -61,7 +58,10 @@ class ScanProgressNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> scan(WalletState walletState) async {
+  Future<void> scan(WalletState walletState, int start, int end) async {
+    this.start = start;
+    this.end = end;
+
     try {
       final wallet = await walletState.getWalletFromSecureStorage();
       final settings = SettingsRepository.instance;
@@ -76,7 +76,7 @@ class ScanProgressNotifier extends ChangeNotifier {
       final ownedOutPoints =
           walletState.ownedOutputs.getUnconfirmedSpentOutpoints();
 
-      activate(walletState.lastScan!);
+      activate();
       await wallet.scanToTip(
           blindbitUrl: blindbitUrl,
           dustLimit: BigInt.from(dustLimit),
