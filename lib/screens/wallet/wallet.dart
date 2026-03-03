@@ -44,11 +44,12 @@ class WalletScreenState extends State<WalletScreen> {
     });
   }
 
-  Widget buildScanProgress(double scanProgress) {
+  Widget buildScanProgress(double? scanProgress) {
     return Row(
       children: [
-        Text('Scanning: ${(scanProgress * 100.0).toStringAsFixed(0)} %  ',
-            style: BitcoinTextStyle.body5(Bitcoin.neutral7)),
+        if (scanProgress != null)
+          Text('Scanning: ${(scanProgress * 100.0).toStringAsFixed(0)} %  ',
+              style: BitcoinTextStyle.body5(Bitcoin.neutral7)),
         Expanded(
           child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
@@ -471,7 +472,7 @@ class WalletScreenState extends State<WalletScreen> {
         children: [
           // Show sync progress when actively scanning
           Visibility(
-              visible: scanProgress.scanning,
+              visible: scanProgress.isScanning,
               maintainAnimation: true,
               maintainSize: true,
               maintainState: true,
@@ -547,7 +548,7 @@ class WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  AppBar buildAppBar(bool isScanning, Color networkColor) {
+  AppBar buildAppBar(Color networkColor) {
     return AppBar(
       forceMaterialTransparency: true,
       title: Row(
@@ -587,7 +588,7 @@ class WalletScreenState extends State<WalletScreen> {
     bool showFundingScreen = isBalanceZero && !hasTransactionHistory;
 
     return Scaffold(
-        appBar: buildAppBar(scanProgress.scanning, walletState.network.toColor),
+        appBar: buildAppBar(walletState.network.toColor),
         body: showFundingScreen
             ? buildFundingScreen(
                 walletState.receivePaymentCode,
@@ -605,7 +606,7 @@ class WalletScreenState extends State<WalletScreen> {
                         children: [
                           // Show sync progress when actively scanning
                           Visibility(
-                              visible: scanProgress.scanning,
+                              visible: scanProgress.isScanning,
                               maintainAnimation: true,
                               maintainSize: true,
                               maintainState: true,
