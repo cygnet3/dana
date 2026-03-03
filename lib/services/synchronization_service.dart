@@ -98,8 +98,8 @@ class SynchronizationService {
       if (!scanProgress.scanning) {
         Logger().i("Starting sync");
         final start = walletState.lastScan!;
-        final end = chainState.tip;
-        await scanProgress.scan(walletState, start, end);
+        final chainTip = chainState.tip;
+        await scanProgress.scan(walletState, start, chainTip);
       }
     }
 
