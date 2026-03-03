@@ -98,7 +98,7 @@ impl SpWallet {
 
     // note: should only be used when using regtest, else there is privacy loss!
     pub async fn broadcast_using_blindbit(blindbit_url: String, tx: String) -> Result<String> {
-        let blindbit_client = BlindbitClient::new(blindbit_url)?;
+        let blindbit_client = BlindbitClient::new(&blindbit_url)?;
 
         let res = blindbit_client.forward_tx(tx).await?;
 
