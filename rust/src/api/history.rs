@@ -54,66 +54,63 @@ impl TxHistory {
         update: &StateUpdate,
         owned_outputs: &OwnedOutputs,
     ) -> Result<()> {
-        match update {
-            StateUpdate::Update {
-                blkheight,
-                blkhash: _,
-                found_outputs,
-                found_inputs,
-            } => {
-                let mut unknown_spent_outpoints = vec![];
-                for outpoint in found_inputs {
-                    // this may confirm the same tx multiple times, but this shouldn't be a problem
-                    if !self.confirm_recorded_outgoing_transaction(*outpoint, *blkheight) {
-                        // if we're unable to confirm the spent outpoint, it means we don't know
-                        // the spending transaction because of a history desync. To keep the
-                        // history consistent we make a new 'unknown' spent output for these.
-                        unknown_spent_outpoints.push(*outpoint);
-                    }
-                }
+        let StateUpdate {
+            blkheight,
+            found_outputs,
+            found_inputs,
+            ..
+        } = update;
 
-                if !unknown_spent_outpoints.is_empty() {
-                    let unknown_sum = unknown_spent_outpoints
-                        .iter()
-                        .map(|outpoint| owned_outputs.get(outpoint).unwrap().amount)
-                        .sum();
+        let mut unknown_spent_outpoints = vec![];
+        for outpoint in found_inputs {
+            // this may confirm the same tx multiple times, but this shouldn't be a problem
+            if !self.confirm_recorded_outgoing_transaction(*outpoint, *blkheight) {
+                // if we're unable to confirm the spent outpoint, it means we don't know
+                // the spending transaction because of a history desync. To keep the
+                // history consistent we make a new 'unknown' spent output for these.
+                unknown_spent_outpoints.push(*outpoint);
+            }
+        }
 
-                    self.record_unknown_outgoing_transaction(
-                        unknown_spent_outpoints,
-                        unknown_sum,
-                        *blkheight,
-                    )?;
-                }
+        if !unknown_spent_outpoints.is_empty() {
+            let unknown_sum = unknown_spent_outpoints
+                .iter()
+                .map(|outpoint| owned_outputs.get(outpoint).unwrap().amount)
+                .sum();
 
-                // add new incoming transactions
-                let mut txs: HashMap<Txid, Amount> = HashMap::new();
-                for (outpoint, output) in found_outputs {
-                    // if this transaction is a send-to-self, it may have a change output present.
-                    // since we don't deduct change outputs from the sending side,
-                    // we shouldn't add the funds on the receiving side either.
-                    //
-                    // however, in case the user is recovering using a seed phrase,
-                    // we should NOT exclude the change output, since we don't have the sending
-                    // equivalent.
-                    //
-                    // since we're a label-less wallet, the only label we use is the change label,
-                    // so we simply check if an output is labelled.
-                    if output.label.is_some() {
-                        if self.check_is_self_send(outpoint.txid) {
-                            // if this is both a change output, as well as a tx we sent ourselves,
-                            // skip this output
-                            continue;
-                        }
-                    }
+            self.record_unknown_outgoing_transaction(
+                unknown_spent_outpoints,
+                unknown_sum,
+                *blkheight,
+            )?;
+        }
 
-                    let entry = txs.entry(outpoint.txid).or_default();
-                    *entry += output.value;
-                }
-                for (txid, amount) in txs {
-                    self.record_incoming_transaction(txid, amount, *blkheight);
+        // add new incoming transactions
+        let mut txs: HashMap<Txid, Amount> = HashMap::new();
+        for (outpoint, output) in found_outputs {
+            // if this transaction is a send-to-self, it may have a change output present.
+            // since we don't deduct change outputs from the sending side,
+            // we shouldn't add the funds on the receiving side either.
+            //
+            // however, in case the user is recovering using a seed phrase,
+            // we should NOT exclude the change output, since we don't have the sending
+            // equivalent.
+            //
+            // since we're a label-less wallet, the only label we use is the change label,
+            // so we simply check if an output is labelled.
+            if output.label.is_some() {
+                if self.check_is_self_send(outpoint.txid) {
+                    // if this is both a change output, as well as a tx we sent ourselves,
+                    // skip this output
+                    continue;
                 }
             }
-            StateUpdate::NoUpdate { .. } => (),
+
+            let entry = txs.entry(outpoint.txid).or_default();
+            *entry += output.value;
+        }
+        for (txid, amount) in txs {
+            self.record_incoming_transaction(txid, amount, *blkheight);
         }
 
         Ok(())

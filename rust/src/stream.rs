@@ -16,16 +16,11 @@ lazy_static! {
 }
 
 #[derive(Debug)]
-pub enum StateUpdate {
-    NoUpdate {
-        blkheight: Height,
-    },
-    Update {
-        blkheight: Height,
-        blkhash: BlockHash,
-        found_outputs: HashMap<OutPoint, DiscoveredOutput>,
-        found_inputs: HashSet<OutPoint>,
-    },
+pub struct StateUpdate {
+    pub(crate) blkheight: Height,
+    pub(crate) blkhash: BlockHash,
+    pub(crate) found_outputs: HashMap<OutPoint, DiscoveredOutput>,
+    pub(crate) found_inputs: HashSet<OutPoint>,
 }
 
 pub fn create_scan_progress_stream(s: StreamSink<u32>) {

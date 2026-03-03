@@ -34,7 +34,7 @@ impl SpWallet {
         let end = Height::from_consensus(to_height)?;
 
         let sp_client = self.client.clone();
-        let updater = StateUpdater::new();
+        let updater = StateUpdater::new(end);
 
         KEEP_SCANNING.store(true, std::sync::atomic::Ordering::Relaxed);
 

@@ -77,37 +77,34 @@ impl OwnedOutputs {
 
     #[flutter_rust_bridge::frb(sync)]
     pub fn process_state_update(&mut self, update: &StateUpdate) -> Result<()> {
-        match update {
-            StateUpdate::Update {
-                blkheight,
-                blkhash,
-                found_outputs,
-                found_inputs,
-            } => {
-                // mark inputs as mined
-                for outpoint in found_inputs {
-                    // this may confirm the same tx multiple times, but this shouldn't be a problem
-                    self.mark_mined(*outpoint, *blkhash)?;
-                }
+        let StateUpdate {
+            blkheight,
+            blkhash,
+            found_outputs,
+            found_inputs,
+        } = update;
 
-                // record the outputs
-                self.0
-                    .extend(found_outputs.iter().map(|(outpoint, output)| {
-                        (
-                            *outpoint,
-                            OwnedOutput {
-                                blockheight: *blkheight,
-                                spend_status: OutputSpendStatus::Unspent,
-                                tweak: output.tweak.to_be_bytes(),
-                                amount: output.value,
-                                script: output.script_pubkey.clone(),
-                                label: output.label.clone(),
-                            },
-                        )
-                    }))
-            }
-            StateUpdate::NoUpdate { .. } => (),
+        // mark inputs as mined
+        for outpoint in found_inputs {
+            // this may confirm the same tx multiple times, but this shouldn't be a problem
+            self.mark_mined(*outpoint, *blkhash)?;
         }
+
+        // record the outputs
+        self.0
+            .extend(found_outputs.iter().map(|(outpoint, output)| {
+                (
+                    *outpoint,
+                    OwnedOutput {
+                        blockheight: *blkheight,
+                        spend_status: OutputSpendStatus::Unspent,
+                        tweak: output.tweak.to_be_bytes(),
+                        amount: output.value,
+                        script: output.script_pubkey.clone(),
+                        label: output.label.clone(),
+                    },
+                )
+            }));
 
         Ok(())
     }
