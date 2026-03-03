@@ -130,4 +130,8 @@ class SynchronizationService {
     Logger().i("Stopping sync service");
     _timer?.cancel();
   }
+
+  void clearSyncHistory() {
+    _startHeight = null;
+  }
 }
