@@ -23,24 +23,24 @@ pub struct StateUpdate {
     pub(crate) found_inputs: HashSet<OutPoint>,
 }
 
-pub fn create_scan_progress_stream(s: StreamSink<u32>) {
+pub fn create_sync_progress_stream(s: StreamSink<u32>) {
     let mut stream_sink = SCAN_PROGRESS_STREAM_SINK.lock().unwrap();
     *stream_sink = Some(s);
 }
 
-pub fn create_scan_update_stream(s: StreamSink<StateUpdate>) {
+pub fn create_sync_update_stream(s: StreamSink<StateUpdate>) {
     let mut stream_sink = STATE_UPDATE_STREAM_SINK.lock().unwrap();
     *stream_sink = Some(s);
 }
 
-pub(crate) fn send_scan_progress(scan_progress: u32) {
+pub(crate) fn send_sync_progress(scan_progress: u32) {
     let stream_sink = SCAN_PROGRESS_STREAM_SINK.lock().unwrap();
     if let Some(stream_sink) = stream_sink.as_ref() {
         stream_sink.add(scan_progress).unwrap();
     }
 }
 
-pub(crate) fn send_state_update(update: StateUpdate) {
+pub(crate) fn send_sync_update(update: StateUpdate) {
     let stream_sink = STATE_UPDATE_STREAM_SINK.lock().unwrap();
     if let Some(stream_sink) = stream_sink.as_ref() {
         stream_sink.add(update).unwrap();

@@ -14,7 +14,7 @@ import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/home_state.dart';
-import 'package:danawallet/states/scan_progress_notifier.dart';
+import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/pin_guard.dart';
 import 'package:flutter/material.dart';
@@ -38,7 +38,7 @@ void main() async {
   // Initialize contacts database
   await DatabaseHelper.instance.database;
   final walletState = await WalletState.create();
-  final scanNotifier = await ScanProgressNotifier.create();
+  final scanNotifier = await SyncProgressNotifier.create();
   final chainState = ChainState();
   final contactsState = ContactsState();
   final fiatExchangeRate = await FiatExchangeRateState.create();

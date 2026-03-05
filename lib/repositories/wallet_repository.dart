@@ -20,7 +20,7 @@ const String _keyBirthday = "birthday";
 const String _keyNetwork = "network";
 const String _keyTxHistory = "txhistory";
 const String _keyOwnedOutputs = "ownedoutputs";
-const String _keyLastScan = "lastscan";
+const String _keyLastSync = "lastscan";
 const String _keyDanaAddress = "danaaddress";
 
 class WalletRepository {
@@ -41,7 +41,7 @@ class WalletRepository {
     await nonSecureStorage.clear(allowList: {
       _keyNetwork,
       _keyTxHistory,
-      _keyLastScan,
+      _keyLastSync,
       _keyOwnedOutputs,
       _keyBirthday,
       _keyDanaAddress,
@@ -49,7 +49,7 @@ class WalletRepository {
   }
 
   Future<SpWallet> setupWallet(WalletSetupResult walletSetup,
-      ApiNetwork network, DateTime? birthday, int? lastScan) async {
+      ApiNetwork network, DateTime? birthday, int? lastSync) async {
     if ((await secureStorage.readAll()).isNotEmpty) {
       throw Exception('Previous wallet not properly deleted');
     }
@@ -73,7 +73,7 @@ class WalletRepository {
     }
 
     // set default values for new wallet
-    await saveLastScan(lastScan);
+    await saveLastSync(lastSync);
     await saveHistory(TxHistory.empty());
     await saveOwnedOutputs(OwnedOutputs.empty());
 
@@ -146,17 +146,17 @@ class WalletRepository {
     return timestamp?.toDate();
   }
 
-  Future<void> saveLastScan(int? lastScan) async {
-    if (lastScan != null) {
-      await nonSecureStorage.setInt(_keyLastScan, lastScan);
+  Future<void> saveLastSync(int? lastSync) async {
+    if (lastSync != null) {
+      await nonSecureStorage.setInt(_keyLastSync, lastSync);
     } else {
-      await nonSecureStorage.remove(_keyLastScan);
+      await nonSecureStorage.remove(_keyLastSync);
     }
   }
 
-  Future<int?> readLastScan() async {
-    final lastScan = await nonSecureStorage.getInt(_keyLastScan);
-    return lastScan;
+  Future<int?> readLastSync() async {
+    final lastSync = await nonSecureStorage.getInt(_keyLastSync);
+    return lastSync;
   }
 
   Future<void> saveOwnedOutputs(OwnedOutputs ownedOutputs) async {
@@ -192,13 +192,13 @@ class WalletRepository {
     final history = await readHistory();
     final outputs = await readOwnedOutputs();
     final seedPhrase = await readSeedPhrase();
-    final lastScan = await readLastScan();
+    final lastSync = await readLastSync();
     final network = await readNetwork();
 
     return WalletBackup(
         wallet: wallet!,
         birthday: birthday?.toSeconds(),
-        lastScan: lastScan!,
+        lastScan: lastSync!,
         txHistory: history,
         ownedOutputs: outputs,
         seedPhrase: seedPhrase,
@@ -224,6 +224,6 @@ class WalletRepository {
 
     await saveHistory(backup.txHistory);
     await saveOwnedOutputs(backup.ownedOutputs);
-    await saveLastScan(backup.lastScan);
+    await saveLastSync(backup.lastScan);
   }
 }

@@ -4,7 +4,7 @@ use spdk_wallet::bitcoin::absolute::Height;
 use spdk_wallet::bitcoin::Amount;
 use spdk_wallet::scanner::SpScanner;
 
-use crate::{api::outputs::OwnedOutPoints, state::StateUpdater, wallet::KEEP_SCANNING};
+use crate::{api::outputs::OwnedOutPoints, state::StateUpdater, wallet::KEEP_SYNCING};
 
 use super::SpWallet;
 
@@ -13,8 +13,8 @@ const ENABLE_CUTTHROUGH: bool = true;
 
 impl SpWallet {
     #[flutter_rust_bridge::frb(sync)]
-    pub fn interrupt_scanning() {
-        KEEP_SCANNING.store(false, std::sync::atomic::Ordering::Relaxed);
+    pub fn interrupt_sync() {
+        KEEP_SYNCING.store(false, std::sync::atomic::Ordering::Relaxed);
     }
 
     pub async fn sync_to_height(
@@ -36,14 +36,14 @@ impl SpWallet {
         let sp_client = self.client.clone();
         let updater = StateUpdater::new(end);
 
-        KEEP_SCANNING.store(true, std::sync::atomic::Ordering::Relaxed);
+        KEEP_SYNCING.store(true, std::sync::atomic::Ordering::Relaxed);
 
         let mut scanner = SpScanner::new(
             sp_client,
             Box::new(updater),
             Box::new(backend),
             owned_outpoints.to_inner(),
-            &KEEP_SCANNING,
+            &KEEP_SYNCING,
         );
 
         scanner
