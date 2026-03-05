@@ -26,7 +26,6 @@ class PersonalisationSettingsScreen extends StatelessWidget {
 
   // Business logic methods
   void _onChangeFiat(BuildContext context) async {
-    final homeState = Provider.of<HomeState>(context, listen: false);
     final fiatExchangeRate =
         Provider.of<FiatExchangeRateState>(context, listen: false);
     final currentCurrency =
@@ -39,9 +38,9 @@ class PersonalisationSettingsScreen extends StatelessWidget {
               currentCurrency: currentCurrency,
               onConfirm: (chosen) async {
                 await fiatExchangeRate.updateCurrency(chosen);
-                homeState.showMainScreen();
+
                 if (context.mounted) {
-                  Navigator.popUntil(context, (route) => route.isFirst);
+                  goToHomeScreen(context);
                 }
               }));
     }
