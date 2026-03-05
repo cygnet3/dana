@@ -54,7 +54,7 @@ as this may imply there's an issue with the faucet.
 There are 3 app 'flavors' hosted on our F-droid repository:
 
 - 'Dana wallet', this is the default flavor, and is identical to the APK released on GitHub. Uses Mainnet (real bitcoin).
-- 'Dana wallet - Development', this flavor has some additional extra advanced options/features. May be less stable. Uses the Regtest network.
+- 'Dana wallet - Experimental', this flavor has some additional extra advanced options/features. Some of these features may not be stable and are not necessarily expected to end up in the stable releases. Uses Signet by default, but allows user to change the network.
 - 'Dana wallet - Signet', this flavor is for using the Signet network.
 
 ## Building Dana wallet from source
