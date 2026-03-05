@@ -5,6 +5,7 @@ import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/enums/warning_type.dart';
 import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
+import 'package:danawallet/states/home_state.dart';
 import 'package:danawallet/widgets/alerts/warning_message.dart';
 import 'package:danawallet/widgets/confirmation_widget.dart';
 import 'package:danawallet/widgets/input_alert_widget.dart';
@@ -12,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:logger/logger.dart';
+import 'package:provider/provider.dart';
 
 final globalNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -211,4 +213,10 @@ void goToScreenAndResetPath(BuildContext context, Widget screen) {
 
 void goBack(BuildContext context) {
   Navigator.of(context).pop();
+}
+
+void goToHomeScreen(BuildContext context) {
+  final homeState = Provider.of<HomeState>(context, listen: false);
+  homeState.showMainScreen();
+  Navigator.popUntil(context, (route) => route.isFirst);
 }
