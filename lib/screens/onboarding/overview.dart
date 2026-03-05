@@ -142,7 +142,10 @@ class _OverviewScreenState extends State<OverviewScreen> {
       }
 
       // clear path (don't allow users to go back to registration screen by pressing 'back')
-      goToScreenAndResetPath(context, nextScreen);
+      Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => nextScreen),
+          (Route<dynamic> route) => false);
     }
   }
 
