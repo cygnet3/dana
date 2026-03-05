@@ -54,10 +54,8 @@ class NetworkSettingsScreen extends StatelessWidget {
       chainState.clearSyncHistory();
       homeState.showMainScreen();
     } else if (syncHeight is bool && syncHeight) {
-      final birthday = walletState.birthday;
-      // TODO probably better and simpler to set lastScan to null and let the synchronization service set it to the birthday height
-      final height = await chainState.getBlockHeightFromDate(birthday!);
-      await walletState.resetToSyncHeight(height);
+      // if no height is provided, we reset to the birthday
+      await walletState.resetToBirthday();
       chainState.clearSyncHistory();
       homeState.showMainScreen();
     }
