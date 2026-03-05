@@ -33,7 +33,7 @@ class WalletState extends ChangeNotifier {
   // variables that change
   late ApiAmount amount;
   late ApiAmount unconfirmedChange;
-  late int? lastScan;
+  late int? lastSync;
   late TxHistory txHistory;
   late OwnedOutputs ownedOutputs;
 
@@ -41,7 +41,7 @@ class WalletState extends ChangeNotifier {
   Bip353Address? danaAddress;
 
   // stream to receive updates while scanning
-  late StreamSubscription scanResultSubscription;
+  late StreamSubscription syncResultSubscription;
 
   // private constructor
   WalletState._();
@@ -53,16 +53,16 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<void> _initStreams() async {
-    scanResultSubscription = createScanResultStream().listen(((event) async {
+    syncResultSubscription = createSyncResultStream().listen(((event) async {
       // process update
-      lastScan = event.getHeight();
+      lastSync = event.getHeight();
       txHistory.processStateUpdate(update: event, ownedOutputs: ownedOutputs);
       ownedOutputs.processStateUpdate(update: event);
 
       // save updates to storage
       await walletRepository.saveHistory(txHistory);
       await walletRepository.saveOwnedOutputs(ownedOutputs);
-      await walletRepository.saveLastScan(lastScan);
+      await walletRepository.saveLastSync(lastSync);
 
       // update UI
       await _updateWalletState();
@@ -95,7 +95,7 @@ class WalletState extends ChangeNotifier {
 
   @override
   void dispose() {
-    scanResultSubscription.cancel();
+    syncResultSubscription.cancel();
     super.dispose();
   }
 
@@ -118,8 +118,8 @@ class WalletState extends ChangeNotifier {
     this.birthday = birthday;
     this.network = network;
 
-    // lastScan will be initialized by chainState synchronization service
-    lastScan = null;
+    // lastSync will be initialized by chainState synchronization service
+    lastSync = null;
 
     await _updateWalletState();
   }
@@ -138,7 +138,7 @@ class WalletState extends ChangeNotifier {
     changePaymentCode = wallet.getChangeAddress();
     birthday = now;
     this.network = network;
-    lastScan = currentTip;
+    lastSync = currentTip;
     await _updateWalletState();
   }
 
@@ -188,13 +188,13 @@ class WalletState extends ChangeNotifier {
     }
   }
 
-  Future<void> resetToScanHeight(int height) async {
-    lastScan = height;
+  Future<void> resetToSyncHeight(int height) async {
+    lastSync = height;
 
     ownedOutputs.resetToHeight(height: height);
     txHistory.resetToHeight(height: height);
 
-    await walletRepository.saveLastScan(height);
+    await walletRepository.saveLastSync(height);
     await walletRepository.saveHistory(txHistory);
     await walletRepository.saveOwnedOutputs(ownedOutputs);
 
@@ -205,7 +205,7 @@ class WalletState extends ChangeNotifier {
   Future<void> _updateWalletState() async {
     txHistory = await walletRepository.readHistory();
     ownedOutputs = await walletRepository.readOwnedOutputs();
-    lastScan = await walletRepository.readLastScan();
+    lastSync = await walletRepository.readLastSync();
 
     amount = ownedOutputs.getUnspentAmount();
     unconfirmedChange = txHistory.getUnconfirmedChange();

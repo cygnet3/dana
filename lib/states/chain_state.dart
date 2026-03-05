@@ -5,7 +5,7 @@ import 'package:danawallet/generated/rust/api/chain.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
 import 'package:danawallet/services/synchronization_service.dart';
-import 'package:danawallet/states/scan_progress_notifier.dart';
+import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
@@ -37,7 +37,7 @@ class ChainState extends ChangeNotifier {
   }
 
   void startSyncService(WalletState walletState,
-      ScanProgressNotifier scanProgress, bool immediate) {
+      SyncProgressNotifier scanProgress, bool immediate) {
     // start sync service & timer
     _synchronizationService = SynchronizationService(
         chainState: this, walletState: walletState, scanProgress: scanProgress);
