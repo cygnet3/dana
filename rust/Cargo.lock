@@ -120,7 +120,7 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 [[package]]
 name = "backend-blindbit-v1"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#317c0dd464fc7977b2812c9f26266f547ac0c2a1"
+source = "git+https://github.com/cygnet3/spdk?branch=bip392#8c589ca16359cec235e9452196480d2427f8647c"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1861,7 +1861,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 [[package]]
 name = "silentpayments"
 version = "0.5.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#317c0dd464fc7977b2812c9f26266f547ac0c2a1"
+source = "git+https://github.com/cygnet3/spdk?branch=bip392#8c589ca16359cec235e9452196480d2427f8647c"
 dependencies = [
  "bech32 0.9.1",
  "bimap",
@@ -1921,16 +1921,17 @@ dependencies = [
 [[package]]
 name = "sp-descriptor"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=bip392#dc4490e44222759fd2bb3a539e9441e9590b5aec"
+source = "git+https://github.com/cygnet3/spdk?branch=bip392#8c589ca16359cec235e9452196480d2427f8647c"
 dependencies = [
  "miniscript",
  "secp256k1 0.29.1",
+ "silentpayments",
 ]
 
 [[package]]
 name = "spdk-core"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#317c0dd464fc7977b2812c9f26266f547ac0c2a1"
+source = "git+https://github.com/cygnet3/spdk?branch=bip392#8c589ca16359cec235e9452196480d2427f8647c"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1943,7 +1944,7 @@ dependencies = [
 [[package]]
 name = "spdk-wallet"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#317c0dd464fc7977b2812c9f26266f547ac0c2a1"
+source = "git+https://github.com/cygnet3/spdk?branch=bip392#8c589ca16359cec235e9452196480d2427f8647c"
 dependencies = [
  "anyhow",
  "backend-blindbit-v1",
@@ -1954,6 +1955,7 @@ dependencies = [
  "rayon",
  "serde",
  "silentpayments",
+ "sp-descriptor",
  "spdk-core",
 ]
 
