@@ -8,7 +8,7 @@ import 'package:danawallet/screens/onboarding/recovery/birthday_picker_screen.da
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
-import 'package:danawallet/states/scan_progress_notifier.dart';
+import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/loading_widget.dart';
@@ -51,7 +51,7 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
       final chainState = Provider.of<ChainState>(context, listen: false);
       final contactsState = Provider.of<ContactsState>(context, listen: false);
       final scanProgress =
-          Provider.of<ScanProgressNotifier>(context, listen: false);
+          Provider.of<SyncProgressNotifier>(context, listen: false);
 
       // Get birthday: navigate to picker if user knows it, else null
       DateTime? birthday;

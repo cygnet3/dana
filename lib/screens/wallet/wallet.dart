@@ -12,7 +12,7 @@ import 'package:danawallet/screens/spend/choose_recipient.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
-import 'package:danawallet/states/scan_progress_notifier.dart';
+import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -471,7 +471,7 @@ class WalletScreenState extends State<WalletScreen> {
   }
 
   Widget buildFundingScreen(String silentPaymentAddress, String? danaAddress,
-      ScanProgressNotifier scanProgress, ChainState chainState) {
+      SyncProgressNotifier scanProgress, ChainState chainState) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Column(
@@ -578,7 +578,7 @@ class WalletScreenState extends State<WalletScreen> {
   Widget build(BuildContext context) {
     final walletState = Provider.of<WalletState>(context);
     final exchangeRate = Provider.of<FiatExchangeRateState>(context);
-    final scanProgress = Provider.of<ScanProgressNotifier>(context);
+    final scanProgress = Provider.of<SyncProgressNotifier>(context);
     final chainState = Provider.of<ChainState>(context);
     final danaAddress = walletState.danaAddress;
 

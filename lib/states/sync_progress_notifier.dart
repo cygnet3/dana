@@ -8,21 +8,21 @@ import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
 
-class ScanProgressNotifier extends ChangeNotifier {
+class SyncProgressNotifier extends ChangeNotifier {
   Completer? _completer;
   double? progress;
   late int startHeight;
   late int endHeight;
 
-  late StreamSubscription scanProgressSubscription;
+  late StreamSubscription syncProgressSubscription;
 
   bool get isScanning => _completer != null && !_completer!.isCompleted;
 
   // private constructor
-  ScanProgressNotifier._();
+  SyncProgressNotifier._();
 
   Future<void> _initialize() async {
-    scanProgressSubscription = createScanProgressStream().listen(((current) {
+    syncProgressSubscription = createSyncProgressStream().listen(((current) {
       double scanned = (current - startHeight).toDouble();
       double total = (endHeight - startHeight).toDouble();
       double progress = scanned / total;
@@ -34,15 +34,15 @@ class ScanProgressNotifier extends ChangeNotifier {
     }));
   }
 
-  static Future<ScanProgressNotifier> create() async {
-    final instance = ScanProgressNotifier._();
+  static Future<SyncProgressNotifier> create() async {
+    final instance = SyncProgressNotifier._();
     await instance._initialize();
     return instance;
   }
 
   @override
   void dispose() {
-    scanProgressSubscription.cancel();
+    syncProgressSubscription.cancel();
     super.dispose();
   }
 
@@ -65,7 +65,7 @@ class ScanProgressNotifier extends ChangeNotifier {
 
     // start syncing from the first block after our last sync
     // we ignore the startHeight here, because we may be continuing from another sync
-    final fromHeight = walletState.lastScan! + 1;
+    final fromHeight = walletState.lastSync! + 1;
     final toHeight = chainTip;
 
     try {
@@ -75,7 +75,7 @@ class ScanProgressNotifier extends ChangeNotifier {
           walletState.network.defaultBlindbitUrl;
       final dustLimit = await settings.getDustLimit() ?? defaultDustLimit;
 
-      if (walletState.lastScan == null) {
+      if (walletState.lastSync == null) {
         throw Exception("Last scan is null");
       }
 
@@ -97,9 +97,9 @@ class ScanProgressNotifier extends ChangeNotifier {
     deactivate();
   }
 
-  Future<void> interruptScan() async {
+  Future<void> interruptSync() async {
     if (isScanning) {
-      SpWallet.interruptScanning();
+      SpWallet.interruptSync();
 
       // this makes sure the scan function has been terminated
       await _completer?.future;

@@ -24,9 +24,9 @@ class NetworkSettingsScreen extends StatelessWidget {
       if (isDevEnv)
         _NetworkSettingsItem(
           icon: Icons.schedule,
-          title: 'Set scan height',
-          subtitle: 'Reset blockchain scan position',
-          onTap: () => _onSetLastScan(context),
+          title: 'Set sync height',
+          subtitle: 'Reset blockchain sync position',
+          onTap: () => _onSetLastSync(context),
         ),
       if (isDevEnv)
         _NetworkSettingsItem(
@@ -38,26 +38,26 @@ class NetworkSettingsScreen extends StatelessWidget {
     ];
   }
 
-  Future<void> _onSetLastScan(BuildContext context) async {
+  Future<void> _onSetLastSync(BuildContext context) async {
     final walletState = Provider.of<WalletState>(context, listen: false);
     final homeState = Provider.of<HomeState>(context, listen: false);
     final chainState = Provider.of<ChainState>(context, listen: false);
 
     TextEditingController controller = TextEditingController();
-    final scanHeight = await showInputAlertDialog(
+    final syncHeight = await showInputAlertDialog(
         controller,
         TextInputType.number,
-        'Enter scan height',
-        'Enter current scan height (numeric value)');
-    if (scanHeight is int) {
-      await walletState.resetToScanHeight(scanHeight);
+        'Enter sync height',
+        'Enter current sync height (numeric value)');
+    if (syncHeight is int) {
+      await walletState.resetToSyncHeight(syncHeight);
       chainState.clearSyncHistory();
       homeState.showMainScreen();
-    } else if (scanHeight is bool && scanHeight) {
+    } else if (syncHeight is bool && syncHeight) {
       final birthday = walletState.birthday;
       // TODO probably better and simpler to set lastScan to null and let the synchronization service set it to the birthday height
       final height = await chainState.getBlockHeightFromDate(birthday!);
-      await walletState.resetToScanHeight(height);
+      await walletState.resetToSyncHeight(height);
       chainState.clearSyncHistory();
       homeState.showMainScreen();
     }

@@ -9,7 +9,7 @@ use spdk_wallet::{
     updater::DiscoveredOutput,
 };
 
-use crate::stream::{send_scan_progress, send_state_update, StateUpdate};
+use crate::stream::{send_sync_progress, send_sync_update, StateUpdate};
 
 use anyhow::Result;
 
@@ -54,7 +54,7 @@ impl Updater for StateUpdater {
                 found_inputs: discovered_inputs,
             };
 
-            send_state_update(update);
+            send_sync_update(update);
 
             self.last_update = Instant::now();
         }
@@ -62,7 +62,7 @@ impl Updater for StateUpdater {
         // whether we update or not, we always notify the progress notifier
         // note: the scan progress notifyer is purely to show scan progress to the user,
         // it does not affect persistent storage
-        send_scan_progress(blkheight.to_consensus_u32());
+        send_sync_progress(blkheight.to_consensus_u32());
 
         Ok(())
     }

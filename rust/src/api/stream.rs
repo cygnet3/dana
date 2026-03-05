@@ -11,13 +11,13 @@ pub fn create_log_stream(s: StreamSink<LogEntry>, level: LogLevel, log_dependenc
 }
 
 #[flutter_rust_bridge::frb(sync)]
-pub fn create_scan_progress_stream(s: StreamSink<u32>) {
-    stream::create_scan_progress_stream(s);
+pub fn create_sync_progress_stream(s: StreamSink<u32>) {
+    stream::create_sync_progress_stream(s);
 }
 
 #[flutter_rust_bridge::frb(sync)]
-pub fn create_scan_result_stream(s: StreamSink<StateUpdate>) {
-    stream::create_scan_update_stream(s);
+pub fn create_sync_result_stream(s: StreamSink<StateUpdate>) {
+    stream::create_sync_update_stream(s);
 }
 
 impl StateUpdate {
