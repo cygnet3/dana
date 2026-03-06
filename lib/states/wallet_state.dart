@@ -14,7 +14,6 @@ import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart'
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:danawallet/generated/rust/api/wallet/setup.dart';
-import 'package:danawallet/generated/rust/stream.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
@@ -48,6 +47,9 @@ class WalletState extends ChangeNotifier {
   // stream to receive updates while scanning
   late StreamSubscription scanResultSubscription;
 
+  // callback when outputs are found during scan
+  void Function(int count)? onOutputsFound;
+
   // private constructor
   WalletState._();
 
@@ -60,6 +62,10 @@ class WalletState extends ChangeNotifier {
   Future<void> _initStreams() async {
     scanResultSubscription = createScanResultStream().listen(((event) async {
       lastScan = event.blkheight;
+
+      if (onOutputsFound != null) {
+        onOutputsFound!(event.foundOutputs.length);
+      }
 
       // Process found outputs (new UTXOs we own)
       for (final found in event.foundOutputs) {
