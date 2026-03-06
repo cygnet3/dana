@@ -38,7 +38,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
       final contactsState = Provider.of<ContactsState>(context, listen: false);
       final scanProgress =
           Provider.of<ScanProgressNotifier>(context, listen: false);
-      final encryptedBackup = await BackupService.getEncryptedBackupFromFile();
+      final encryptedBackup = await BackupService.getBackupFromFile();
 
       if (encryptedBackup != null) {
         final controller = TextEditingController();
@@ -51,8 +51,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
             showReset: false);
 
         if (password is String) {
-          await BackupService.restoreFromEncryptedBackup(
-              encryptedBackup, password);
+          await BackupService.restoreFromFile(encryptedBackup, password);
 
           await walletState.initialize();
           final network = walletState.network;
