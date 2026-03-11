@@ -1,5 +1,5 @@
 mod info;
-mod scan;
+mod sync;
 pub mod setup;
 mod transaction;
 

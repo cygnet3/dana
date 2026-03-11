@@ -9,7 +9,7 @@ import 'package:danawallet/services/backup_service.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/home_state.dart';
-import 'package:danawallet/states/scan_progress_notifier.dart';
+import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -46,12 +46,12 @@ class WalletSettingsScreen extends StatelessWidget {
   Future<void> _onRemoveWallet(
     WalletState walletState,
     ChainState chainState,
-    ScanProgressNotifier scanProgress,
+    SyncProgressNotifier scanProgress,
     HomeState homeState,
     ContactsState contacts,
   ) async {
     try {
-      await scanProgress.interruptScan();
+      await scanProgress.interruptSync();
       chainState.reset();
       await walletState.reset();
       await SettingsRepository.instance.resetAll();
@@ -87,7 +87,7 @@ class WalletSettingsScreen extends StatelessWidget {
       final homeState = Provider.of<HomeState>(context, listen: false);
       final chainState = Provider.of<ChainState>(context, listen: false);
       final scanProgress =
-          Provider.of<ScanProgressNotifier>(context, listen: false);
+          Provider.of<SyncProgressNotifier>(context, listen: false);
       final contacts = Provider.of<ContactsState>(context, listen: false);
 
       await _onRemoveWallet(

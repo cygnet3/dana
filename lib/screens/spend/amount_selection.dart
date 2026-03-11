@@ -75,8 +75,8 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
 
     final availableBalance = walletState.amount;
     int blocksToScan = 0;
-    if (walletState.lastScan != null) {
-      blocksToScan = chainState.tip - walletState.lastScan!;
+    if (walletState.lastSync != null) {
+      blocksToScan = chainState.tip - walletState.lastSync!;
     }
 
     String recipientName = form.recipient!.displayName;

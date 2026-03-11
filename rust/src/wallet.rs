@@ -9,7 +9,7 @@ use spdk_wallet::bitcoin::secp256k1::SecretKey;
 use spdk_wallet::bitcoin::{Network, NetworkKind};
 
 lazy_static! {
-    pub static ref KEEP_SCANNING: AtomicBool = AtomicBool::new(true);
+    pub static ref KEEP_SYNCING: AtomicBool = AtomicBool::new(true);
 }
 
 pub type WalletFingerprint = [u8; 8];
