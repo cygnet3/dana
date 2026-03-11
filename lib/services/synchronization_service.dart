@@ -126,6 +126,10 @@ class SynchronizationService {
     walletState.lastScan = blockHeight;
   }
 
+  Future<void> interruptScan() async {
+    await scanProgress.interruptScan();
+  }
+
   void stopSyncTimer() {
     Logger().i("Stopping sync service");
     _timer?.cancel();

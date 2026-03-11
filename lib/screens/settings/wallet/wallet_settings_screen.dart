@@ -3,6 +3,8 @@ import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/screens/onboarding/introduction.dart';
 import 'package:danawallet/screens/recovery/view_mnemonic_screen.dart';
+import 'package:danawallet/screens/settings/wallet/change_birthday_screen.dart';
+import 'package:danawallet/screens/settings/wallet/rescan_from_date_screen.dart';
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/services/backup_service.dart';
@@ -24,6 +26,18 @@ class WalletSettingsScreen extends StatelessWidget {
         title: 'Show seed phrase',
         subtitle: 'View your recovery phrase',
         onTap: () => _onShowMnemonic(context),
+      ),
+      _WalletSettingsItem(
+        icon: Icons.cake_outlined,
+        title: 'Change wallet birthday',
+        subtitle: 'Update wallet creation date',
+        onTap: () => goToScreen(context, const ChangeBirthdayScreen()),
+      ),
+      _WalletSettingsItem(
+        icon: Icons.replay_outlined,
+        title: 'Rescan from date',
+        subtitle: 'Rescan blockchain from a specific date',
+        onTap: () => goToScreen(context, const RescanFromDateScreen()),
       ),
       if (isDevEnv)
         _WalletSettingsItem(
