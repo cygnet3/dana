@@ -2,11 +2,13 @@ import 'dart:io';
 
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/extensions/network.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/frb_generated.dart';
 
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/repositories/database_helper.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
+import 'package:danawallet/repositories/wallet_repository.dart';
 import 'package:danawallet/screens/onboarding/introduction.dart';
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/services/app_info_service.dart';
@@ -20,7 +22,6 @@ import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/pin_guard.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
-import 'package:logger/logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:sizer/sizer.dart';
@@ -38,21 +39,20 @@ void main() async {
 
   final appInfo = AppInfoService(packageInfo: await PackageInfo.fromPlatform());
 
-  // Initialize contacts database
+  // Initialize database
   await DatabaseHelper.instance.database;
+
+  // Migrate legacy SharedPreferences data to SQLite (for users upgrading from older app versions)
+  await WalletRepository.instance.migrateToSqliteIfNeeded();
+
   final walletState = await WalletState.create();
   final scanNotifier = await ScanProgressNotifier.create();
   final chainState = ChainState();
   final contactsState = ContactsState();
   final fiatExchangeRate = await FiatExchangeRateState.create();
 
-  // Try to update exchange rate, but don't crash if it fails
-  try {
-    await fiatExchangeRate.updateExchangeRate();
-  } catch (e) {
-    Logger().w('Failed to update exchange rate during startup: $e');
-    // Continue with cached data or no data - UI will handle it
-  }
+  // Start periodic exchange rate updates (non-blocking)
+  fiatExchangeRate.startPeriodicUpdate();
 
   await precacheImages();
 
@@ -71,18 +71,15 @@ void main() async {
         network.defaultBlindbitUrl;
 
     chainState.initialize(network);
+    chainState.setBlindbitUrl(blindbitUrl);
 
-    final connected = await chainState.connect(blindbitUrl);
-    if (!connected) {
-      Logger().w("Failed to connect");
-      // Continue without chain sync - wallet still usable for local operations
-      // UI will show appropriate "offline" state
-    }
-
+    // Connection will be attempted by the sync service in the background
     chainState.startSyncService(walletState, scanNotifier, true);
 
+    // Local-only check: danaAddress was already read from storage by initialize().
+    // Network-based verification/lookup is skipped to avoid blocking startup.
     final addressRegistrationNeeded =
-        await walletState.checkDanaAddressRegistrationNeeded();
+        network != ApiNetwork.regtest && walletState.danaAddress == null;
 
     // initialize contacts with the 'you' contact
     contactsState.initialize(

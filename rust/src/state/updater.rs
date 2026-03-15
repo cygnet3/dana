@@ -9,7 +9,7 @@ use spdk_wallet::{
     updater::DiscoveredOutput,
 };
 
-use crate::stream::{send_scan_progress, send_state_update, StateUpdate};
+use crate::stream::{FoundOutput, StateUpdate, send_scan_progress, send_state_update};
 
 use anyhow::Result;
 
@@ -48,10 +48,13 @@ impl Updater for StateUpdater {
         if new_discoveries || is_final_block_update || max_delay_reached {
             // sending a state update always implies we are writing to persistent storage
             let update = StateUpdate {
-                blkheight,
-                blkhash,
-                found_outputs: discovered_outputs,
-                found_inputs: discovered_inputs,
+                blkheight: blkheight.to_consensus_u32(),
+                blkhash: blkhash.to_string(),
+                found_outputs: discovered_outputs.into_iter().map(|(outpoint, output)| FoundOutput {
+                    outpoint: outpoint.to_string(),
+                    output: output.into(),
+                }).collect(),
+                found_inputs: discovered_inputs.into_iter().map(|outpoint| outpoint.to_string()).collect(),
             };
 
             send_state_update(update);

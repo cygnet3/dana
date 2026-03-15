@@ -166,17 +166,12 @@ class DanaAddressService {
   }
 
   /// Check if a dana address is available for registration
-  /// Returns true if the dana address is not taken, false otherwise
+  /// Returns true if the dana address is not taken, false if taken
+  /// Throws an exception if there's a network error or DNS resolution fails
   Future<bool> isDanaUsernameAvailable(String username) async {
-    try {
-      final domain = await danaAddressDomain;
-      final parsed = Bip353Address(username: username, domain: domain);
-      return await Bip353Resolver.isBip353AddressPresent(parsed, network);
-    } catch (e) {
-      // If we can't resolve due to network error, assume it's taken to be safe
-      Logger().e('Error checking address availability: $e');
-      return false;
-    }
+    final domain = await danaAddressDomain;
+    final parsed = Bip353Address(username: username, domain: domain);
+    return await Bip353Resolver.isBip353AddressPresent(parsed, network);
   }
 
   /// Searches for dana addresses by prefix
