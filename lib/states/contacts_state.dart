@@ -146,6 +146,18 @@ class ContactsState extends ChangeNotifier {
     return _contacts;
   }
 
+  int getOtherContactsCount() {
+    return _contacts.length;
+  }
+
+  List<Contact> filterContacts(String query) {
+    return _contacts.where((contact) {
+      final displayName = contact.displayName.toLowerCase();
+      return displayName.contains(query) ||
+              contact.name!.toLowerCase().contains(query);
+    }).toList();
+  }
+
   /// Creates the appropriate display widget for a given silent payment address, using data from the contact list
   /// Priority: contact name > contact dana address > SP address
   /// note: this may not be the best place to put this function, may be refactored out later
