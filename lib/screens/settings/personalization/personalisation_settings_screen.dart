@@ -6,7 +6,6 @@ import 'package:danawallet/screens/settings/personalization/change_fiat_screen.d
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
-import 'package:danawallet/states/home_state.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 

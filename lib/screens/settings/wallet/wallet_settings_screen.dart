@@ -33,6 +33,12 @@ class WalletSettingsScreen extends StatelessWidget {
           onTap: () => _onBackupWalletButtonPressed(),
         ),
       _WalletSettingsItem(
+        icon: Icons.restore,
+        title: 'Reset wallet data',
+        subtitle: 'Reset wallet data to its birthday',
+        onTap: () => _onResetToBirthdayButtonPressed(context),
+      ),
+      _WalletSettingsItem(
         icon: Icons.delete_outline,
         title: 'Wipe wallet',
         subtitle: 'Delete wallet and all data',
@@ -78,6 +84,31 @@ class WalletSettingsScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _onResetToBirthdayButtonPressed(BuildContext context) async {
+    final confirmed = await showConfirmationAlertDialog(
+        'Confirm resetting wallet data',
+        "Are you sure you want to reset your wallet data? Only do this if you think your wallet data is corrupted, as you will lose valuable data like transaction history.");
+
+    if (confirmed && context.mounted) {
+      final walletState = Provider.of<WalletState>(context, listen: false);
+      final chainState = Provider.of<ChainState>(context, listen: false);
+      final scanProgress =
+          Provider.of<ScanProgressNotifier>(context, listen: false);
+
+      // first interrupt the sync process if this is still running
+      await scanProgress.interruptScan();
+
+      // clear cached start height from sync history
+      chainState.clearSyncHistory();
+
+      // reset wallet data
+      await walletState.resetToBirthday();
+
+      // go to home screen after resetting
+      if (context.mounted) goToHomeScreen(context);
+    }
+  }
+
   Future<void> _onWipeWalletButtonPressed(BuildContext context) async {
     final confirmed = await showConfirmationAlertDialog('Confirm deletion',
         "Are you sure you want to wipe your wallet? Without a backup, you will lose your funds!");
@@ -107,7 +138,8 @@ class WalletSettingsScreen extends StatelessWidget {
 
     if (context.mounted) {
       if (mnemonic != null) {
-        goToScreen(context, ViewMnemonicScreen(mnemonic: mnemonic, birthday: wallet.birthday));
+        goToScreen(context,
+            ViewMnemonicScreen(mnemonic: mnemonic, birthday: wallet.birthday));
       } else {
         showAlertDialog("Seed phrase unknown",
             "Seed phrase unknown! Did you import from keys?");

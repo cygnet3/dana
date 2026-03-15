@@ -188,9 +188,20 @@ class WalletState extends ChangeNotifier {
     }
   }
 
-  Future<void> resetToScanHeight(int height) async {
-    lastScan = height;
+  Future<void> resetToBirthday() async {
+    // when we reset to the birthday, clear out all stored data
+    await walletRepository.saveHistory(TxHistory.empty());
+    await walletRepository.saveOwnedOutputs(OwnedOutputs.empty());
 
+    // the sync service will handle setting the lastSync to the birthday height
+    await walletRepository.saveLastScan(null);
+
+    await _updateWalletState();
+    notifyListeners();
+  }
+
+  Future<void> resetToScanHeight(int height) async {
+    // note: this feature is not stable, as it does not take output spent status into account
     ownedOutputs.resetToHeight(height: height);
     txHistory.resetToHeight(height: height);
 
