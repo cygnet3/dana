@@ -79,16 +79,13 @@ class ScanProgressNotifier extends ChangeNotifier {
         throw Exception("Last scan is null");
       }
 
-      final ownedOutPoints =
-          walletState.ownedOutputs.getUnconfirmedSpentOutpoints();
-
       activate();
       await wallet.syncToHeight(
         fromHeight: fromHeight,
         toHeight: toHeight,
         blindbitUrl: blindbitUrl,
         dustLimit: BigInt.from(dustLimit),
-        ownedOutpoints: ownedOutPoints,
+        ownedOutpoints: walletState.outpointsToScan,
       );
     } catch (e) {
       deactivate();

@@ -1,18 +1,20 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/recipient_form_filled.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
-import 'package:danawallet/generated/rust/api/history.dart';
-import 'package:danawallet/generated/rust/api/outputs.dart';
 import 'package:danawallet/generated/rust/api/stream.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/generated/rust/api/structs/discovered_output.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
+import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart';
 import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:danawallet/generated/rust/api/wallet/setup.dart';
+import 'package:danawallet/generated/rust/stream.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
@@ -34,8 +36,11 @@ class WalletState extends ChangeNotifier {
   late ApiAmount amount;
   late ApiAmount unconfirmedChange;
   late int? lastScan;
-  late TxHistory txHistory;
-  late OwnedOutputs ownedOutputs;
+
+  // Cached data from SQLite (updated via _updateWalletState)
+  late Map<String, ApiDiscoveredOutput> unspentOutputs;
+  late List<String> outpointsToScan;
+  late List<ApiRecordedTransaction> transactions;
 
   // this variable may change in some exceptional cases
   Bip353Address? danaAddress;
@@ -54,15 +59,63 @@ class WalletState extends ChangeNotifier {
 
   Future<void> _initStreams() async {
     scanResultSubscription = createScanResultStream().listen(((event) async {
-      // process update
-      lastScan = event.getHeight();
-      txHistory.processStateUpdate(update: event, ownedOutputs: ownedOutputs);
-      ownedOutputs.processStateUpdate(update: event);
+      lastScan = event.blkheight;
 
-      // save updates to storage
-      await walletRepository.saveHistory(txHistory);
-      await walletRepository.saveOwnedOutputs(ownedOutputs);
-      await walletRepository.saveLastScan(lastScan);
+      // Process found outputs (new UTXOs we own)
+      for (final found in event.foundOutputs) {
+        final outpoint = found.outpoint.split(':');
+        final txid = outpoint[0];
+        final vout = int.parse(outpoint[1]);
+        final output = found.output;
+
+        // Insert output into database
+        await walletRepository.insertOutput(
+          txid: txid,
+          vout: vout,
+          blockheight: event.blkheight,
+          tweak: Uint8List.fromList(output.tweak),
+          amountSat: output.value.field0.toInt(),
+          script: output.scriptPubkey,
+          label: output.label,
+        );
+
+        // Check if this is a self-send (skip change outputs)
+        final isOwnTx = await walletRepository.isOwnOutgoingTx(txid);
+        if (!isOwnTx || output.label == null) {
+          // Add incoming transaction
+          await walletRepository.addIncomingTransaction(
+            txid: txid,
+            amountSat: output.value.field0.toInt(),
+            confirmationHeight: event.blkheight,
+            confirmationBlockhash: event.blkhash,
+          );
+        }
+      }
+
+      // Process found inputs (our UTXOs being spent)
+      for (final outpointStr in event.foundInputs) {
+        final outpoint = outpointStr.split(':');
+        final spentTxid = outpoint[0];
+        final spentVout = int.parse(outpoint[1]);
+
+        // Try to confirm an outgoing transaction
+        final confirmed = await walletRepository.confirmOutgoingTransaction(
+          spentOutpointTxid: spentTxid,
+          spentOutpointVout: spentVout,
+          confirmationHeight: event.blkheight,
+          confirmationBlockhash: event.blkhash,
+        );
+
+        if (!confirmed) {
+          // Unknown spend - mark output as spent without history entry
+          await walletRepository.markOutputsSpentUnknown(
+            spentOutpoints: [(spentTxid, spentVout, 0)],
+            minedInBlock: event.blkhash,
+          );
+        }
+      }
+
+      await walletRepository.saveLastScan(lastScan!);
 
       // update UI
       await _updateWalletState();
@@ -191,31 +244,34 @@ class WalletState extends ChangeNotifier {
   Future<void> resetToScanHeight(int height) async {
     lastScan = height;
 
-    ownedOutputs.resetToHeight(height: height);
-    txHistory.resetToHeight(height: height);
-
-    await walletRepository.saveLastScan(height);
-    await walletRepository.saveHistory(txHistory);
-    await walletRepository.saveOwnedOutputs(ownedOutputs);
+    await walletRepository.resetToHeight(height);
 
     await _updateWalletState();
     notifyListeners();
   }
 
   Future<void> _updateWalletState() async {
-    txHistory = await walletRepository.readHistory();
-    ownedOutputs = await walletRepository.readOwnedOutputs();
     lastScan = await walletRepository.readLastScan();
 
-    amount = ownedOutputs.getUnspentAmount();
-    unconfirmedChange = txHistory.getUnconfirmedChange();
+    // Get cached data from SQLite
+    final balanceSat = await walletRepository.getUnspentBalance();
+    amount = ApiAmount(field0: BigInt.from(balanceSat));
+
+    final unconfirmedChangeSat = await walletRepository.getUnconfirmedChange();
+    unconfirmedChange = ApiAmount(field0: BigInt.from(unconfirmedChangeSat));
+
+    // Cache outputs for spending and scanning
+    unspentOutputs = await walletRepository.getUnspentOutputs();
+    outpointsToScan = await walletRepository.getNotMinedOutpoints();
+
+    // Cache transactions for UI
+    transactions = await walletRepository.getAllTransactions();
   }
 
   Future<ApiSilentPaymentUnsignedTransaction> createUnsignedTxToThisRecipient(
       RecipientFormFilled form) async {
     final wallet = await getWalletFromSecureStorage();
 
-    final unspentOutputs = ownedOutputs.getUnspentOutputs();
     if (form.amount.field0 < amount.field0 - BigInt.from(546)) {
       return wallet.createNewTransaction(
           apiOutputs: unspentOutputs,
@@ -284,18 +340,31 @@ class WalletState extends ChangeNotifier {
           'Unable to broadcast transaction. Please check your connection and try again.');
     }
 
-    ownedOutputs.markOutpointsSpent(spentBy: txid, spent: selectedOutpoints);
+    // Mark outputs as spent in SQLite
+    for (final outpointStr in selectedOutpoints) {
+      final parts = outpointStr.split(':');
+      final outTxid = parts[0];
+      final outVout = int.parse(parts[1]);
+      await walletRepository.markOutputSpent(outTxid, outVout, txid);
+    }
 
-    txHistory.addOutgoingTxToHistory(
-        txid: txid,
-        spentOutpoints: selectedOutpoints,
-        recipients: recipients,
-        change: changeValue,
-        fee: feeAmount);
+    // Add outgoing transaction to SQLite
+    final spentOutpointsWithAmount = <(String, int, int)>[];
+    for (final outpointStr in selectedOutpoints) {
+      final parts = outpointStr.split(':');
+      final outTxid = parts[0];
+      final outVout = int.parse(parts[1]);
+      final outputAmount = unspentOutputs[outpointStr]?.value.field0.toInt() ?? 0;
+      spentOutpointsWithAmount.add((outTxid, outVout, outputAmount));
+    }
 
-    // save the updated wallet
-    await walletRepository.saveOwnedOutputs(ownedOutputs);
-    await walletRepository.saveHistory(txHistory);
+    await walletRepository.addOutgoingTransaction(
+      txid: txid,
+      spentOutpoints: spentOutpointsWithAmount,
+      recipients: recipients,
+      changeSat: changeValue.field0.toInt(),
+      feeSat: feeAmount.field0.toInt(),
+    );
 
     // refresh variables and notify listeners
     await _updateWalletState();

@@ -5,6 +5,7 @@ use spdk_wallet::{
 
 use crate::api::structs::amount::ApiAmount;
 
+#[derive(Debug, Clone)]
 pub struct ApiDiscoveredOutput {
     pub tweak: [u8; 32],
     pub value: ApiAmount,

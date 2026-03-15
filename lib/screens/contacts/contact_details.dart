@@ -317,7 +317,7 @@ class ContactDetailsScreen extends StatelessWidget {
   List<ApiRecordedTransaction> _getSentTransactions(
       BuildContext context, Contact contact) {
     final walletState = Provider.of<WalletState>(context, listen: false);
-    final allTransactions = walletState.txHistory.toApiTransactions();
+    final allTransactions = walletState.transactions;
     final contactPaymentCode = contact.paymentCode;
 
     // Filter to only outgoing transactions where recipient matches this contact's SP address
@@ -340,8 +340,8 @@ class ContactDetailsScreen extends StatelessWidget {
 
     final field0 = tx.field0;
     final recipient = contact.displayName;
-    final date = field0.confirmedAt?.toString() ?? 'Unconfirmed';
-    final color = field0.confirmedAt == null ? Bitcoin.neutral4 : Bitcoin.red;
+    final date = field0.confirmationHeight?.toString() ?? 'Unconfirmed';
+    final color = field0.confirmationHeight == null ? Bitcoin.neutral4 : Bitcoin.red;
     final amount = field0.totalOutgoing().displayBtc();
     const amountprefix = '-';
     final amountFiat = exchangeRate.displayFiat(field0.totalOutgoing());
