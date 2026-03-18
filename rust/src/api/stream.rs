@@ -19,10 +19,3 @@ pub fn create_sync_progress_stream(s: StreamSink<u32>) {
 pub fn create_sync_result_stream(s: StreamSink<StateUpdate>) {
     stream::create_sync_update_stream(s);
 }
-
-impl StateUpdate {
-    #[flutter_rust_bridge::frb(sync)]
-    pub fn get_height(&self) -> u32 {
-        self.blkheight.to_consensus_u32()
-    }
-}

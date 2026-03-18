@@ -1,13 +1,15 @@
-use std::{collections::HashMap, str::FromStr};
+use std::str::FromStr;
 
 use crate::api::structs::network::ApiNetwork;
-use crate::api::structs::owned_output::ApiOwnedOutput;
 use crate::api::structs::recipient::ApiRecipient;
 use crate::api::structs::unsigned_transaction::ApiSilentPaymentUnsignedTransaction;
+use crate::stream::OwnedOutput;
 
 use anyhow::Result;
 use bip39::rand::{thread_rng, RngCore};
 use spdk_wallet::backend_blindbit_v1::BlindbitClient;
+use spdk_wallet::bitcoin::{ScriptBuf, Txid};
+use spdk_wallet::bitcoin::secp256k1::Scalar;
 use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex, OutPoint};
 use spdk_wallet::client::{FeeRate, Recipient, RecipientAddress, SpClient};
 use spdk_wallet::updater::DiscoveredOutput;
@@ -18,17 +20,25 @@ impl SpWallet {
     #[flutter_rust_bridge::frb(sync)]
     pub fn create_new_transaction(
         &self,
-        api_outputs: HashMap<String, ApiOwnedOutput>,
+        owned_outputs: Vec<OwnedOutput>,
         api_recipients: Vec<ApiRecipient>,
         feerate: f32,
         network: ApiNetwork,
     ) -> Result<ApiSilentPaymentUnsignedTransaction> {
         let client = &self.client;
-        let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = api_outputs
+        let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = owned_outputs
             .into_iter()
-            .map(|(string, output)| {
-                let outpoint = OutPoint::from_str(&string)?;
-                Ok((outpoint, output.into()))
+            .map(|output| {
+                let txid = Txid::from_str(&output.txid)?;
+                let vout = output.vout;
+                let outpoint = OutPoint::from_str(format!("{}:{}", txid, vout).as_str())?;
+                let output = DiscoveredOutput {
+                    tweak: Scalar::from_be_bytes(output.tweak)?,
+                    value: output.amount.into(),
+                    script_pubkey: ScriptBuf::from_hex(&output.script)?,
+                    label: output.label.map(|l| l.try_into().unwrap()),
+                };
+                Ok((outpoint, output))
             })
             .collect();
         let recipients: Vec<Recipient> = api_recipients
@@ -48,17 +58,25 @@ impl SpWallet {
     #[flutter_rust_bridge::frb(sync)]
     pub fn create_drain_transaction(
         &self,
-        api_outputs: HashMap<String, ApiOwnedOutput>,
+        owned_outputs: Vec<OwnedOutput>,
         wipe_address: String,
         feerate: f32,
         network: ApiNetwork,
     ) -> Result<ApiSilentPaymentUnsignedTransaction> {
         let client = &self.client;
-        let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = api_outputs
+        let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = owned_outputs
             .into_iter()
-            .map(|(string, output)| {
-                let outpoint = OutPoint::from_str(&string)?;
-                Ok((outpoint, output.into()))
+            .map(|output| {
+                let txid = Txid::from_str(&output.txid)?;
+                let vout = output.vout;
+                let outpoint = OutPoint::from_str(format!("{}:{}", txid, vout).as_str())?;
+                let output = DiscoveredOutput {
+                    tweak: Scalar::from_be_bytes(output.tweak)?,
+                    value: output.amount.into(),
+                    script_pubkey: ScriptBuf::from_hex(&output.script)?,
+                    label: output.label.map(|l| l.try_into().unwrap()),
+                };
+                Ok((outpoint, output))
             })
             .collect();
 
