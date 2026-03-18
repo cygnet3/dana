@@ -1,12 +1,11 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/recovery/view_mnemonic_screen.dart';
+import 'package:danawallet/screens/settings/wallet/confirm_reset_wallet.dart';
 import 'package:danawallet/screens/settings/wallet/confirm_wallet_deletion.dart';
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/services/backup_service.dart';
-import 'package:danawallet/states/chain_state.dart';
-import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -61,29 +60,8 @@ class WalletSettingsScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _onResetToBirthdayButtonPressed(BuildContext context) async {
-    final confirmed = await showConfirmationAlertDialog(
-        'Confirm resetting wallet data',
-        "Are you sure you want to reset your wallet data? Only do this if you think your wallet data is corrupted, as you will lose valuable data like transaction history.");
-
-    if (confirmed && context.mounted) {
-      final walletState = Provider.of<WalletState>(context, listen: false);
-      final chainState = Provider.of<ChainState>(context, listen: false);
-      final scanProgress =
-          Provider.of<SyncProgressNotifier>(context, listen: false);
-
-      // first interrupt the sync process if this is still running
-      await scanProgress.interruptSync();
-
-      // clear cached start height from sync history
-      chainState.clearSyncHistory();
-
-      // reset wallet data
-      await walletState.resetToBirthday();
-
-      // go to home screen after resetting
-      if (context.mounted) goToHomeScreen(context);
-    }
+  void _onResetToBirthdayButtonPressed(BuildContext context) {
+    goToScreen(context, const ConfirmWalletResetScreen());
   }
 
   void _onWipeWalletButtonPressed(BuildContext context) {
