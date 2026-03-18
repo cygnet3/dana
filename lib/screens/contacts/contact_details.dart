@@ -317,7 +317,7 @@ class ContactDetailsScreen extends StatelessWidget {
   List<ApiRecordedTransaction> _getSentTransactions(
       BuildContext context, Contact contact) {
     final walletState = Provider.of<WalletState>(context, listen: false);
-    final allTransactions = walletState.txHistory.toApiTransactions();
+    final allTransactions = walletState.transactions;
     final contactPaymentCode = contact.paymentCode;
 
     // Filter to only outgoing transactions where recipient matches this contact's SP address
