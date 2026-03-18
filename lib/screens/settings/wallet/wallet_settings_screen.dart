@@ -1,14 +1,11 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/global_functions.dart';
-import 'package:danawallet/repositories/settings_repository.dart';
-import 'package:danawallet/screens/onboarding/introduction.dart';
 import 'package:danawallet/screens/recovery/view_mnemonic_screen.dart';
+import 'package:danawallet/screens/settings/wallet/confirm_wallet_deletion.dart';
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/services/backup_service.dart';
 import 'package:danawallet/states/chain_state.dart';
-import 'package:danawallet/states/contacts_state.dart';
-import 'package:danawallet/states/home_state.dart';
 import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
@@ -46,26 +43,6 @@ class WalletSettingsScreen extends StatelessWidget {
         isDestructive: true,
       ),
     ];
-  }
-
-  // Business logic methods
-  Future<void> _onRemoveWallet(
-    WalletState walletState,
-    ChainState chainState,
-    SyncProgressNotifier scanProgress,
-    HomeState homeState,
-    ContactsState contacts,
-  ) async {
-    try {
-      await scanProgress.interruptSync();
-      chainState.reset();
-      await walletState.reset();
-      await SettingsRepository.instance.resetAll();
-      contacts.reset();
-      homeState.reset();
-    } catch (e) {
-      rethrow;
-    }
   }
 
   Future<void> _onBackupWalletButtonPressed() async {
@@ -109,27 +86,8 @@ class WalletSettingsScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _onWipeWalletButtonPressed(BuildContext context) async {
-    final confirmed = await showConfirmationAlertDialog('Confirm deletion',
-        "Are you sure you want to wipe your wallet? Without a backup, you will lose your funds!");
-
-    if (confirmed && context.mounted) {
-      final walletState = Provider.of<WalletState>(context, listen: false);
-      final homeState = Provider.of<HomeState>(context, listen: false);
-      final chainState = Provider.of<ChainState>(context, listen: false);
-      final scanProgress =
-          Provider.of<SyncProgressNotifier>(context, listen: false);
-      final contacts = Provider.of<ContactsState>(context, listen: false);
-
-      await _onRemoveWallet(
-          walletState, chainState, scanProgress, homeState, contacts);
-      if (context.mounted) {
-        Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const IntroductionScreen()));
-      }
-    }
+  void _onWipeWalletButtonPressed(BuildContext context) {
+    goToScreen(context, const ConfirmWalletDeletionScreen());
   }
 
   void _onShowMnemonic(BuildContext context) async {
