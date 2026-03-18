@@ -1,14 +1,13 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     sync::Mutex,
 };
 
-use crate::frb_generated::StreamSink;
-use lazy_static::lazy_static;
-use spdk_wallet::{
-    bitcoin::{absolute::Height, BlockHash, OutPoint},
-    updater::DiscoveredOutput,
+use crate::{
+    api::structs::amount::ApiAmount, frb_generated::StreamSink
 };
+use flutter_rust_bridge::frb;
+use lazy_static::lazy_static;
 
 lazy_static! {
     static ref SCAN_PROGRESS_STREAM_SINK: Mutex<Option<StreamSink<u32>>> = Mutex::new(None);
@@ -16,11 +15,24 @@ lazy_static! {
 }
 
 #[derive(Debug)]
+#[frb]
 pub struct StateUpdate {
-    pub(crate) blkheight: Height,
-    pub(crate) blkhash: BlockHash,
-    pub(crate) found_outputs: HashMap<OutPoint, DiscoveredOutput>,
-    pub(crate) found_inputs: HashSet<OutPoint>,
+    pub blkheight: u32,
+    pub blkhash: String,
+    pub found_outputs: Vec<OwnedOutput>,
+    pub found_inputs: HashSet<String>,
+}
+
+#[derive(Debug, Clone)]
+#[frb]
+pub struct OwnedOutput {
+    pub txid: String,
+    pub vout: u32,
+    pub blockheight: u32,
+    pub tweak: [u8; 32],
+    pub amount: ApiAmount,
+    pub script: String,
+    pub label: Option<String>,
 }
 
 pub fn create_sync_progress_stream(s: StreamSink<u32>) {
