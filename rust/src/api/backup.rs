@@ -8,7 +8,7 @@ use flutter_rust_bridge::frb;
 use rand::{rngs::OsRng, TryRngCore};
 use serde::{Deserialize, Serialize};
 
-use crate::api::{outputs::OwnedOutputs, structs::network::ApiNetwork};
+use crate::api::structs::network::ApiNetwork;
 
 use super::{
     history::TxHistory,
@@ -170,7 +170,6 @@ pub struct WalletBackup {
     pub birthday: Option<u32>,
     pub network: ApiNetwork,
     pub tx_history: TxHistory,
-    pub owned_outputs: OwnedOutputs,
     pub seed_phrase: Option<String>,
     pub last_scan: u32,
 }
@@ -182,7 +181,6 @@ impl WalletBackup {
         birthday: Option<u32>,
         network: ApiNetwork,
         tx_history: TxHistory,
-        owned_outputs: OwnedOutputs,
         seed_phrase: Option<String>,
         last_scan: u32,
     ) -> Self {
@@ -192,7 +190,6 @@ impl WalletBackup {
             birthday,
             network,
             tx_history,
-            owned_outputs,
             seed_phrase,
             last_scan,
         }

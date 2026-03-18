@@ -588,7 +588,7 @@ class WalletScreenState extends State<WalletScreen> {
     bool isBalanceZero = amount.field0 == BigInt.zero;
     // Check if there's transaction history
     bool hasTransactionHistory =
-        walletState.txHistory.toApiTransactions().isNotEmpty;
+        walletState.transactions.isNotEmpty;
 
     // Show funding screen only if balance is zero AND there's no transaction history
     bool showFundingScreen = isBalanceZero && !hasTransactionHistory;
@@ -635,7 +635,7 @@ class WalletScreenState extends State<WalletScreen> {
                             buildDanaAddressBanner(danaAddress),
                           const Spacer(),
                           buildTransactionHistory(
-                            walletState.txHistory.toApiTransactions(),
+                            walletState.transactions,
                             exchangeRate,
                           ),
                           buildBottomButtons(walletState.receivePaymentCode),
