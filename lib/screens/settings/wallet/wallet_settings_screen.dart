@@ -33,6 +33,7 @@ class WalletSettingsScreen extends StatelessWidget {
         title: 'Reset wallet data',
         subtitle: 'Reset wallet data to its birthday',
         onTap: () => _onResetToBirthdayButtonPressed(context),
+        isDestructive: true,
       ),
       _WalletSettingsItem(
         icon: Icons.delete_outline,
