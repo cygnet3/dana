@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
-use spdk_wallet::bitcoin::{absolute::Height, OutPoint, Txid};
+use spdk_wallet::bitcoin::{absolute::Height, BlockHash, OutPoint, Txid};
 
 use crate::api::structs::amount::ApiAmount;
 use crate::api::structs::recipient::ApiRecipient;
@@ -22,7 +22,8 @@ pub enum ApiRecordedTransaction {
 pub struct ApiRecordedTransactionIncoming {
     pub txid: String,
     pub amount: ApiAmount,
-    pub confirmed_at: Option<u32>,
+    pub confirmation_height: Option<u32>,
+    pub confirmation_blockhash: Option<String>,
 }
 
 impl ApiRecordedTransactionIncoming {
@@ -60,7 +61,8 @@ pub struct ApiRecordedTransactionOutgoing {
     pub txid: String,
     pub spent_outpoints: Vec<String>,
     pub recipients: Vec<ApiRecipient>,
-    pub confirmed_at: Option<u32>,
+    pub confirmation_height: Option<u32>,
+    pub confirmation_blockhash: Option<String>,
     pub change: ApiAmount,
     pub fee: ApiAmount,
 }
@@ -68,7 +70,8 @@ pub struct ApiRecordedTransactionOutgoing {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ApiRecordedTransactionUnknownOutgoing {
     pub amount: ApiAmount,
-    pub confirmed_at: u32,
+    pub confirmation_height: u32,
+    pub confirmation_blockhash: String,
     pub spent_outpoints: Vec<String>,
 }
 
@@ -97,7 +100,8 @@ impl From<ApiRecordedTransaction> for RecordedTransaction {
 impl From<RecordedTransactionUnknownOutgoing> for ApiRecordedTransactionUnknownOutgoing {
     fn from(value: RecordedTransactionUnknownOutgoing) -> Self {
         Self {
-            confirmed_at: value.confirmed_at.to_consensus_u32(),
+            confirmation_height: value.confirmation_height.to_consensus_u32(),
+            confirmation_blockhash: value.confirmation_blockhash.to_string(),
             amount: value.amount.into(),
             spent_outpoints: value
                 .spent_outpoints
@@ -112,7 +116,8 @@ impl From<ApiRecordedTransactionUnknownOutgoing> for RecordedTransactionUnknownO
     fn from(value: ApiRecordedTransactionUnknownOutgoing) -> Self {
         Self {
             amount: value.amount.into(),
-            confirmed_at: Height::from_consensus(value.confirmed_at).unwrap(),
+            confirmation_height: Height::from_consensus(value.confirmation_height).unwrap(),
+            confirmation_blockhash: BlockHash::from_str(&value.confirmation_blockhash).unwrap(),
             spent_outpoints: value
                 .spent_outpoints
                 .into_iter()
@@ -124,33 +129,48 @@ impl From<ApiRecordedTransactionUnknownOutgoing> for RecordedTransactionUnknownO
 
 impl From<RecordedTransactionIncoming> for ApiRecordedTransactionIncoming {
     fn from(value: RecordedTransactionIncoming) -> Self {
-        let confirmed_at = value.confirmed_at.map(|height| height.to_consensus_u32());
+        let confirmation_height = value
+            .confirmation_height
+            .map(|height| height.to_consensus_u32());
+        let confirmation_blockhash = value
+            .confirmation_blockhash
+            .map(|blockhash| blockhash.to_string());
 
         Self {
             txid: value.txid.to_string(),
             amount: value.amount.into(),
-            confirmed_at,
+            confirmation_height,
+            confirmation_blockhash,
         }
     }
 }
 
 impl From<ApiRecordedTransactionIncoming> for RecordedTransactionIncoming {
     fn from(value: ApiRecordedTransactionIncoming) -> Self {
-        let confirmed_at = value
-            .confirmed_at
+        let confirmation_height = value
+            .confirmation_height
             .map(|height| Height::from_consensus(height).unwrap());
+        let confirmation_blockhash = value
+            .confirmation_blockhash
+            .map(|blockhash| BlockHash::from_str(&blockhash).unwrap());
 
         Self {
             txid: Txid::from_str(&value.txid).unwrap(),
             amount: value.amount.into(),
-            confirmed_at,
+            confirmation_height,
+            confirmation_blockhash,
         }
     }
 }
 
 impl From<RecordedTransactionOutgoing> for ApiRecordedTransactionOutgoing {
     fn from(value: RecordedTransactionOutgoing) -> Self {
-        let confirmed_at = value.confirmed_at.map(|height| height.to_consensus_u32());
+        let confirmation_height = value
+            .confirmation_height
+            .map(|height| height.to_consensus_u32());
+        let confirmation_blockhash = value
+            .confirmation_blockhash
+            .map(|blockhash| blockhash.to_string());
 
         Self {
             txid: value.txid.to_string(),
@@ -160,7 +180,8 @@ impl From<RecordedTransactionOutgoing> for ApiRecordedTransactionOutgoing {
                 .map(|x| x.to_string())
                 .collect(),
             recipients: value.recipients.into_iter().map(Into::into).collect(),
-            confirmed_at,
+            confirmation_height,
+            confirmation_blockhash,
             change: value.change.into(),
             fee: value.fee.into(),
         }
@@ -169,9 +190,12 @@ impl From<RecordedTransactionOutgoing> for ApiRecordedTransactionOutgoing {
 
 impl From<ApiRecordedTransactionOutgoing> for RecordedTransactionOutgoing {
     fn from(value: ApiRecordedTransactionOutgoing) -> Self {
-        let confirmed_at = value
-            .confirmed_at
+        let confirmation_height = value
+            .confirmation_height
             .map(|height| Height::from_consensus(height).unwrap());
+        let confirmation_blockhash = value
+            .confirmation_blockhash
+            .map(|blockhash| BlockHash::from_str(&blockhash).unwrap());
 
         Self {
             txid: Txid::from_str(&value.txid).unwrap(),
@@ -185,7 +209,8 @@ impl From<ApiRecordedTransactionOutgoing> for RecordedTransactionOutgoing {
                 .into_iter()
                 .map(|r| r.try_into().unwrap())
                 .collect(),
-            confirmed_at,
+            confirmation_height,
+            confirmation_blockhash,
             change: value.change.into(),
             fee: value.fee.into(),
         }
