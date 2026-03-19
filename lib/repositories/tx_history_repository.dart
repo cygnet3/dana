@@ -1,7 +1,11 @@
+import 'package:danawallet/extensions/api_amount.dart';
+import 'package:danawallet/generated/rust/api/history.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart';
 import 'package:danawallet/repositories/database_helper.dart';
+import 'package:logger/logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 class TxHistoryRepository {
@@ -12,16 +16,6 @@ class TxHistoryRepository {
   static final instance = TxHistoryRepository._();
 
   Future<Database> get _db async => await DatabaseHelper.instance.database;
-
-  /// Converts a [BigInt] satoshi amount to [int] for SQLite storage.
-  /// Throws a [StateError] if the value exceeds the safe integer range,
-  /// preventing silent data corruption on overflow.
-  static int _bigIntToSat(BigInt value) {
-    if (!value.isValidInt) {
-      throw StateError('Amount overflows int: $value');
-    }
-    return value.toInt();
-  }
 
   Future<void> reset() async {
     final db = await _db;
@@ -200,7 +194,7 @@ class TxHistoryRepository {
         await txn.rawInsert('''
           INSERT INTO tx_recipients (txid, address, amount_sat)
           VALUES (?, ?, ?)
-        ''', [txid, recipient.address, _bigIntToSat(recipient.amount.field0)]);
+        ''', [txid, recipient.address, recipient.amount.toSat()]);
       }
     });
   }
@@ -251,4 +245,101 @@ class TxHistoryRepository {
       ''', [height]);
     });
   }
+}
+
+// ============================================
+// LEGACY MIGRATION
+// ============================================
+
+/// Checks SharedPreferences for a legacy tx-history blob and, if found,
+/// migrates it into SQLite and removes the old key.
+///
+/// LEGACY: TxHistory.decode() is only used here for migration.
+/// Can be removed once no users remain on pre-SQLite versions.
+Future<void> migrateTxHistoryFromSharedPreferences() async {
+  final prefs = SharedPreferencesAsync();
+  final encoded = await prefs.getString('txhistory');
+  if (encoded == null) return;
+
+  Logger().i("Migrating transaction history from SharedPreferences to SQLite");
+
+  final history = TxHistory.decode(encodedHistory: encoded);
+  final transactions = history.toApiTransactions();
+
+  final db = await DatabaseHelper.instance.database;
+  await db.transaction((txn) async {
+    for (final tx in transactions) {
+      await _insertTransaction(txn, tx);
+    }
+  });
+
+  Logger().i("Migrated ${transactions.length} transactions");
+  await prefs.remove('txhistory');
+}
+
+Future<void> _insertTransaction(
+    DatabaseExecutor executor, ApiRecordedTransaction tx) async {
+  switch (tx) {
+    case ApiRecordedTransaction_Incoming(:final field0):
+      await executor.insert('tx_incoming', {
+        'txid': field0.txid,
+        'amount_received_sat': field0.amount.field0.toInt(),
+        'confirmation_height': field0.confirmationHeight,
+        'confirmation_blockhash': field0.confirmationBlockhash,
+      });
+      break;
+
+    case ApiRecordedTransaction_Outgoing(:final field0):
+      final totalAmount = field0.recipients
+          .fold<int>(0, (sum, r) => sum + r.amount.field0.toInt());
+
+      await executor.insert('tx_outgoing', {
+        'txid': field0.txid,
+        'amount_spent_sat': totalAmount + field0.fee.field0.toInt(),
+        'confirmation_height': field0.confirmationHeight?.toInt(),
+        'confirmation_blockhash': field0.confirmationBlockhash?.toString(),
+        'change_sat': field0.change.field0.toInt(),
+        'fee_sat': field0.fee.field0.toInt(),
+      });
+
+      for (final outpoint in field0.spentOutpoints) {
+        final (outTxid, outVout) = _parseOutpoint(outpoint);
+        await executor.insert('tx_spent_outpoints', {
+          'txid': field0.txid,
+          'outpoint_txid': outTxid,
+          'outpoint_vout': outVout,
+        });
+      }
+
+      for (final recipient in field0.recipients) {
+        await executor.insert('tx_recipients', {
+          'txid': field0.txid,
+          'address': recipient.address,
+          'amount_sat': recipient.amount.toSat(),
+        });
+      }
+      break;
+
+    case ApiRecordedTransaction_UnknownOutgoing(:final field0):
+      // Don't create a history entry for unknown outgoing transactions.
+      // Just mark the outputs as spent with unknown txid.
+      for (final outpoint in field0.spentOutpoints) {
+        final (outTxid, outVout) = _parseOutpoint(outpoint);
+        await executor.update(
+          'owned_outputs',
+          {
+            'spending_txid': null,
+            'mined_in_block': field0.confirmationBlockhash,
+          },
+          where: 'txid = ? AND vout = ?',
+          whereArgs: [outTxid, outVout],
+        );
+      }
+      break;
+  }
+}
+
+(String, int) _parseOutpoint(String outpoint) {
+  final parts = outpoint.split(':');
+  return (parts[0], int.parse(parts[1]));
 }

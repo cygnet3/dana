@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:danawallet/extensions/api_amount.dart';
@@ -6,6 +7,7 @@ import 'package:danawallet/generated/rust/lib.dart';
 import 'package:danawallet/generated/rust/stream.dart';
 import 'package:danawallet/repositories/database_helper.dart';
 import 'package:logger/logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 class OwnedOutputsRepository {
@@ -168,4 +170,72 @@ class OwnedOutputsRepository {
       WHERE blockheight > ?
     ''', [height]);
   }
+}
+
+// ============================================
+// LEGACY MIGRATION
+// ============================================
+
+/// Checks SharedPreferences for a legacy owned-outputs blob and, if found,
+/// migrates it into SQLite and removes the old key.
+///
+/// LEGACY: can be removed once no users remain on pre-SQLite versions.
+///
+/// The old spend_status was a serde enum:
+///   "Unspent"              → spending_txid: null, mined_in_block: null
+///   {"Spent": "txid"}      → spending_txid: txid, mined_in_block: null
+///   {"Mined": "blockhash"} → spending_txid: null, mined_in_block: blockhash
+Future<void> migrateOutputsFromSharedPreferences() async {
+  final prefs = SharedPreferencesAsync();
+  final json = await prefs.getString('ownedoutputs');
+  if (json == null) return;
+
+  Logger().i("Migrating owned outputs from SharedPreferences to SQLite");
+
+  final Map<String, dynamic> decoded = jsonDecode(json);
+  int migrated = 0;
+
+  final db = await DatabaseHelper.instance.database;
+  await db.transaction((txn) async {
+    for (final entry in decoded.entries) {
+      final Map<String, dynamic> output = entry.value;
+      final spendStatus = output['spend_status'];
+
+      String? spendingTxid;
+      String? minedInBlock;
+
+      if (spendStatus is Map<String, dynamic>) {
+        if (spendStatus.containsKey('Spent')) {
+          spendingTxid = spendStatus['Spent'] as String?;
+        } else if (spendStatus.containsKey('Mined')) {
+          minedInBlock = spendStatus['Mined'] as String?;
+        }
+      }
+      // else: "Unspent" string — both remain null
+
+      final outpoint = _parseOutpoint(entry.key);
+      final List<dynamic> tweakList = output['tweak'];
+
+      await txn.insert('owned_outputs', {
+        'txid': outpoint.$1,
+        'vout': outpoint.$2,
+        'blockheight': output['blockheight'] as int,
+        'tweak': Uint8List.fromList(tweakList.cast<int>()),
+        'amount_sat': output['amount'] as int,
+        'script': output['script'] as String,
+        'label': output['label'] as String?,
+        'spending_txid': spendingTxid,
+        'mined_in_block': minedInBlock,
+      });
+      migrated++;
+    }
+  });
+
+  Logger().i("Migrated $migrated outputs (of ${decoded.length} total)");
+  await prefs.remove('ownedoutputs');
+}
+
+(String, int) _parseOutpoint(String outpoint) {
+  final parts = outpoint.split(':');
+  return (parts[0], int.parse(parts[1]));
 }

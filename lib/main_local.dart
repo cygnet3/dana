@@ -5,8 +5,9 @@ import 'package:danawallet/generated/rust/frb_generated.dart';
 
 import 'package:danawallet/main.dart';
 import 'package:danawallet/repositories/database_helper.dart';
+import 'package:danawallet/repositories/owned_outputs_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
-import 'package:danawallet/repositories/wallet_repository.dart';
+import 'package:danawallet/repositories/tx_history_repository.dart';
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/screens/onboarding/introduction.dart';
 import 'package:danawallet/services/app_info_service.dart';
@@ -40,7 +41,8 @@ void main() async {
   await DatabaseHelper.instance.database;
 
   // Migrate legacy SharedPreferences data to SQLite (for users upgrading from older app versions)
-  await WalletRepository.instance.migrateToSqliteIfNeeded();
+  await migrateOutputsFromSharedPreferences();
+  await migrateTxHistoryFromSharedPreferences();
 
   final walletState = await WalletState.create();
   final scanNotifier = await SyncProgressNotifier.create();
