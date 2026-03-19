@@ -1,8 +1,9 @@
 pub mod amount;
+pub mod discovered_output;
 pub mod network;
 pub mod output_spend_status;
 pub mod owned_output;
 pub mod recipient;
 pub mod recorded_transaction;
+pub mod sync_queue_item;
 pub mod unsigned_transaction;
-pub mod discovered_output;
