@@ -17,16 +17,6 @@ class TxHistoryRepository {
 
   Future<Database> get _db async => await DatabaseHelper.instance.database;
 
-  /// Converts a [BigInt] satoshi amount to [int] for SQLite storage.
-  /// Throws a [StateError] if the value exceeds the safe integer range,
-  /// preventing silent data corruption on overflow.
-  static int _bigIntToSat(BigInt value) {
-    if (!value.isValidInt) {
-      throw StateError('Amount overflows int: $value');
-    }
-    return value.toInt();
-  }
-
   Future<void> reset() async {
     final db = await _db;
     await db.rawDelete('DELETE FROM tx_incoming');
@@ -177,7 +167,7 @@ class TxHistoryRepository {
       INSERT OR REPLACE INTO tx_incoming (
         txid, amount_received_sat, confirmation_height, confirmation_blockhash
       ) VALUES (?, ?, ?, ?)
-    ''', [txid, _bigIntToSat(amountSat.field0), confirmationHeight, confirmationBlockhash]);
+    ''', [txid, amountSat.toSat(), confirmationHeight, confirmationBlockhash]);
   }
 
   /// Add an outgoing transaction (when user sends).
