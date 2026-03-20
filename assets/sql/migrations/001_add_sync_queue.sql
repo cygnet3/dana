@@ -1,0 +1,5 @@
+CREATE TABLE sync_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    start INT NOT NULL,
+    end INT NOT NULL
+);
