@@ -1,6 +1,10 @@
+import 'package:flutter/services.dart';
 import 'package:logger/logger.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+
+const String migrationsDirectory = "assets/sql/migrations";
+const String dbFileName = "dana.db";
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -10,61 +14,47 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('dana.db');
+    _database = await _initDB(dbFileName);
     return _database!;
   }
 
+// Usage
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
+
+    // read migration files from asset manifest
+    final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+    final migrations = manifest
+        .listAssets()
+        .where((key) => key.startsWith(migrationsDirectory))
+        .toList();
+
+    // migrations must run in alphabetical order of their file names
+    migrations.sort();
+
+    // database version is the number of migrations
+    final version = migrations.length;
+
     return await openDatabase(
       path,
-      version: 1,
-      onCreate: (db, version) async {
-        await _createDB(db, version);
-      },
+      version: version,
+      onUpgrade: (db, oldVersion, newVersion) =>
+          _performMigrations(db, oldVersion, migrations),
     );
   }
 
-  Future _createDB(Database db, int version) async {
-    Logger().i("Creating Database");
-    const idType = 'INTEGER PRIMARY KEY AUTOINCREMENT';
-    const textType = 'TEXT NOT NULL';
-    const textTypeNullable = 'TEXT';
-    const intType = 'INTEGER NOT NULL';
+  Future _performMigrations(
+      Database db, int currentVersion, List<String> migrations) async {
+    Logger().i(
+        "Performing database migration from $currentVersion to ${migrations.length}");
 
-    await db.execute('''
-    CREATE TABLE contacts (
-      id $idType,
-      name $textTypeNullable,
-      bip353Address $textTypeNullable UNIQUE,
-      paymentCode $textType UNIQUE
-    )
-    ''');
-
-    // Create indexes for faster lookups on contacts table
-    await db.execute('''
-    CREATE INDEX idx_contacts_bip353_address ON contacts(bip353Address)
-    ''');
-
-    await db.execute('''
-    CREATE INDEX idx_contacts_payment_code ON contacts(paymentCode)
-    ''');
-
-    await db.execute('''
-    CREATE TABLE contact_fields (
-      id $idType,
-      contact_id $intType,
-      field_type $textType,
-      field_value $textType,
-      FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
-    )
-    ''');
-
-    // Create index for faster queries on contact_fields table
-    await db.execute('''
-    CREATE INDEX idx_contact_fields_contact_id ON contact_fields(contact_id)
-    ''');
+    while (currentVersion < migrations.length) {
+      final migration = await rootBundle.loadString(migrations[currentVersion]);
+      Logger().d(migration);
+      await db.execute(migration);
+      currentVersion++;
+    }
   }
 
   Future<void> close() async {

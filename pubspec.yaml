@@ -67,6 +67,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/sql/migrations/
     - assets/icons/
 
   fonts:
