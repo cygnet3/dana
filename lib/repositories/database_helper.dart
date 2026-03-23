@@ -51,8 +51,13 @@ class DatabaseHelper {
 
     while (currentVersion < migrations.length) {
       final migration = await rootBundle.loadString(migrations[currentVersion]);
-      Logger().d(migration);
-      await db.execute(migration);
+      final statements =
+          migration.split(';').map((s) => s.trim()).where((s) => s.isNotEmpty);
+
+      for (final statement in statements) {
+        Logger().d(statement);
+        await db.execute(statement);
+      }
       currentVersion++;
     }
   }
