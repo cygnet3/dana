@@ -20,7 +20,7 @@ pub struct StateUpdate {
     pub blkheight: u32,
     pub blkhash: String,
     pub found_outputs: Vec<OwnedOutput>,
-    pub found_inputs: HashSet<String>,
+    pub found_inputs: HashSet<crate::api::structs::outpoint::OutPoint>,
 }
 
 #[derive(Debug, Clone)]
