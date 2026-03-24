@@ -5,14 +5,14 @@ use crate::api::structs::amount::ApiAmount;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ApiRecipient {
-    pub address: String, // either old school or silent payment
+    pub payment_code: String, // either old school or silent payment
     pub amount: ApiAmount,
 }
 
 impl From<Recipient> for ApiRecipient {
     fn from(value: Recipient) -> Self {
         ApiRecipient {
-            address: value.address.into(),
+            payment_code: value.address.into(),
             amount: value.amount.into(),
         }
     }
@@ -21,9 +21,9 @@ impl From<Recipient> for ApiRecipient {
 impl TryFrom<ApiRecipient> for Recipient {
     type Error = anyhow::Error;
     fn try_from(value: ApiRecipient) -> Result<Self, Self::Error> {
-        let address = value.address.try_into()?;
+        let recipient_address = value.payment_code.try_into()?;
         let res = Recipient {
-            address,
+            address: recipient_address,
             amount: value.amount.into(),
         };
 
