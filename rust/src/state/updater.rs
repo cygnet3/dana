@@ -61,7 +61,7 @@ impl Updater for StateUpdater {
                     spending_txid: None,
                     mined_in_block: None,
                 }).collect(),
-                found_inputs: discovered_inputs.into_iter().map(|outpoint| outpoint.to_string()).collect(),
+                found_inputs: discovered_inputs.into_iter().map(|outpoint| outpoint.into()).collect(),
             };
 
             send_sync_update(update);
