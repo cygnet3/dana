@@ -289,7 +289,7 @@ class WalletScreenState extends State<WalletScreen> {
             image: const AssetImage("icons/receive.png", package: "bitcoin_ui"),
             color: Bitcoin.neutral3Dark);
       case ApiRecordedTransaction_Outgoing(:final field0):
-        final paymentCode = field0.recipients[0].address;
+        final paymentCode = field0.recipients[0].paymentCode;
         recipientWidget =
             contactsState.getDisplayNameWidget(context, paymentCode);
         date = field0.confirmationHeight?.toString() ?? 'Unconfirmed';

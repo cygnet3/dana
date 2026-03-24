@@ -86,9 +86,9 @@ CREATE INDEX idx_spent_outpoints_outpoint ON tx_spent_outpoints(outpoint_txid, o
 CREATE TABLE tx_recipients (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   txid TEXT NOT NULL,
-  address TEXT NOT NULL,
-  amount_sat INTEGER NOT NULL,
+  payment_code TEXT NOT NULL,
+  amount INTEGER NOT NULL,
   FOREIGN KEY (txid) REFERENCES tx_outgoing(txid) ON DELETE CASCADE
 );
 CREATE INDEX idx_recipients_txid ON tx_recipients(txid);
-CREATE INDEX idx_recipients_address ON tx_recipients(address);
+CREATE INDEX idx_recipients_payment_code ON tx_recipients(payment_code);

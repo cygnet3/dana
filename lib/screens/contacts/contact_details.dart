@@ -325,7 +325,7 @@ class ContactDetailsScreen extends StatelessWidget {
       if (tx is ApiRecordedTransaction_Outgoing) {
         // Check if any recipient matches the contact's SP address
         return tx.field0.recipients
-            .any((recipient) => recipient.address == contactPaymentCode);
+            .any((recipient) => recipient.paymentCode == contactPaymentCode);
       }
       return false;
     }).toList();
