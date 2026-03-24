@@ -232,7 +232,7 @@ class WalletState extends ChangeNotifier {
           apiOutputs: unspentOutputs,
           apiRecipients: [
             ApiRecipient(
-                address: form.recipient.paymentCode, amount: form.amount)
+                paymentCode: form.recipient.paymentCode, amount: form.amount)
           ],
           feerate: form.feerate.toDouble(),
           network: network);

@@ -68,7 +68,7 @@ impl ApiSilentPaymentUnsignedTransaction {
             .recipients
             .iter()
             .filter_map(|r| {
-                if r.address != change_address {
+                if r.payment_code != change_address {
                     Some(r.amount.0)
                 } else {
                     None
@@ -85,7 +85,7 @@ impl ApiSilentPaymentUnsignedTransaction {
             .recipients
             .iter()
             .filter_map(|r| {
-                if r.address == change_address {
+                if r.payment_code == change_address {
                     Some(r.amount.0)
                 } else {
                     None
@@ -108,7 +108,7 @@ impl ApiSilentPaymentUnsignedTransaction {
     pub fn get_recipients(&self, change_address: String) -> Vec<ApiRecipient> {
         self.recipients
             .iter()
-            .filter(|r| r.address != change_address)
+            .filter(|r| r.payment_code != change_address)
             .cloned()
             .collect()
     }
