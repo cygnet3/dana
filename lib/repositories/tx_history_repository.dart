@@ -1,6 +1,7 @@
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/generated/rust/api/history.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart';
 import 'package:danawallet/repositories/database_helper.dart';
@@ -71,7 +72,7 @@ class TxHistoryRepository {
         WHERE tx_outgoing_id = ?
       ''', [txOutgoingId]);
       final spentOutpoints = spentRows
-          .map((r) => '${r['outpoint_txid']}:${r['outpoint_vout']}')
+          .map((r) => OutPoint(txid: r['outpoint_txid'] as String, vout: r['outpoint_vout'] as int))
           .toList();
 
       // Fetch recipients (empty for unknown-outgoing)
@@ -172,7 +173,7 @@ class TxHistoryRepository {
 
   /// Add an outgoing transaction (when user sends).
   Future<void> addOutgoingTransaction({
-    required List<(String, int, int)> spentOutpoints, // (txid, vout, amount)
+    required List<OutPoint> spentOutpoints,
     required List<ApiRecipient> recipients,
     String? txid,
     int? changeSat,
@@ -202,11 +203,11 @@ class TxHistoryRepository {
         feeSat,
       ]);
 
-      for (final (outTxid, outVout, _) in spentOutpoints) {
+      for (final outpoint in spentOutpoints) {
         await txn.rawInsert('''
           INSERT INTO tx_spent_outpoints (tx_outgoing_id, outpoint_txid, outpoint_vout)
           VALUES (?, ?, ?)
-        ''', [txOutgoingId, outTxid, outVout]);
+        ''', [txOutgoingId, outpoint.txid, outpoint.vout]);
       }
 
       for (final recipient in recipients) {
@@ -338,13 +339,10 @@ Future<void> _insertTransaction(
       });
 
       for (final outpoint in field0.spentOutpoints) {
-        final outpointParts = outpoint.split(':');
-        final outpointTxid = outpointParts[0];
-        final outpointVout = int.parse(outpointParts[1]);
         await executor.insert('tx_spent_outpoints', {
           'tx_outgoing_id': txOutgoingId,
-          'outpoint_txid': outpointTxid,
-          'outpoint_vout': outpointVout,
+          'outpoint_txid': outpoint.txid,
+          'outpoint_vout': outpoint.vout,
         });
       }
 
@@ -367,14 +365,11 @@ Future<void> _insertTransaction(
         'fee_sat': null,
       });
 
-      for (final outpointStr in field0.spentOutpoints) {
-        final outpointParts = outpointStr.split(':');
-        final outpointTxid = outpointParts[0];
-        final outpointVout = int.parse(outpointParts[1]);
+      for (final outpoint in field0.spentOutpoints) {
         await executor.insert('tx_spent_outpoints', {
           'tx_outgoing_id': txOutgoingId,
-          'outpoint_txid': outpointTxid,
-          'outpoint_vout': outpointVout,
+          'outpoint_txid': outpoint.txid,
+          'outpoint_vout': outpoint.vout,
         });
       }
       break;
