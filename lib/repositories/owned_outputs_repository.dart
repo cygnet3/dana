@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/lib.dart';
 import 'package:danawallet/generated/rust/stream.dart';
 import 'package:danawallet/repositories/database_helper.dart';
@@ -114,13 +115,13 @@ class OwnedOutputsRepository {
 
   /// Mark an output as spent (when user broadcasts a transaction).
   Future<void> markOutputSpent(
-      String txid, int vout, String spendingTxid) async {
+      OutPoint outpoint, String spendingTxid) async {
     final db = await _db;
     await db.rawUpdate('''
       UPDATE owned_outputs
       SET spending_txid = ?
       WHERE txid = ? AND vout = ?
-    ''', [spendingTxid, txid, vout]);
+    ''', [spendingTxid, outpoint.txid, outpoint.vout]);
   }
 
   /// Mark an output as mined (during scanning).

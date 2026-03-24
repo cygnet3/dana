@@ -1,6 +1,7 @@
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/generated/rust/api/history.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart';
 import 'package:danawallet/repositories/database_helper.dart';
@@ -69,7 +70,7 @@ class TxHistoryRepository {
         WHERE txid = ?
       ''', [txid]);
       final spentOutpoints = spentRows
-          .map((r) => '${r['outpoint_txid']}:${r['outpoint_vout']}')
+          .map((r) => OutPoint(txid: r['outpoint_txid'] as String, vout: r['outpoint_vout'] as int))
           .toList();
 
       // Fetch recipients
@@ -159,7 +160,7 @@ class TxHistoryRepository {
   /// Add an outgoing transaction (when user sends).
   Future<void> addOutgoingTransaction({
     required String txid,
-    required List<(String, int, int)> spentOutpoints, // (txid, vout, amount)
+    required List<OutPoint> spentOutpoints,
     required List<ApiRecipient> recipients,
     int? changeSat,
     int? feeSat,
@@ -183,11 +184,11 @@ class TxHistoryRepository {
         feeSat,
       ]);
 
-      for (final (outTxid, outVout, _) in spentOutpoints) {
+      for (final outpoint in spentOutpoints) {
         await txn.rawInsert('''
           INSERT INTO tx_spent_outpoints (txid, outpoint_txid, outpoint_vout)
           VALUES (?, ?, ?)
-        ''', [txid, outTxid, outVout]);
+        ''', [txid, outpoint.txid, outpoint.vout]);
       }
 
       for (final recipient in recipients) {
@@ -303,11 +304,10 @@ Future<void> _insertTransaction(
       });
 
       for (final outpoint in field0.spentOutpoints) {
-        final (outTxid, outVout) = _parseOutpoint(outpoint);
         await executor.insert('tx_spent_outpoints', {
           'txid': field0.txid,
-          'outpoint_txid': outTxid,
-          'outpoint_vout': outVout,
+          'outpoint_txid': outpoint.txid,
+          'outpoint_vout': outpoint.vout,
         });
       }
 
@@ -324,7 +324,6 @@ Future<void> _insertTransaction(
       // Don't create a history entry for unknown outgoing transactions.
       // Just mark the outputs as spent with unknown txid.
       for (final outpoint in field0.spentOutpoints) {
-        final (outTxid, outVout) = _parseOutpoint(outpoint);
         await executor.update(
           'owned_outputs',
           {
@@ -332,14 +331,9 @@ Future<void> _insertTransaction(
             'mined_in_block': field0.confirmationBlockhash,
           },
           where: 'txid = ? AND vout = ?',
-          whereArgs: [outTxid, outVout],
+          whereArgs: [outpoint.txid, outpoint.vout],
         );
       }
       break;
   }
-}
-
-(String, int) _parseOutpoint(String outpoint) {
-  final parts = outpoint.split(':');
-  return (parts[0], int.parse(parts[1]));
 }
