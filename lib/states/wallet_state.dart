@@ -90,12 +90,6 @@ class WalletState extends ChangeNotifier {
         final spentTxid = outpoint[0];
         final spentVout = int.parse(outpoint[1]);
 
-        await ownedOutputsRepository.markOutputMined(
-          spentTxid,
-          spentVout,
-          event.blkhash,
-        );
-
         // Try to confirm an outgoing transaction
         final confirmed = await txHistoryRepository.confirmOutgoingTransaction(
           spentOutpointTxid: spentTxid,
@@ -296,7 +290,9 @@ class WalletState extends ChangeNotifier {
 
     // Cache outputs for spending and scanning
     unspentOutputs = await ownedOutputsRepository.getUnspentOutputs();
-    outpointsToScan = await ownedOutputsRepository.getNotMinedOutpoints();
+    final unspentOutpoints = await ownedOutputsRepository.getUnspentOutpoints();
+    final unconfirmedSpentOutpoints = await txHistoryRepository.getUnconfirmedSpentOutpoints();
+    outpointsToScan = [...unspentOutpoints, ...unconfirmedSpentOutpoints];
 
     // Cache transactions for UI
     transactions = await txHistoryRepository.getAllTransactions();

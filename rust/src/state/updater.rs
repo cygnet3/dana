@@ -59,7 +59,6 @@ impl Updater for StateUpdater {
                     script: output.script_pubkey.to_hex_string(),
                     label: output.label.map(|l| l.as_string()),
                     spending_txid: None,
-                    mined_in_block: None,
                 }).collect(),
                 found_inputs: discovered_inputs.into_iter().map(|outpoint| outpoint.to_string()).collect(),
             };

@@ -34,7 +34,6 @@ pub struct OwnedOutput {
     pub script: String,
     pub label: Option<String>,
     pub spending_txid: Option<String>,
-    pub mined_in_block: Option<String>,
 }
 
 pub fn create_sync_progress_stream(s: StreamSink<u32>) {

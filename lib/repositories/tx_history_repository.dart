@@ -231,6 +231,22 @@ class TxHistoryRepository {
     return true;
   }
 
+  /// Get outpoints whose spending transaction has been broadcast but not yet confirmed.
+  /// These must be included in the scan list so the scanner can detect when they are mined.
+  Future<List<String>> getUnconfirmedSpentOutpoints() async {
+    final db = await _db;
+    final rows = await db.rawQuery('''
+      SELECT s.outpoint_txid, s.outpoint_vout
+      FROM tx_spent_outpoints s
+      JOIN tx_outgoing o ON o.txid = s.txid
+      WHERE o.confirmation_height IS NULL AND o.confirmation_blockhash IS NULL
+    ''');
+
+    return rows
+        .map((row) => '${row['outpoint_txid']}:${row['outpoint_vout']}')
+        .toList();
+  }
+
   /// Delete transactions above a certain blockheight (for resetToHeight).
   Future<void> deleteTransactionsAboveHeight(int height) async {
     final db = await _db;
@@ -321,16 +337,29 @@ Future<void> _insertTransaction(
       break;
 
     case ApiRecordedTransaction_UnknownOutgoing(:final field0):
-      // Don't create a history entry for unknown outgoing transactions.
-      // Just mark the outputs as spent with unknown txid.
+      final amountPerOutpoint = field0.amount.toSat() ~/ field0.spentOutpoints.length;
       for (final outpoint in field0.spentOutpoints) {
         final (outTxid, outVout) = _parseOutpoint(outpoint);
+        final fakeTxid = "unknown:$outTxid:$outVout";
+
+        await executor.insert('tx_outgoing', {
+          'txid': fakeTxid,
+          'amount_spent_sat': amountPerOutpoint,
+          'confirmation_height': field0.confirmationHeight,
+          'confirmation_blockhash': field0.confirmationBlockhash,
+          'change_sat': null,
+          'fee_sat': null,
+        });
+        await executor.insert('tx_spent_outpoints', {
+          'txid': fakeTxid,
+          'outpoint_txid': outTxid,
+          'outpoint_vout': outVout,
+        });
+        // Mark the output as spent so it is excluded from the balance.
+        // Cross-repository write is acceptable in legacy migration code.
         await executor.update(
           'owned_outputs',
-          {
-            'spending_txid': null,
-            'mined_in_block': field0.confirmationBlockhash,
-          },
+          {'spending_txid': fakeTxid},
           where: 'txid = ? AND vout = ?',
           whereArgs: [outTxid, outVout],
         );

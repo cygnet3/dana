@@ -30,7 +30,7 @@ class OwnedOutputsRepository {
     final result = await db.rawQuery('''
       SELECT COALESCE(SUM(amount_sat), 0) as total 
       FROM owned_outputs 
-      WHERE spending_txid IS NULL AND mined_in_block IS NULL
+      WHERE spending_txid IS NULL
     ''');
     return ApiAmount(field0: BigInt.from(result.first['total'] as int));
   }
@@ -41,7 +41,7 @@ class OwnedOutputsRepository {
     final rows = await db.rawQuery('''
       SELECT *
       FROM owned_outputs
-      WHERE spending_txid IS NULL AND mined_in_block IS NULL
+      WHERE spending_txid IS NULL
     ''');
 
     final result = <OwnedOutput>[];
@@ -55,19 +55,18 @@ class OwnedOutputsRepository {
         script: row['script'] as String,
         label: row['label'] as String?,
         spendingTxid: row['spending_txid'] as String?,
-        minedInBlock: row['mined_in_block'] as String?,
       ));
     }
     return result;
   }
 
-  /// Get outpoints that are not yet mined (for scanning).
-  Future<List<String>> getNotMinedOutpoints() async {
+  /// Get all unspent outpoints to pass to the scanner (so it can detect spends).
+  Future<List<String>> getUnspentOutpoints() async {
     final db = await _db;
     final rows = await db.rawQuery('''
       SELECT txid, vout
       FROM owned_outputs
-      WHERE mined_in_block IS NULL
+      WHERE spending_txid IS NULL
     ''');
 
     return rows.map((row) => '${row['txid']}:${row['vout']}').toList();
@@ -93,8 +92,8 @@ class OwnedOutputsRepository {
     try {
       await db.rawInsert('''
         INSERT OR FAIL INTO owned_outputs (
-          txid, vout, blockheight, tweak, amount_sat, script, label, spending_txid, mined_in_block
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          txid, vout, blockheight, tweak, amount_sat, script, label, spending_txid
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ''', [
         output.txid,
         output.vout,
@@ -104,7 +103,6 @@ class OwnedOutputsRepository {
         output.script,
         output.label,
         output.spendingTxid,
-        output.minedInBlock,
       ]);
     } catch (e) {
       Logger().e("Failed to insert output: $e");
@@ -121,17 +119,6 @@ class OwnedOutputsRepository {
       SET spending_txid = ?
       WHERE txid = ? AND vout = ?
     ''', [spendingTxid, txid, vout]);
-  }
-
-  /// Mark an output as mined (during scanning).
-  Future<void> markOutputMined(String txid, int vout, String minedInBlock) async {
-    final db = await _db;
-    await db.update(
-      'owned_outputs',
-      {'mined_in_block': minedInBlock},
-      where: 'txid = ? AND vout = ?',
-      whereArgs: [txid, vout],
-    );
   }
 
   /// Delete outputs above a certain blockheight (for resetToHeight).
@@ -154,9 +141,9 @@ class OwnedOutputsRepository {
 /// LEGACY: can be removed once no users remain on pre-SQLite versions.
 ///
 /// The old spend_status was a serde enum:
-///   "Unspent"              → spending_txid: null, mined_in_block: null
-///   {"Spent": "txid"}      → spending_txid: txid, mined_in_block: null
-///   {"Mined": "blockhash"} → spending_txid: null, mined_in_block: blockhash
+///   "Unspent"              → spending_txid: null
+///   {"Spent": "txid"}      → spending_txid: txid
+///   {"Mined": "blockhash"} → spending_txid set later by migrateTxHistoryFromSharedPreferences
 Future<void> migrateOutputsFromSharedPreferences() async {
   final prefs = SharedPreferencesAsync();
   final json = await prefs.getString('ownedoutputs');
@@ -174,16 +161,14 @@ Future<void> migrateOutputsFromSharedPreferences() async {
       final spendStatus = output['spend_status'];
 
       String? spendingTxid;
-      String? minedInBlock;
 
       if (spendStatus is Map<String, dynamic>) {
         if (spendStatus.containsKey('Spent')) {
           spendingTxid = spendStatus['Spent'] as String?;
-        } else if (spendStatus.containsKey('Mined')) {
-          minedInBlock = spendStatus['Mined'] as String?;
         }
+        // 'Mined' outputs have spending_txid set later by migrateTxHistoryFromSharedPreferences
+        // via _insertTransaction, which also creates the corresponding tx_outgoing entry.
       }
-      // else: "Unspent" string — both remain null
 
       final outpoint = _parseOutpoint(entry.key);
       final List<dynamic> tweakList = output['tweak'];
@@ -197,7 +182,6 @@ Future<void> migrateOutputsFromSharedPreferences() async {
         'script': output['script'] as String,
         'label': output['label'] as String?,
         'spending_txid': spendingTxid,
-        'mined_in_block': minedInBlock,
       });
       migrated++;
     }

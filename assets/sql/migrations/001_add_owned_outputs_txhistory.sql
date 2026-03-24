@@ -7,16 +7,13 @@ CREATE TABLE owned_outputs (
   script TEXT NOT NULL,
   label TEXT,
   spending_txid TEXT,
-  mined_in_block TEXT,
   created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
   PRIMARY KEY (txid, vout)
 );
-CREATE INDEX idx_outputs_unspent ON owned_outputs(spending_txid, mined_in_block)
-  WHERE spending_txid IS NULL AND mined_in_block IS NULL;
-CREATE INDEX idx_outputs_spent_unmined ON owned_outputs(spending_txid, mined_in_block)
-  WHERE spending_txid IS NOT NULL AND mined_in_block IS NULL;
-CREATE INDEX idx_outputs_to_scan ON owned_outputs(mined_in_block)
-  WHERE mined_in_block IS NULL;
+CREATE INDEX idx_outputs_unspent ON owned_outputs(spending_txid)
+  WHERE spending_txid IS NULL;
+CREATE INDEX idx_outputs_spent ON owned_outputs(spending_txid)
+  WHERE spending_txid IS NOT NULL;
 CREATE INDEX idx_outputs_blockheight ON owned_outputs(blockheight);
 CREATE INDEX idx_outputs_txid ON owned_outputs(txid);
 
