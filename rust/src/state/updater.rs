@@ -59,7 +59,7 @@ impl Updater for StateUpdater {
                     script: output.script_pubkey.to_hex_string(),
                     label: output.label.map(|l| l.as_string()),
                 }).collect(),
-                found_inputs: discovered_inputs.into_iter().map(|outpoint| outpoint.to_string()).collect(),
+                found_inputs: discovered_inputs.into_iter().map(|outpoint| outpoint.into()).collect(),
             };
 
             send_sync_update(update);

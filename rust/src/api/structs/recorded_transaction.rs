@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
-use spdk_wallet::bitcoin::{absolute::Height, BlockHash, OutPoint, Txid};
+use spdk_wallet::bitcoin::{absolute::Height, BlockHash, Txid};
 
 use crate::api::structs::amount::ApiAmount;
 use crate::api::structs::recipient::ApiRecipient;
@@ -59,7 +59,7 @@ impl ApiRecordedTransactionUnknownOutgoing {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ApiRecordedTransactionOutgoing {
     pub txid: String,
-    pub spent_outpoints: Vec<String>,
+    pub spent_outpoints: Vec<super::outpoint::OutPoint>,
     pub recipients: Vec<ApiRecipient>,
     pub confirmation_height: Option<u32>,
     pub confirmation_blockhash: Option<String>,
@@ -72,7 +72,7 @@ pub struct ApiRecordedTransactionUnknownOutgoing {
     pub amount: ApiAmount,
     pub confirmation_height: u32,
     pub confirmation_blockhash: String,
-    pub spent_outpoints: Vec<String>,
+    pub spent_outpoints: Vec<super::outpoint::OutPoint>,
 }
 
 impl From<RecordedTransaction> for ApiRecordedTransaction {
@@ -106,7 +106,7 @@ impl From<RecordedTransactionUnknownOutgoing> for ApiRecordedTransactionUnknownO
             spent_outpoints: value
                 .spent_outpoints
                 .into_iter()
-                .map(|x| x.to_string())
+                .map(|x| x.into())
                 .collect(),
         }
     }
@@ -121,7 +121,7 @@ impl From<ApiRecordedTransactionUnknownOutgoing> for RecordedTransactionUnknownO
             spent_outpoints: value
                 .spent_outpoints
                 .into_iter()
-                .map(|x| OutPoint::from_str(&x).unwrap())
+                .map(|x| x.into())
                 .collect(),
         }
     }
@@ -177,7 +177,7 @@ impl From<RecordedTransactionOutgoing> for ApiRecordedTransactionOutgoing {
             spent_outpoints: value
                 .spent_outpoints
                 .into_iter()
-                .map(|x| x.to_string())
+                .map(|x| x.into())
                 .collect(),
             recipients: value.recipients.into_iter().map(Into::into).collect(),
             confirmation_height,
@@ -202,7 +202,7 @@ impl From<ApiRecordedTransactionOutgoing> for RecordedTransactionOutgoing {
             spent_outpoints: value
                 .spent_outpoints
                 .into_iter()
-                .map(|x| OutPoint::from_str(&x).unwrap())
+                .map(|x| x.into())
                 .collect(),
             recipients: value
                 .recipients
