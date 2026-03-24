@@ -124,42 +124,14 @@ class OwnedOutputsRepository {
   }
 
   /// Mark an output as mined (during scanning).
-  Future<void> markOutputMined(String txid, int vout, String minedInBlock,
-      {String? spendingTxid}) async {
+  Future<void> markOutputMined(String txid, int vout, String minedInBlock) async {
     final db = await _db;
-    final updates = <String, Object?>{'mined_in_block': minedInBlock};
-    if (spendingTxid != null) {
-      updates['spending_txid'] = spendingTxid;
-    }
     await db.update(
       'owned_outputs',
-      updates,
+      {'mined_in_block': minedInBlock},
       where: 'txid = ? AND vout = ?',
       whereArgs: [txid, vout],
     );
-  }
-
-  /// Mark outputs as spent without creating a history entry (unknown spend case).
-  /// Used when outputs are spent from another device/wallet.
-  Future<void> markOutputsSpentUnknown({
-    required List<(String, int, int)> spentOutpoints, // (txid, vout, amount)
-    required String minedInBlock,
-  }) async {
-    final db = await _db;
-
-    await db.transaction((txn) async {
-      for (final (outTxid, outVout, _) in spentOutpoints) {
-        await txn.update(
-          'owned_outputs',
-          {
-            'spending_txid': null, // Unknown txid
-            'mined_in_block': minedInBlock,
-          },
-          where: 'txid = ? AND vout = ?',
-          whereArgs: [outTxid, outVout],
-        );
-      }
-    });
   }
 
   /// Delete outputs above a certain blockheight (for resetToHeight).

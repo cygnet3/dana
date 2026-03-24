@@ -90,6 +90,12 @@ class WalletState extends ChangeNotifier {
         final spentTxid = outpoint[0];
         final spentVout = int.parse(outpoint[1]);
 
+        await ownedOutputsRepository.markOutputMined(
+          spentTxid,
+          spentVout,
+          event.blkhash,
+        );
+
         // Try to confirm an outgoing transaction
         final confirmed = await txHistoryRepository.confirmOutgoingTransaction(
           spentOutpointTxid: spentTxid,
@@ -98,12 +104,35 @@ class WalletState extends ChangeNotifier {
           confirmationBlockhash: event.blkhash,
         );
 
+        // This should never happen, it means user is using the same wallet on multiple devices
+        // If that happens, we register the transaction as "unknown:{txid}:{vout}"
         if (!confirmed) {
-          // Unknown spend - mark output as spent without history entry
-          await ownedOutputsRepository.markOutputsSpentUnknown(
-            spentOutpoints: [(spentTxid, spentVout, 0)],
-            minedInBlock: event.blkhash,
-          );
+          final unknownTxid = "unknown:$spentTxid:$spentVout";
+          // We should *never* get null here, but we'll handle it just in case
+          final spentAmount = await ownedOutputsRepository.getOutputAmount(spentTxid, spentVout);
+          if (spentAmount == null) {
+            throw Exception("Failed to get output amount for $spentTxid:$spentVout");
+          }
+          try {
+            await txHistoryRepository.addOutgoingTransaction(
+              txid: unknownTxid, 
+              spentOutpoints: [(spentTxid, spentVout, spentAmount)], 
+              recipients: [], 
+              changeSat: null, // unknown for externally-created spend
+              feeSat: null, // unknown for externally-created spend
+            ); 
+            final confirmed = await txHistoryRepository.confirmOutgoingTransaction(
+              spentOutpointTxid: spentTxid,
+              spentOutpointVout: spentVout,
+              confirmationHeight: event.blkheight,
+              confirmationBlockhash: event.blkhash,
+            );
+            if (!confirmed) {
+              throw Exception("Failed to confirm unknown outgoing transaction for $spentTxid:$spentVout");
+            }
+          } catch (e) {
+            Logger().e("Failed to add unknown outgoing transaction: $e");
+          }
         }
       }
 
