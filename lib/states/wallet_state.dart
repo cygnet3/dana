@@ -4,8 +4,10 @@ import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/recipient_form_filled.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
+import 'package:danawallet/extensions/outpoint.dart';
 import 'package:danawallet/generated/rust/api/stream.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart';
 import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart';
@@ -84,15 +86,11 @@ class WalletState extends ChangeNotifier {
       }
 
       // Process found inputs (our UTXOs being spent)
-      for (final outpointStr in event.foundInputs) {
-        final outpoint = outpointStr.split(':');
-        final spentTxid = outpoint[0];
-        final spentVout = int.parse(outpoint[1]);
-
+      for (final outpoint in event.foundInputs) {
         // Try to confirm an outgoing transaction
         final confirmed = await txHistoryRepository.confirmOutgoingTransaction(
-          spentOutpointTxid: spentTxid,
-          spentOutpointVout: spentVout,
+          spentOutpointTxid: outpoint.txid,
+          spentOutpointVout: outpoint.vout,
           confirmationHeight: event.blkheight,
           confirmationBlockhash: event.blkhash,
         );
@@ -103,11 +101,11 @@ class WalletState extends ChangeNotifier {
             // For unknown outgoing transactions we don't know the spending txid.
             // We store `tx_outgoing.txid = NULL` and link the outpoints via `tx_outgoing.id`.
             final spentAmountSat = await ownedOutputsRepository.getOutputAmount(
-              spentTxid,
-              spentVout,
+              outpoint.txid,
+              outpoint.vout,
             );
             await txHistoryRepository.addOutgoingTransaction(
-              spentOutpoints: [(spentTxid, spentVout, spentAmountSat ?? 0)], 
+              spentOutpoints: [outpoint], 
               recipients: [], 
               changeSat: null, // unknown for externally-created spend
               feeSat: null, // unknown for externally-created spend
@@ -115,13 +113,13 @@ class WalletState extends ChangeNotifier {
               amountSpentSat: spentAmountSat ?? 0,
             ); 
             final confirmed = await txHistoryRepository.confirmOutgoingTransaction(
-              spentOutpointTxid: spentTxid,
-              spentOutpointVout: spentVout,
+              spentOutpointTxid: outpoint.txid,
+              spentOutpointVout: outpoint.vout,
               confirmationHeight: event.blkheight,
               confirmationBlockhash: event.blkhash,
             );
             if (!confirmed) {
-              throw Exception("Failed to confirm unknown outgoing transaction for ${spentTxid}:${spentVout}");
+              throw Exception("Failed to confirm unknown outgoing transaction for ${outpoint.toDisplayString()}");
             }
           } catch (e) {
             Logger().e("Failed to add unknown outgoing transaction: $e");
@@ -323,7 +321,7 @@ class WalletState extends ChangeNotifier {
       ApiSilentPaymentUnsignedTransaction unsignedTx) async {
     final selectedOutputs = unsignedTx.selectedUtxos;
 
-    List<String> selectedOutpoints =
+    List<OutPoint> selectedOutpoints =
         selectedOutputs.map((tuple) => tuple.$1).toList();
 
     final changeValue =
