@@ -25,4 +25,9 @@ impl StateUpdate {
     pub fn get_height(&self) -> u32 {
         self.blkheight.to_consensus_u32()
     }
+
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn get_queue_id(&self) -> i32 {
+        self.queue_item_id
+    }
 }

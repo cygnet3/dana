@@ -15,6 +15,7 @@ import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:danawallet/generated/rust/api/wallet/setup.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
+import 'package:danawallet/repositories/sync_queue_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/services/dana_address_service.dart';
@@ -23,6 +24,7 @@ import 'package:logger/logger.dart';
 
 class WalletState extends ChangeNotifier {
   final walletRepository = WalletRepository.instance;
+  final SyncQueueRepository syncQueue = SyncQueueRepository();
 
   // variables that never change (unless wallet is reset)
   late ApiNetwork network;
@@ -55,7 +57,11 @@ class WalletState extends ChangeNotifier {
   Future<void> _initStreams() async {
     syncResultSubscription = createSyncResultStream().listen(((event) async {
       // process update
-      lastSync = event.getHeight();
+
+      final id = event.getQueueId();
+      final height = event.getHeight();
+      await syncQueue.processUpdate(id, height);
+
       txHistory.processStateUpdate(update: event, ownedOutputs: ownedOutputs);
       ownedOutputs.processStateUpdate(update: event);
 
@@ -140,6 +146,11 @@ class WalletState extends ChangeNotifier {
     this.network = network;
     lastSync = currentTip;
     await _updateWalletState();
+  }
+
+  Future<void> updateSyncHeight(int newHeight) async {
+    lastSync = newHeight;
+    walletRepository.saveLastSync(newHeight);
   }
 
   Future<SpWallet> getWalletFromSecureStorage() async {

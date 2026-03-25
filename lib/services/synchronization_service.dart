@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:danawallet/constants.dart';
+import 'package:danawallet/extensions/sync_queue_item.dart';
 import 'package:danawallet/global_functions.dart';
+import 'package:danawallet/repositories/sync_queue_repository.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
@@ -9,15 +11,14 @@ import 'package:flutter/scheduler.dart';
 import 'package:logger/logger.dart';
 
 class SynchronizationService {
+  SyncQueueRepository queue = SyncQueueRepository();
   WalletState walletState;
   ChainState chainState;
   SyncProgressNotifier scanProgress;
 
-  // first sync will set the start height, all other syncs will keep the same height
-  // this is useful if we receive an error while syncing, and restart the sync process.
-  // this way, we make it explicit that we're continuing from the last sync,
-  // instead of completely restarting.
-  int? _startHeight;
+  // the total number of blocks in the sync queue
+  // this value is used to track total sync progress across different sync items
+  int? _syncBlockCount;
 
   Timer? _timer;
   final Duration _interval = const Duration(seconds: 10);
@@ -31,7 +32,7 @@ class SynchronizationService {
     Logger().i("Starting sync service");
 
     if (immediate) {
-      _tryPerformTask();
+      await _tryPerformTask();
     }
     await _scheduleNextTask();
   }
@@ -89,6 +90,7 @@ class SynchronizationService {
   }
 
   Future<void> _performSynchronizationTask() async {
+    Logger().i("last sync: ${walletState.lastSync}");
     if (walletState.lastSync == null) {
       // if we just recovered a wallet, we haven't set the lastSync variable yet.
       Logger().d("Setting last sync to block height of birthday");
@@ -101,20 +103,34 @@ class SynchronizationService {
     }
 
     if (walletState.lastSync! < chainState.tip) {
-      if (!scanProgress.isScanning) {
-        Logger().i("Starting sync");
-
-        // set start height if not yet set
-        _startHeight ??= walletState.lastSync!;
-
-        await scanProgress.scan(walletState, _startHeight!, chainState.tip);
+      // we only insert new sync queue items if we're currently not syncing
+      if (_syncBlockCount == null) {
+        final start = walletState.lastSync! + 1;
+        final end = chainState.tip;
+        await queue.insertNewSyncQueueItem(start, end);
+        Logger().i("inserted new sync queue item: [$start ..= $end]");
+        // sync height now no longer represents the height to which we are synced, but instead the height to which we have created queue objects
+        walletState.updateSyncHeight(end);
       }
     }
 
-    if (chainState.tip < walletState.lastSync!) {
-      // not sure what we should do here, that's really bad
-      Logger().e('Current height is less than wallet last scan');
+    final blocksToSync = await queue.getBlockCountToSync();
+    int synced;
+    if (_syncBlockCount == null) {
+      _syncBlockCount = blocksToSync;
+      synced = 0;
+    } else {
+      synced = _syncBlockCount! - blocksToSync;
     }
+
+    final queueItems = await queue.getQueueItems();
+    for (final item in queueItems) {
+      await scanProgress.scan(walletState, item, synced, _syncBlockCount!);
+      Logger().i("scanned ${item.toMap()}");
+    }
+
+    // done syncing, clear history
+    clearSyncHistory();
   }
 
   Future<void> _initializeLastSync() async {
@@ -132,6 +148,7 @@ class SynchronizationService {
   }
 
   void clearSyncHistory() {
-    _startHeight = null;
+    scanProgress.reset();
+    _syncBlockCount = null;
   }
 }

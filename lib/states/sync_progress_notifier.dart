@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/stream.dart';
+import 'package:danawallet/generated/rust/api/structs/sync_queue_item.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/states/wallet_state.dart';
@@ -11,8 +12,9 @@ import 'package:flutter/material.dart';
 class SyncProgressNotifier extends ChangeNotifier {
   Completer? _completer;
   double? progress;
-  late int startHeight;
-  late int endHeight;
+  late SyncQueueItem item;
+  late int totalToSync;
+  late int synced;
 
   late StreamSubscription syncProgressSubscription;
 
@@ -23,12 +25,9 @@ class SyncProgressNotifier extends ChangeNotifier {
 
   Future<void> _initialize() async {
     syncProgressSubscription = createSyncProgressStream().listen(((current) {
-      double scanned = (current - startHeight).toDouble();
-      double total = (endHeight - startHeight).toDouble();
-      double progress = scanned / total;
-      if (current != endHeight) {
-        this.progress = progress;
-
+      synced++;
+      if (synced != totalToSync) {
+        progress = (synced.toDouble() / totalToSync.toDouble());
         notifyListeners();
       }
     }));
@@ -58,15 +57,10 @@ class SyncProgressNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> scan(
-      WalletState walletState, int startHeight, int chainTip) async {
-    this.startHeight = startHeight;
-    endHeight = chainTip;
-
-    // start syncing from the first block after our last sync
-    // we ignore the startHeight here, because we may be continuing from another sync
-    final fromHeight = walletState.lastSync! + 1;
-    final toHeight = chainTip;
+  Future<void> scan(WalletState walletState, SyncQueueItem item, int synced,
+      int totalToSync) async {
+    this.synced = synced;
+    this.totalToSync = totalToSync;
 
     try {
       final wallet = await walletState.getWalletFromSecureStorage();
@@ -84,8 +78,7 @@ class SyncProgressNotifier extends ChangeNotifier {
 
       activate();
       await wallet.syncToHeight(
-        fromHeight: fromHeight,
-        toHeight: toHeight,
+        item: item,
         blindbitUrl: blindbitUrl,
         dustLimit: BigInt.from(dustLimit),
         ownedOutpoints: ownedOutPoints,
@@ -95,6 +88,10 @@ class SyncProgressNotifier extends ChangeNotifier {
       rethrow;
     }
     deactivate();
+  }
+
+  void reset() {
+    synced = 0;
   }
 
   Future<void> interruptSync() async {

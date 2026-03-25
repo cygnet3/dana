@@ -50,13 +50,13 @@ class SyncQueueRepository {
 
     if (maps.isEmpty) return List.empty();
 
-      return maps.map((map) => SyncQueueItemExtension.fromMap(map)).toList();
+    return maps.map((map) => SyncQueueItemExtension.fromMap(map)).toList();
   }
 
   Future<int> getBlockCountToSync() async {
     final db = await _dbHelper.database;
-    final result =
-        await db.rawQuery("SELECT COALESCE(SUM(end - start), 0) AS total FROM sync_queue");
+    final result = await db.rawQuery(
+        "SELECT COALESCE(SUM(end - start), 0) AS total FROM sync_queue");
 
     return result[0]['total'] as int;
   }

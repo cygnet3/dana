@@ -17,6 +17,7 @@ lazy_static! {
 
 #[derive(Debug)]
 pub struct StateUpdate {
+    pub(crate) queue_item_id: i32,
     pub(crate) blkheight: Height,
     pub(crate) blkhash: BlockHash,
     pub(crate) found_outputs: HashMap<OutPoint, DiscoveredOutput>,

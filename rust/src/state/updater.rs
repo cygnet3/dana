@@ -9,7 +9,10 @@ use spdk_wallet::{
     updater::DiscoveredOutput,
 };
 
-use crate::stream::{send_sync_progress, send_sync_update, StateUpdate};
+use crate::{
+    api::structs::sync_queue_item::SyncQueueItem,
+    stream::{send_sync_progress, send_sync_update, StateUpdate},
+};
 
 use anyhow::Result;
 
@@ -17,14 +20,14 @@ const MAX_TIME_BETWEEN_UPDATES: Duration = Duration::from_secs(30);
 
 pub struct StateUpdater {
     last_update: Instant,
-    final_update_height: Height,
+    item: SyncQueueItem,
 }
 
 impl StateUpdater {
-    pub fn new(final_update_height: Height) -> Self {
+    pub fn new(item: SyncQueueItem) -> Self {
         Self {
             last_update: Instant::now(),
-            final_update_height,
+            item,
         }
     }
 }
@@ -42,12 +45,13 @@ impl Updater for StateUpdater {
         // - the maximum delay between updates has been reached
         // - we're sending the final update
         let new_discoveries = !discovered_inputs.is_empty() || !discovered_outputs.is_empty();
-        let is_final_block_update = blkheight == self.final_update_height;
+        let is_final_block_update = blkheight.to_consensus_u32() == self.item.end;
         let max_delay_reached = self.last_update.elapsed() > MAX_TIME_BETWEEN_UPDATES;
 
         if new_discoveries || is_final_block_update || max_delay_reached {
             // sending a state update always implies we are writing to persistent storage
             let update = StateUpdate {
+                queue_item_id: self.item.id,
                 blkheight,
                 blkhash,
                 found_outputs: discovered_outputs,

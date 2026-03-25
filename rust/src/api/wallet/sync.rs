@@ -4,6 +4,7 @@ use spdk_wallet::bitcoin::absolute::Height;
 use spdk_wallet::bitcoin::Amount;
 use spdk_wallet::scanner::SpScanner;
 
+use crate::api::structs::sync_queue_item::SyncQueueItem;
 use crate::{api::outputs::OwnedOutPoints, state::StateUpdater, wallet::KEEP_SYNCING};
 
 use super::SpWallet;
@@ -19,8 +20,7 @@ impl SpWallet {
 
     pub async fn sync_to_height(
         &self,
-        from_height: u32,
-        to_height: u32,
+        item: SyncQueueItem,
         blindbit_url: String,
         dust_limit: u64,
         owned_outpoints: OwnedOutPoints,
@@ -30,11 +30,11 @@ impl SpWallet {
 
         let dust_limit = Amount::from_sat(dust_limit);
 
-        let start = Height::from_consensus(from_height)?;
-        let end = Height::from_consensus(to_height)?;
+        let start = Height::from_consensus(item.start)?;
+        let end = Height::from_consensus(item.end)?;
 
         let sp_client = self.client.clone();
-        let updater = StateUpdater::new(end);
+        let updater = StateUpdater::new(item);
 
         KEEP_SYNCING.store(true, std::sync::atomic::Ordering::Relaxed);
 

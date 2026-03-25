@@ -82,6 +82,7 @@ impl OwnedOutputs {
             blkhash,
             found_outputs,
             found_inputs,
+            ..
         } = update;
 
         // mark inputs as mined

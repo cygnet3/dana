@@ -70,8 +70,8 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
         }
         // pickedDate is already in UTC from BirthdayPickerScreen
         // Use 1am UTC to avoid edge issues at midnight
-        birthday = DateTime.utc(
-            pickedDate.year, pickedDate.month, pickedDate.day, 1);
+        birthday =
+            DateTime.utc(pickedDate.year, pickedDate.month, pickedDate.day, 1);
       }
 
       setState(() {
@@ -81,15 +81,17 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
       await walletState.restoreWallet(widget.network, mnemonic, birthday);
 
       chainState.initialize(widget.network);
-      
+
       // Try to connect, but continue even if it fails (offline mode)
-      final connected = await chainState.connect(widget.network.defaultBlindbitUrl);
+      final connected =
+          await chainState.connect(widget.network.defaultBlindbitUrl);
       if (!connected) {
         // Connection failed, but continue anyway - sync will happen when network is available
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Unable to connect to network. Wallet will sync when connection is restored.'),
+              content: Text(
+                  'Unable to connect to network. Wallet will sync when connection is restored.'),
               duration: Duration(seconds: 3),
             ),
           );
