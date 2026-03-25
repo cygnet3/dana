@@ -14,6 +14,7 @@ use spdk_wallet::client::{SpClient, SpendKey};
 #[frb(opaque)]
 pub struct SpWallet {
     client: SpClient,
+    #[allow(unused)]
     wallet_fingerprint: WalletFingerprint,
 }
 
