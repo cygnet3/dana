@@ -6,12 +6,24 @@ flutter := if `which fvm 2> /dev/null || true` != "" { "fvm flutter" }  else { "
 # target platform that is automatically chosen when using 'flutter run'
 platform := `fvm flutter devices --machine | jq .[0].targetPlatform`
 
-run:
+git_hash := `git rev-parse HEAD`
+
+run flags="":
+    #!/bin/sh
     just gen
-    {{flutter}} run --flavor local --target lib/main_local.dart --dart-define="GIT_HASH=$(git rev-parse HEAD)"
+
+    # always build rust binaries if building for android
+    [[ {{platform}} == "android-arm64" ]] && just build-android
+
+    flags={{flags}}
+    flags="$flags --flavor local"
+    flags="$flags --target lib/main_local.dart"
+    flags="$flags --dart-define=GIT_HASH={{git_hash}}"
+
+    {{flutter}} run $flags
+
 run-release:
-    just gen
-    {{flutter}} run --release --flavor local --target lib/main_local.dart --dart-define="GIT_HASH=$(git rev-parse HEAD)"
+    just run --release
 
 clean-bin:
     cd rust && just clean-bin
