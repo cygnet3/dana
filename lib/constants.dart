@@ -8,7 +8,7 @@ const String defaultSignet = "https://silentpayments.dev/blindbit/signet";
 const String defaultRegtest = "https://silentpayments.dev/blindbit/regtest";
 
 // Default birthday, this value is based on the first Dana release
-final DateTime defaultBirthday = DateTime.utc(2025, 6, 1); 
+final DateTime defaultBirthday = DateTime.utc(2025, 6, 1);
 
 // minimum birthday allowed during recovery. This value is set to the moment BIP352 got merged,
 // see: https://github.com/bitcoin/bips/pull/1458
