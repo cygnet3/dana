@@ -75,18 +75,20 @@ class MempoolApiRepository {
 
   Future<String> getBlockHashForHeight(int height) async {
     // First get the block hash from height
-    final hashResponse = await http.get(Uri.parse('$baseUrl/block-height/$height'));
+    final hashResponse =
+        await http.get(Uri.parse('$baseUrl/block-height/$height'));
     if (hashResponse.statusCode != 200) {
       throw Exception('Unexpected status code: ${hashResponse.statusCode}');
     }
-    
+
     // Then get the full block data using the hash
     return hashResponse.body.trim();
   }
 
   /// Converts a Unix timestamp to block info using mempool API.
   /// Returns the block closest to the given timestamp.
-  Future<MempoolBlockTimestampResponse> getBlockFromTimestamp(int timestamp) async {
+  Future<MempoolBlockTimestampResponse> getBlockFromTimestamp(
+      int timestamp) async {
     final response = await http.get(
       Uri.parse('$baseUrl/v1/mining/blocks/timestamp/$timestamp'),
     );
