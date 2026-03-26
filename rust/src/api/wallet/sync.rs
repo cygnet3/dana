@@ -30,8 +30,9 @@ impl SpWallet {
 
         let dust_limit = Amount::from_sat(dust_limit);
 
-        let start = Height::from_consensus(item.start)?;
-        let end = Height::from_consensus(item.end)?;
+        // set start and end in reverse, indicating we want to sync backwards
+        let start = Height::from_consensus(item.end)?;
+        let end = Height::from_consensus(item.start)?;
 
         let sp_client = self.client.clone();
         let updater = StateUpdater::new(item);

@@ -1,7 +1,6 @@
 import 'package:danawallet/extensions/sync_queue_item.dart';
 import 'package:danawallet/generated/rust/api/structs/sync_queue_item.dart';
 import 'package:danawallet/repositories/database_helper.dart';
-import 'package:logger/logger.dart';
 import 'package:sqflite/sqflite.dart';
 
 class SyncQueueRepository {
@@ -20,13 +19,13 @@ class SyncQueueRepository {
     final items = await getQueueItems();
     final item = items.firstWhere((item) => item.id == id);
 
-    if (height >= item.end) {
+    if (height <= item.start) {
       return await deleteSyncQueueItem(item.id);
     } else {
       final db = await _dbHelper.database;
       return await db.update(
         'sync_queue',
-        {"start": height + 1},
+        {"end": height - 1},
         where: 'id = ?',
         whereArgs: [item.id],
       );

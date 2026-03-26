@@ -16,7 +16,7 @@ use crate::{
 
 use anyhow::Result;
 
-const MAX_TIME_BETWEEN_UPDATES: Duration = Duration::from_secs(30);
+const MAX_TIME_BETWEEN_UPDATES: Duration = Duration::from_secs(5);
 
 pub struct StateUpdater {
     last_update: Instant,
@@ -45,7 +45,7 @@ impl Updater for StateUpdater {
         // - the maximum delay between updates has been reached
         // - we're sending the final update
         let new_discoveries = !discovered_inputs.is_empty() || !discovered_outputs.is_empty();
-        let is_final_block_update = blkheight.to_consensus_u32() == self.item.end;
+        let is_final_block_update = blkheight.to_consensus_u32() == self.item.start;
         let max_delay_reached = self.last_update.elapsed() > MAX_TIME_BETWEEN_UPDATES;
 
         if new_discoveries || is_final_block_update || max_delay_reached {

@@ -60,6 +60,7 @@ class WalletState extends ChangeNotifier {
 
       final id = event.getQueueId();
       final height = event.getHeight();
+      Logger().d("height: $height");
       await syncQueue.processUpdate(id, height);
 
       txHistory.processStateUpdate(update: event, ownedOutputs: ownedOutputs);
