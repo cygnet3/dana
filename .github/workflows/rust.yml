@@ -1,0 +1,33 @@
+name: Rust
+
+on:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - name: Build
+      working-directory: ./rust
+      run: cargo build --verbose
+    - name: Run tests
+      working-directory: ./rust
+      run: cargo test --verbose
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup toolchain
+        uses: actions-rs/toolchain@v1.0.6
+        with:
+          toolchain: stable
+          override: true
+          components: rustfmt
+      - uses: actions/checkout@v6
+      - name: Run rustfmt
+        working-directory: ./rust
+        run: cargo fmt --check
