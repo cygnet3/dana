@@ -289,9 +289,12 @@ class WalletScreenState extends State<WalletScreen> {
             image: const AssetImage("icons/receive.png", package: "bitcoin_ui"),
             color: Bitcoin.neutral3Dark);
       case ApiRecordedTransaction_Outgoing(:final field0):
-        final paymentCode = field0.recipients[0].paymentCode;
-        recipientWidget =
-            contactsState.getDisplayNameWidget(context, paymentCode);
+        final paymentCode = field0.recipients.isNotEmpty
+            ? field0.recipients[0].paymentCode
+            : null;
+        recipientWidget = paymentCode != null
+            ? contactsState.getDisplayNameWidget(context, paymentCode)
+            : Text('Unknown', style: BitcoinTextStyle.body4(Bitcoin.black));
         date = field0.confirmationHeight?.toString() ?? 'Unconfirmed';
         if (field0.confirmationHeight == null) {
           color = Bitcoin.neutral4;
@@ -370,8 +373,7 @@ class WalletScreenState extends State<WalletScreen> {
           reverse: false,
           itemCount: transactions.length,
           itemBuilder: (context, index) {
-            return toListTile(
-                transactions[transactions.length - 1 - index], exchangeRate);
+            return toListTile(transactions[index], exchangeRate);
           });
     }
 
