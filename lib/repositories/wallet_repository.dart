@@ -168,7 +168,7 @@ class WalletRepository {
     // LEGACY: TxHistory is deprecated — wallet recovery relies on seed phrase (rescan from birthday).
     // TxHistory.empty() is only used here for backup compatibility.
     // TODO: Remove TxHistory from backup format entirely.
-    final history = TxHistory.empty();
+    final history = LegacyTxHistoryStruct.empty();
 
     return WalletBackup(
         wallet: wallet!,
