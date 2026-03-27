@@ -120,7 +120,7 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 [[package]]
 name = "backend-blindbit-v1"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#595c53043d32dd04925dfe6538a7ef12b3250312"
+source = "git+https://github.com/Sosthene00/spdk?branch=psbt_integration#6dea3a4e5c70c48f2a6f68ac9cac0a8cb8616b0e"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -547,6 +547,7 @@ checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer",
  "crypto-common",
+ "subtle",
 ]
 
 [[package]]
@@ -573,6 +574,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "dnssec-prover"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18f83841648b581b7f15e1ac62ed5a178bb84a79d86ed1c6dfeaf5eaacdce13f"
+dependencies = [
+ "hex_lit",
+ "ring",
+]
+
+[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -593,6 +604,16 @@ name = "equivalent"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
+
+[[package]]
+name = "errno"
+version = "0.3.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
+dependencies = [
+ "libc",
+ "windows-sys 0.52.0",
+]
 
 [[package]]
 name = "fastrand"
@@ -862,6 +883,15 @@ name = "hex_lit"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3011d1213f159867b13cfd6ac92d2cd5f1345762c63be3554e84092d85a50bbd"
+
+[[package]]
+name = "hmac"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
+dependencies = [
+ "digest",
+]
 
 [[package]]
 name = "http"
@@ -1193,6 +1223,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5aba8db14291edd000dfcc4d620c7ebfb122c613afb886ca8803fa4e128a20a"
 
 [[package]]
+name = "linux-raw-sys"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd945864f07fe9f5371a27ad7b52a172b4b499999f1d97574c9fa68373937e12"
+
+[[package]]
 name = "litemap"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1235,6 +1271,16 @@ name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
+
+[[package]]
+name = "miniscript"
+version = "12.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "487906208f38448e186e3deb02f2b8ef046a9078b0de00bdb28bf4fb9b76951c"
+dependencies = [
+ "bech32 0.11.1",
+ "bitcoin 0.32.8",
+]
 
 [[package]]
 name = "miniz_oxide"
@@ -1410,6 +1456,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "psbt-v2"
+version = "0.2.0"
+source = "git+https://github.com/macgyver13/rust-psbt.git?branch=add-pairs-v2-map#db7e4484b135f513edecfff6364a035a8d406088"
+dependencies = [
+ "bitcoin 0.32.8",
+ "miniscript",
+]
+
+[[package]]
 name = "pushtx"
 version = "0.4.0"
 source = "git+https://github.com/cygnet3/pushtx?branch=master#90ad6b924c30677115206e6911c87bea9ea706fd"
@@ -1438,7 +1493,7 @@ dependencies = [
  "rustc-hash",
  "rustls",
  "socket2",
- "thiserror",
+ "thiserror 2.0.11",
  "tokio",
  "tracing",
 ]
@@ -1457,7 +1512,7 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "slab",
- "thiserror",
+ "thiserror 2.0.11",
  "tinyvec",
  "tracing",
  "web-time",
@@ -1725,6 +1780,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rust-dleq"
+version = "0.1.0"
+source = "git+https://github.com/macgyver13/rust-dleq.git?branch=master#097644a14d87c454e9bd9895de2e60992ff1ba93"
+dependencies = [
+ "bitcoin_hashes 0.14.1",
+ "cc",
+ "secp256k1 0.29.1",
+]
+
+[[package]]
 name = "rust_lib_danawallet"
 version = "0.1.0"
 dependencies = [
@@ -1765,6 +1830,19 @@ name = "rustc-serialize"
 version = "0.3.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe834bc780604f4674073badbad26d7219cadfb4a2275802db12cbae17498401"
+
+[[package]]
+name = "rustix"
+version = "1.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11181fbabf243db407ef8df94a6ce0b2f9a733bd8be4ad02b4eda9602296cac8"
+dependencies = [
+ "bitflags",
+ "errno",
+ "libc",
+ "linux-raw-sys",
+ "windows-sys 0.52.0",
+]
 
 [[package]]
 name = "rustls"
@@ -1942,6 +2020,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha2"
+version = "0.10.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest",
+]
+
+[[package]]
 name = "sha3"
 version = "0.10.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1960,7 +2049,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 [[package]]
 name = "silentpayments"
 version = "0.5.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#595c53043d32dd04925dfe6538a7ef12b3250312"
+source = "git+https://github.com/Sosthene00/spdk?branch=psbt_integration#6dea3a4e5c70c48f2a6f68ac9cac0a8cb8616b0e"
 dependencies = [
  "bech32 0.9.1",
  "bimap",
@@ -2020,20 +2109,31 @@ dependencies = [
 [[package]]
 name = "spdk-core"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#595c53043d32dd04925dfe6538a7ef12b3250312"
+source = "git+https://github.com/Sosthene00/spdk?branch=psbt_integration#6dea3a4e5c70c48f2a6f68ac9cac0a8cb8616b0e"
 dependencies = [
  "anyhow",
  "async-trait",
+ "base64 0.22.1",
  "bitcoin 0.32.8",
+ "dnssec-prover",
  "futures",
+ "hex",
+ "hmac",
+ "psbt-v2",
+ "rust-dleq",
+ "secp256k1 0.29.1",
  "serde",
+ "serde_json",
+ "sha2",
  "silentpayments",
+ "tempfile",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
 name = "spdk-wallet"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#595c53043d32dd04925dfe6538a7ef12b3250312"
+source = "git+https://github.com/Sosthene00/spdk?branch=psbt_integration#6dea3a4e5c70c48f2a6f68ac9cac0a8cb8616b0e"
 dependencies = [
  "anyhow",
  "backend-blindbit-v1",
@@ -2103,6 +2203,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tempfile"
+version = "3.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d31c77bdf42a745371d260a26ca7163f1e0924b64afa0b688e61b5a9fa02f16"
+dependencies = [
+ "fastrand",
+ "getrandom 0.3.1",
+ "once_cell",
+ "rustix",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "termcolor"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2113,11 +2226,31 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
+version = "1.0.69"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
+dependencies = [
+ "thiserror-impl 1.0.69",
+]
+
+[[package]]
+name = "thiserror"
 version = "2.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d452f284b73e6d76dd36758a0c8684b1d5be31f92b89d07fd5822175732206fc"
 dependencies = [
- "thiserror-impl",
+ "thiserror-impl 2.0.11",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "1.0.69"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
