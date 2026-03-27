@@ -299,7 +299,7 @@ Future<void> migrateTxHistoryFromSharedPreferences() async {
 
   Logger().i("Migrating transaction history from SharedPreferences to SQLite");
 
-  final history = TxHistory.decode(encodedHistory: encoded);
+  final history = LegacyTxHistoryStruct.decode(encodedHistory: encoded);
   final transactions = history.toApiTransactions();
 
   final db = await DatabaseHelper.instance.database;

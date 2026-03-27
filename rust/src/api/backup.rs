@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::api::structs::network::ApiNetwork;
 
 use super::{
-    history::TxHistory,
+    history::LegacyTxHistoryStruct,
     wallet::{ApiScanKey, ApiSpendKey, SpWallet},
 };
 
@@ -169,7 +169,7 @@ pub struct WalletBackup {
     pub spend_key: ApiSpendKey,
     pub birthday: Option<u32>,
     pub network: ApiNetwork,
-    pub tx_history: TxHistory,
+    pub tx_history: LegacyTxHistoryStruct,
     pub seed_phrase: Option<String>,
     pub last_scan: u32,
 }
@@ -180,7 +180,7 @@ impl WalletBackup {
         wallet: SpWallet,
         birthday: Option<u32>,
         network: ApiNetwork,
-        tx_history: TxHistory,
+        tx_history: LegacyTxHistoryStruct,
         seed_phrase: Option<String>,
         last_scan: u32,
     ) -> Self {

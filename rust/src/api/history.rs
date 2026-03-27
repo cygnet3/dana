@@ -11,9 +11,9 @@ use anyhow::Result;
 /// Only kept for reading old wallet data from SharedPreferences during migration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[frb(opaque)]
-pub struct TxHistory(Vec<RecordedTransaction>);
+pub struct LegacyTxHistoryStruct(Vec<RecordedTransaction>);
 
-impl TxHistory {
+impl LegacyTxHistoryStruct {
     /// Create an empty transaction history.
     /// Only used for migration/backup compatibility.
     #[flutter_rust_bridge::frb(sync)]
