@@ -63,6 +63,6 @@ pub struct ApiRecordedTransactionOutgoing {
 pub struct ApiRecordedTransactionUnknownOutgoing {
     pub amount: ApiAmount,
     pub confirmation_height: u32,
-    pub confirmation_blockhash: String,
+    pub confirmation_blockhash: Option<String>,
     pub spent_outpoints: Vec<super::outpoint::OutPoint>,
 }
