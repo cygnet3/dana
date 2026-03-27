@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use spdk_wallet::bitcoin::OutPoint;
 use spdk_wallet::bitcoin::{absolute::Height, Amount, BlockHash, Txid};
 use spdk_wallet::client::Recipient;
 
@@ -20,7 +21,7 @@ pub struct RecordedTransactionIncoming {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct RecordedTransactionOutgoing {
     pub txid: Txid,
-    pub spent_outpoints: Vec<spdk_wallet::bitcoin::OutPoint>,
+    pub spent_outpoints: Vec<OutPoint>,
     pub recipients: Vec<Recipient>,
     pub confirmation_height: Option<Height>,
     pub confirmation_blockhash: Option<BlockHash>,
@@ -31,7 +32,7 @@ pub struct RecordedTransactionOutgoing {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct RecordedTransactionUnknownOutgoing {
-    pub spent_outpoints: Vec<crate::api::structs::outpoint::OutPoint>,
+    pub spent_outpoints: Vec<OutPoint>,
     pub amount: Amount,
     pub confirmation_height: Height,
     pub confirmation_blockhash: BlockHash,

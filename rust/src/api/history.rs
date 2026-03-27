@@ -25,8 +25,9 @@ impl TxHistory {
     /// Only used during migration from SharedPreferences to SQLite.
     #[flutter_rust_bridge::frb(sync)]
     pub fn decode(encoded_history: String) -> Result<Self> {
-        let decoded: Vec<ApiRecordedTransaction> = serde_json::from_str(&encoded_history)?;
-        Ok(Self(decoded.into_iter().map(Into::into).collect()))
+        let deserialized = serde_json::from_str(&encoded_history)?;
+
+        Ok(deserialized)
     }
 
     /// Convert to API transaction list for migration.
