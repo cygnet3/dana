@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::api::structs::network::ApiNetwork;
 
 use super::{
-    history::LegacyTxHistoryStruct,
+    legacy::history::LegacyTxHistoryStruct,
     wallet::{ApiScanKey, ApiSpendKey, SpWallet},
 };
 
