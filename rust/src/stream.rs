@@ -1,11 +1,7 @@
-use std::{
-    collections::HashSet,
-    sync::Mutex,
-};
+use std::{collections::HashSet, sync::Mutex};
 
-use crate::{
-    api::structs::amount::ApiAmount, frb_generated::StreamSink
-};
+use crate::api::structs::owned_output::OwnedOutput;
+use crate::frb_generated::StreamSink;
 use flutter_rust_bridge::frb;
 use lazy_static::lazy_static;
 
@@ -21,18 +17,6 @@ pub struct StateUpdate {
     pub blkhash: String,
     pub found_outputs: Vec<OwnedOutput>,
     pub found_inputs: HashSet<crate::api::structs::outpoint::OutPoint>,
-}
-
-#[derive(Debug, Clone)]
-#[frb]
-pub struct OwnedOutput {
-    pub txid: String,
-    pub vout: u32,
-    pub blockheight: u32,
-    pub tweak: [u8; 32],
-    pub amount: ApiAmount,
-    pub script: String,
-    pub label: Option<String>,
 }
 
 pub fn create_sync_progress_stream(s: StreamSink<u32>) {

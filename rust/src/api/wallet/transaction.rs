@@ -1,16 +1,16 @@
 use std::str::FromStr;
 
 use crate::api::structs::network::ApiNetwork;
+use crate::api::structs::owned_output::OwnedOutput;
 use crate::api::structs::recipient::ApiRecipient;
 use crate::api::structs::unsigned_transaction::ApiSilentPaymentUnsignedTransaction;
-use crate::stream::OwnedOutput;
 
 use anyhow::Result;
 use bip39::rand::{thread_rng, RngCore};
 use spdk_wallet::backend_blindbit_v1::BlindbitClient;
-use spdk_wallet::bitcoin::{ScriptBuf, Txid};
 use spdk_wallet::bitcoin::secp256k1::Scalar;
 use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex, OutPoint};
+use spdk_wallet::bitcoin::{ScriptBuf, Txid};
 use spdk_wallet::client::{FeeRate, Recipient, RecipientAddress, SpClient};
 use spdk_wallet::updater::DiscoveredOutput;
 
