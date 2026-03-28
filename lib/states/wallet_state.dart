@@ -43,7 +43,7 @@ class WalletState extends ChangeNotifier {
 
   // Cached data from SQLite (updated via _updateWalletState)
   late List<OwnedOutput> unspentOutputs;
-  late List<String> outpointsToScan;
+  late List<OutPoint> outpointsToScan;
   late List<RecordedTransaction> transactions;
 
   // this variable may change in some exceptional cases
@@ -71,11 +71,12 @@ class WalletState extends ChangeNotifier {
         await ownedOutputsRepository.insertOutput(output: found);
 
         // Check if this is a self-send (skip change outputs)
-        final isOwnTx = await txHistoryRepository.isOwnOutgoingTx(found.txid);
+        final isOwnTx =
+            await txHistoryRepository.isOwnOutgoingTx(found.outpoint.txid);
         if (!isOwnTx || found.label == null) {
           // Add incoming transaction
           await txHistoryRepository.addIncomingTransaction(
-            txid: found.txid,
+            txid: found.outpoint.txid,
             amountSat: found.amount,
             confirmationHeight: event.blkheight,
             confirmationBlockhash: event.blkhash,
@@ -99,8 +100,7 @@ class WalletState extends ChangeNotifier {
             // For unknown outgoing transactions we don't know the spending txid.
             // We store `tx_outgoing.txid = NULL` and link the outpoints via `tx_outgoing.id`.
             final spentAmountSat = await ownedOutputsRepository.getOutputAmount(
-              outpoint.txid,
-              outpoint.vout,
+              outpoint,
             );
             await txHistoryRepository.addOutgoingTransaction(
               spentOutpoints: [outpoint],

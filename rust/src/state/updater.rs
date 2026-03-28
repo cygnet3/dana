@@ -56,8 +56,7 @@ impl Updater for StateUpdater {
                 found_outputs: discovered_outputs
                     .into_iter()
                     .map(|(outpoint, output)| OwnedOutput {
-                        txid: outpoint.txid.to_string(),
-                        vout: outpoint.vout,
+                        outpoint: outpoint.into(),
                         tweak: output.tweak.to_be_bytes(),
                         amount: output.value.into(),
                         script: output.script_pubkey.to_hex_string(),

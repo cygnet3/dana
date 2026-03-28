@@ -1,10 +1,10 @@
-use std::{collections::HashMap, str::FromStr};
+use std::collections::HashMap;
 
 use anyhow::Result;
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
 use spdk_wallet::{
-    bitcoin::{Amount, OutPoint, ScriptBuf, Txid},
+    bitcoin::{Amount, OutPoint, ScriptBuf},
     silentpayments::receiving::Label,
 };
 
@@ -53,8 +53,7 @@ impl LegacyOwnedOutputsStruct {
 impl From<(OutPoint, LegacyOwnedOutputStruct)> for OwnedOutput {
     fn from((outpoint, value): (OutPoint, LegacyOwnedOutputStruct)) -> Self {
         OwnedOutput {
-            txid: outpoint.txid.to_string(),
-            vout: outpoint.vout,
+            outpoint: outpoint.into(),
             tweak: value.tweak,
             amount: value.amount.into(),
             script: value.script.to_hex_string(),
@@ -66,7 +65,7 @@ impl From<(OutPoint, LegacyOwnedOutputStruct)> for OwnedOutput {
 impl From<OwnedOutput> for (OutPoint, LegacyOwnedOutputStruct) {
     fn from(value: OwnedOutput) -> (OutPoint, LegacyOwnedOutputStruct) {
         (
-            OutPoint::new(Txid::from_str(&value.txid).unwrap(), value.vout),
+            value.outpoint.into(),
             LegacyOwnedOutputStruct {
                 tweak: value.tweak,
                 amount: value.amount.into(),

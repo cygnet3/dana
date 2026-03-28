@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/generated/rust/api/legacy/owned_outputs.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/owned_output.dart';
 import 'package:danawallet/generated/rust/lib.dart';
 import 'package:danawallet/repositories/database_helper.dart';
@@ -49,8 +50,8 @@ class OwnedOutputsRepository {
     final result = <OwnedOutput>[];
     for (final row in rows) {
       result.add(OwnedOutput(
-        txid: row['txid'] as String,
-        vout: row['vout'] as int,
+        outpoint:
+            OutPoint(txid: row['txid'] as String, vout: row['vout'] as int),
         tweak: U8Array32(row['tweak'] as Uint8List),
         amount: ApiAmountExtension.fromDbValue(row['amount_sat']),
         script: row['script'] as String,
@@ -61,7 +62,7 @@ class OwnedOutputsRepository {
   }
 
   /// Get all unspent outpoints to pass to the scanner (so it can detect spends).
-  Future<List<String>> getUnspentOutpoints() async {
+  Future<List<OutPoint>> getUnspentOutpoints() async {
     final db = await _db;
     final rows = await db.rawQuery('''
       SELECT o.txid, o.vout
@@ -70,16 +71,19 @@ class OwnedOutputsRepository {
       WHERE s.tx_outgoing_id IS NULL
     ''');
 
-    return rows.map((row) => '${row['txid']}:${row['vout']}').toList();
+    return rows
+        .map((row) =>
+            OutPoint(txid: row['txid'] as String, vout: row['vout'] as int))
+        .toList();
   }
 
   /// Get amount for a specific outpoint.
-  Future<int?> getOutputAmount(String txid, int vout) async {
+  Future<int?> getOutputAmount(OutPoint outpoint) async {
     final db = await _db;
     final rows = await db.rawQuery('''
       SELECT amount_sat FROM owned_outputs 
       WHERE txid = ? AND vout = ?
-    ''', [txid, vout]);
+    ''', [outpoint.txid, outpoint.vout]);
 
     if (rows.isEmpty) return null;
     return rows.first['amount_sat'] as int;
@@ -96,8 +100,8 @@ class OwnedOutputsRepository {
           txid, vout, tweak, amount_sat, script, label
         ) VALUES (?, ?, ?, ?, ?, ?)
       ''', [
-        output.txid,
-        output.vout,
+        output.outpoint.txid,
+        output.outpoint.vout,
         Uint8List.fromList(output.tweak),
         output.amount.toSat(),
         output.script,
@@ -143,8 +147,8 @@ Future<void> migrateOutputsFromSharedPreferences() async {
   await db.transaction((txn) async {
     for (final output in outputs) {
       await txn.insert('owned_outputs', {
-        'txid': output.txid,
-        'vout': output.vout,
+        'txid': output.outpoint.txid,
+        'vout': output.outpoint.vout,
         'tweak': Uint8List.fromList(output.tweak.toList()),
         'amount_sat': output.amount.toSat(),
         'script': output.script,
