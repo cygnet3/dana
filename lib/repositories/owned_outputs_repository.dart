@@ -1,7 +1,7 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:danawallet/extensions/api_amount.dart';
+import 'package:danawallet/generated/rust/api/legacy/owned_outputs.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/owned_output.dart';
 import 'package:danawallet/generated/rust/lib.dart';
@@ -129,47 +129,34 @@ class OwnedOutputsRepository {
 /// migrates it into SQLite and removes the old key.
 ///
 /// LEGACY: can be removed once no users remain on pre-SQLite versions.
-///
-/// The old spend_status was a serde enum:
-///   "Unspent"              → unspent (no entry in tx_spent_outpoints)
-///   {"Spent": "txid"}      → spent status derived from tx_spent_outpoints,
-///                            populated later by migrateTxHistoryFromSharedPreferences
-///   {"Mined": "blockhash"} → same as Spent
 Future<void> migrateOutputsFromSharedPreferences() async {
   final prefs = SharedPreferencesAsync();
-  final json = await prefs.getString('ownedoutputs');
-  if (json == null) return;
+  final encoded = await prefs.getString('ownedoutputs');
+  if (encoded == null) return;
 
   Logger().i("Migrating owned outputs from SharedPreferences to SQLite");
 
-  final Map<String, dynamic> decoded = jsonDecode(json);
+  final decoded = LegacyOwnedOutputsStruct.decode(encodedOutputs: encoded);
+  final outputs = decoded.toApiOwnedOutputs();
+
   int migrated = 0;
 
   final db = await DatabaseHelper.instance.database;
   await db.transaction((txn) async {
-    for (final entry in decoded.entries) {
-      final Map<String, dynamic> output = entry.value;
-      final outpoint = _parseOutpoint(entry.key);
-      final List<dynamic> tweakList = output['tweak'];
-
+    for (final output in outputs) {
       await txn.insert('owned_outputs', {
-        'txid': outpoint.$1,
-        'vout': outpoint.$2,
-        'blockheight': output['blockheight'] as int,
-        'tweak': Uint8List.fromList(tweakList.cast<int>()),
-        'amount': output['amount'] as int,
-        'script': output['script'] as String,
-        'label': output['label'] as String?,
+        'txid': output.txid,
+        'vout': output.vout,
+        'blockheight': output.blockheight,
+        'tweak': Uint8List.fromList(output.tweak.toList()),
+        'amount': output.amount.toSat(),
+        'script': output.script,
+        'label': output.label,
       });
       migrated++;
     }
   });
 
-  Logger().i("Migrated $migrated outputs (of ${decoded.length} total)");
+  Logger().i("Migrated $migrated outputs (of ${outputs.length} total)");
   await prefs.remove('ownedoutputs');
-}
-
-(String, int) _parseOutpoint(String outpoint) {
-  final parts = outpoint.split(':');
-  return (parts[0], int.parse(parts[1]));
 }

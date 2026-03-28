@@ -38,11 +38,21 @@ impl LegacyTxHistoryStruct {
         Ok(deserialized)
     }
 
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn encode(&self) -> Result<String> {
+        Ok(serde_json::to_string(&self)?)
+    }
+
     /// Convert to API transaction list for migration.
     /// Only used during migration from SharedPreferences to SQLite.
     #[flutter_rust_bridge::frb(sync)]
     pub fn to_api_transactions(&self) -> Vec<RecordedTransaction> {
         self.0.iter().map(|x| x.clone().into()).collect()
+    }
+
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn from_api_transactions(txs: Vec<RecordedTransaction>) -> Self {
+        Self(txs.into_iter().map(Into::into).collect())
     }
 }
 
@@ -95,16 +105,12 @@ impl From<RecordedTransaction> for LegacyRecordedTransactionStruct {
         match value {
             RecordedTransaction::Incoming(incoming) => Self::Incoming(incoming.into()),
             RecordedTransaction::Outgoing(outgoing) => Self::Outgoing(outgoing.into()),
-            RecordedTransaction::UnknownOutgoing(unknown) => {
-                Self::UnknownOutgoing(unknown.into())
-            }
+            RecordedTransaction::UnknownOutgoing(unknown) => Self::UnknownOutgoing(unknown.into()),
         }
     }
 }
 
-impl From<LegacyRecordedTransactionUnknownOutgoingStruct>
-    for RecordedTransactionUnknownOutgoing
-{
+impl From<LegacyRecordedTransactionUnknownOutgoingStruct> for RecordedTransactionUnknownOutgoing {
     fn from(value: LegacyRecordedTransactionUnknownOutgoingStruct) -> Self {
         Self {
             confirmation_height: value.confirmed_at.to_consensus_u32(),
@@ -119,9 +125,7 @@ impl From<LegacyRecordedTransactionUnknownOutgoingStruct>
     }
 }
 
-impl From<RecordedTransactionUnknownOutgoing>
-    for LegacyRecordedTransactionUnknownOutgoingStruct
-{
+impl From<RecordedTransactionUnknownOutgoing> for LegacyRecordedTransactionUnknownOutgoingStruct {
     fn from(value: RecordedTransactionUnknownOutgoing) -> Self {
         Self {
             amount: value.amount.into(),
