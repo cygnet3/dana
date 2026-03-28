@@ -44,7 +44,7 @@ class WalletState extends ChangeNotifier {
   // Cached data from SQLite (updated via _updateWalletState)
   late List<OwnedOutput> unspentOutputs;
   late List<String> outpointsToScan;
-  late List<ApiRecordedTransaction> transactions;
+  late List<RecordedTransaction> transactions;
 
   // this variable may change in some exceptional cases
   Bip353Address? danaAddress;
@@ -68,9 +68,7 @@ class WalletState extends ChangeNotifier {
       // Process found outputs (new UTXOs we own)
       for (final found in event.foundOutputs) {
         // Insert output into database
-        await ownedOutputsRepository.insertOutput(
-          output: found
-        );
+        await ownedOutputsRepository.insertOutput(output: found);
 
         // Check if this is a self-send (skip change outputs)
         final isOwnTx = await txHistoryRepository.isOwnOutgoingTx(found.txid);
@@ -105,21 +103,23 @@ class WalletState extends ChangeNotifier {
               outpoint.vout,
             );
             await txHistoryRepository.addOutgoingTransaction(
-              spentOutpoints: [outpoint], 
-              recipients: [], 
+              spentOutpoints: [outpoint],
+              recipients: [],
               changeSat: null, // unknown for externally-created spend
               feeSat: null, // unknown for externally-created spend
               txid: null,
               amountSpentSat: spentAmountSat ?? 0,
-            ); 
-            final confirmed = await txHistoryRepository.confirmOutgoingTransaction(
+            );
+            final confirmed =
+                await txHistoryRepository.confirmOutgoingTransaction(
               spentOutpointTxid: outpoint.txid,
               spentOutpointVout: outpoint.vout,
               confirmationHeight: event.blkheight,
               confirmationBlockhash: event.blkhash,
             );
             if (!confirmed) {
-              throw Exception("Failed to confirm unknown outgoing transaction for ${outpoint.toDisplayString()}");
+              throw Exception(
+                  "Failed to confirm unknown outgoing transaction for ${outpoint.toDisplayString()}");
             }
           } catch (e) {
             Logger().e("Failed to add unknown outgoing transaction: $e");
@@ -288,7 +288,8 @@ class WalletState extends ChangeNotifier {
     // Cache outputs for spending and scanning
     unspentOutputs = await ownedOutputsRepository.getUnspentOutputs();
     final unspentOutpoints = await ownedOutputsRepository.getUnspentOutpoints();
-    final unconfirmedSpentOutpoints = await txHistoryRepository.getUnconfirmedSpentOutpoints();
+    final unconfirmedSpentOutpoints =
+        await txHistoryRepository.getUnconfirmedSpentOutpoints();
     outpointsToScan = [...unspentOutpoints, ...unconfirmedSpentOutpoints];
 
     // Cache transactions for UI

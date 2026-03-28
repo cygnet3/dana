@@ -1,5 +1,5 @@
 import 'package:danawallet/extensions/api_amount.dart';
-import 'package:danawallet/generated/rust/api/history.dart';
+import 'package:danawallet/generated/rust/api/legacy/history.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
@@ -25,7 +25,7 @@ class TxHistoryRepository {
   }
 
   /// Get all transactions for UI display.
-  Future<List<ApiRecordedTransaction>> getAllTransactions() async {
+  Future<List<RecordedTransaction>> getAllTransactions() async {
     final db = await _db;
 
     // Get all incoming transactions
@@ -42,17 +42,17 @@ class TxHistoryRepository {
       ORDER BY created_at DESC
     ''');
 
-    final result = <ApiRecordedTransaction>[];
+    final result = <RecordedTransaction>[];
 
     // Process incoming transactions
     for (final row in incomingRows) {
       final txid = row['txid'] as String;
 
-      result.add(ApiRecordedTransaction.incoming(
-        ApiRecordedTransactionIncoming(
+      result.add(RecordedTransaction.incoming(
+        RecordedTransactionIncoming(
           txid: txid,
-          amount: ApiAmount(
-              field0: BigInt.from(row['amount_received_sat'] as int)),
+          amount:
+              ApiAmount(field0: BigInt.from(row['amount_received_sat'] as int)),
           confirmationHeight: row['confirmation_height'] as int?,
           confirmationBlockhash: row['confirmation_blockhash'] as String?,
         ),
@@ -72,7 +72,9 @@ class TxHistoryRepository {
         WHERE tx_outgoing_id = ?
       ''', [txOutgoingId]);
       final spentOutpoints = spentRows
-          .map((r) => OutPoint(txid: r['outpoint_txid'] as String, vout: r['outpoint_vout'] as int))
+          .map((r) => OutPoint(
+              txid: r['outpoint_txid'] as String,
+              vout: r['outpoint_vout'] as int))
           .toList();
 
       // Fetch recipients (empty for unknown-outgoing)
@@ -89,8 +91,8 @@ class TxHistoryRepository {
           .toList();
 
       if (txid == null) {
-        result.add(ApiRecordedTransaction.unknownOutgoing(
-          ApiRecordedTransactionUnknownOutgoing(
+        result.add(RecordedTransaction.unknownOutgoing(
+          RecordedTransactionUnknownOutgoing(
             amount: ApiAmount(field0: BigInt.from(amountSpentSat)),
             confirmationHeight: row['confirmation_height'] as int,
             confirmationBlockhash: row['confirmation_blockhash'] as String?,
@@ -98,8 +100,8 @@ class TxHistoryRepository {
           ),
         ));
       } else {
-        result.add(ApiRecordedTransaction.outgoing(
-          ApiRecordedTransactionOutgoing(
+        result.add(RecordedTransaction.outgoing(
+          RecordedTransactionOutgoing(
             txid: txid,
             spentOutpoints: spentOutpoints,
             recipients: recipients,
@@ -115,13 +117,13 @@ class TxHistoryRepository {
 
     // Sort by confirmation height (most recent first)
     result.sort((a, b) {
-      int getConfirmationHeight(ApiRecordedTransaction tx) {
+      int getConfirmationHeight(RecordedTransaction tx) {
         return switch (tx) {
-          ApiRecordedTransaction_Incoming(:final field0) =>
+          RecordedTransaction_Incoming(:final field0) =>
             field0.confirmationHeight ?? 9999999999,
-          ApiRecordedTransaction_Outgoing(:final field0) =>
+          RecordedTransaction_Outgoing(:final field0) =>
             field0.confirmationHeight ?? 9999999999,
-          ApiRecordedTransaction_UnknownOutgoing(:final field0) =>
+          RecordedTransaction_UnknownOutgoing(:final field0) =>
             field0.confirmationHeight,
         };
       }
@@ -314,9 +316,9 @@ Future<void> migrateTxHistoryFromSharedPreferences() async {
 }
 
 Future<void> _insertTransaction(
-    DatabaseExecutor executor, ApiRecordedTransaction tx) async {
+    DatabaseExecutor executor, RecordedTransaction tx) async {
   switch (tx) {
-    case ApiRecordedTransaction_Incoming(:final field0):
+    case RecordedTransaction_Incoming(:final field0):
       await executor.insert('tx_incoming', {
         'txid': field0.txid,
         'amount_received_sat': field0.amount.field0.toInt(),
@@ -325,7 +327,7 @@ Future<void> _insertTransaction(
       });
       break;
 
-    case ApiRecordedTransaction_Outgoing(:final field0):
+    case RecordedTransaction_Outgoing(:final field0):
       final totalAmount = field0.recipients
           .fold<int>(0, (sum, r) => sum + r.amount.field0.toInt());
 
@@ -355,7 +357,7 @@ Future<void> _insertTransaction(
       }
       break;
 
-    case ApiRecordedTransaction_UnknownOutgoing(:final field0):
+    case RecordedTransaction_UnknownOutgoing(:final field0):
       final txOutgoingId = await executor.insert('tx_outgoing', {
         'txid': null,
         'amount_spent_sat': field0.amount.toSat(),

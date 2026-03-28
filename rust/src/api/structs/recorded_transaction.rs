@@ -4,28 +4,28 @@ use serde::{Deserialize, Serialize};
 use crate::api::structs::amount::ApiAmount;
 use crate::api::structs::recipient::ApiRecipient;
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum ApiRecordedTransaction {
-    Incoming(ApiRecordedTransactionIncoming),
-    Outgoing(ApiRecordedTransactionOutgoing),
-    UnknownOutgoing(ApiRecordedTransactionUnknownOutgoing),
+pub enum RecordedTransaction {
+    Incoming(RecordedTransactionIncoming),
+    Outgoing(RecordedTransactionOutgoing),
+    UnknownOutgoing(RecordedTransactionUnknownOutgoing),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct ApiRecordedTransactionIncoming {
+pub struct RecordedTransactionIncoming {
     pub txid: String,
     pub amount: ApiAmount,
     pub confirmation_height: Option<u32>,
     pub confirmation_blockhash: Option<String>,
 }
 
-impl ApiRecordedTransactionIncoming {
+impl RecordedTransactionIncoming {
     #[frb(sync)]
     pub fn to_string(&self) -> String {
         serde_json::to_string_pretty(&self).unwrap()
     }
 }
 
-impl ApiRecordedTransactionOutgoing {
+impl RecordedTransactionOutgoing {
     #[frb(sync)]
     pub fn to_string(&self) -> String {
         serde_json::to_string_pretty(&self).unwrap()
@@ -41,7 +41,7 @@ impl ApiRecordedTransactionOutgoing {
     }
 }
 
-impl ApiRecordedTransactionUnknownOutgoing {
+impl RecordedTransactionUnknownOutgoing {
     #[frb(sync)]
     pub fn to_string(&self) -> String {
         serde_json::to_string_pretty(&self).unwrap()
@@ -49,7 +49,7 @@ impl ApiRecordedTransactionUnknownOutgoing {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct ApiRecordedTransactionOutgoing {
+pub struct RecordedTransactionOutgoing {
     pub txid: String,
     pub spent_outpoints: Vec<super::outpoint::OutPoint>,
     pub recipients: Vec<ApiRecipient>,
@@ -60,7 +60,7 @@ pub struct ApiRecordedTransactionOutgoing {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct ApiRecordedTransactionUnknownOutgoing {
+pub struct RecordedTransactionUnknownOutgoing {
     pub amount: ApiAmount,
     pub confirmation_height: u32,
     pub confirmation_blockhash: Option<String>,

@@ -314,7 +314,7 @@ class ContactDetailsScreen extends StatelessWidget {
     );
   }
 
-  List<ApiRecordedTransaction> _getSentTransactions(
+  List<RecordedTransaction> _getSentTransactions(
       BuildContext context, Contact contact) {
     final walletState = Provider.of<WalletState>(context, listen: false);
     final allTransactions = walletState.transactions;
@@ -322,7 +322,7 @@ class ContactDetailsScreen extends StatelessWidget {
 
     // Filter to only outgoing transactions where recipient matches this contact's SP address
     return allTransactions.where((tx) {
-      if (tx is ApiRecordedTransaction_Outgoing) {
+      if (tx is RecordedTransaction_Outgoing) {
         // Check if any recipient matches the contact's SP address
         return tx.field0.recipients
             .any((recipient) => recipient.paymentCode == contactPaymentCode);
@@ -331,10 +331,10 @@ class ContactDetailsScreen extends StatelessWidget {
     }).toList();
   }
 
-  ListTile _buildTransactionTile(ApiRecordedTransaction tx,
+  ListTile _buildTransactionTile(RecordedTransaction tx,
       FiatExchangeRateState exchangeRate, Contact contact) {
     // Only handle outgoing transactions (we filter for those)
-    if (tx is! ApiRecordedTransaction_Outgoing) {
+    if (tx is! RecordedTransaction_Outgoing) {
       throw Exception('Expected outgoing transaction');
     }
 
