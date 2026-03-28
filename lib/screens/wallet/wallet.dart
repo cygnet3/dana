@@ -257,7 +257,7 @@ class WalletScreenState extends State<WalletScreen> {
   }
 
   ListTile toListTile(
-      ApiRecordedTransaction tx, FiatExchangeRateState exchangeRate) {
+      RecordedTransaction tx, FiatExchangeRateState exchangeRate) {
     Color? color;
     String amount;
     String amountprefix;
@@ -271,7 +271,7 @@ class WalletScreenState extends State<WalletScreen> {
     final contactsState = Provider.of<ContactsState>(context);
 
     switch (tx) {
-      case ApiRecordedTransaction_Incoming(:final field0):
+      case RecordedTransaction_Incoming(:final field0):
         recipientWidget = Text(
           'Incoming',
           style: BitcoinTextStyle.body4(Bitcoin.black),
@@ -288,7 +288,7 @@ class WalletScreenState extends State<WalletScreen> {
         image = Image(
             image: const AssetImage("icons/receive.png", package: "bitcoin_ui"),
             color: Bitcoin.neutral3Dark);
-      case ApiRecordedTransaction_Outgoing(:final field0):
+      case RecordedTransaction_Outgoing(:final field0):
         final paymentCode = field0.recipients.isNotEmpty
             ? field0.recipients[0].paymentCode
             : null;
@@ -313,7 +313,7 @@ class WalletScreenState extends State<WalletScreen> {
             image: const AssetImage("icons/send.png", package: "bitcoin_ui"),
             color: Bitcoin.neutral3Dark);
 
-      case ApiRecordedTransaction_UnknownOutgoing(:final field0):
+      case RecordedTransaction_UnknownOutgoing(:final field0):
         recipientWidget = Text(
           'Unknown',
           style: BitcoinTextStyle.body4(Bitcoin.black),
@@ -359,7 +359,7 @@ class WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget buildTransactionHistory(List<ApiRecordedTransaction> transactions,
+  Widget buildTransactionHistory(List<RecordedTransaction> transactions,
       FiatExchangeRateState exchangeRate) {
     Widget history;
     if (transactions.isEmpty) {
@@ -589,8 +589,7 @@ class WalletScreenState extends State<WalletScreen> {
     // Check if balance is zero
     bool isBalanceZero = amount.field0 == BigInt.zero;
     // Check if there's transaction history
-    bool hasTransactionHistory =
-        walletState.transactions.isNotEmpty;
+    bool hasTransactionHistory = walletState.transactions.isNotEmpty;
 
     // Show funding screen only if balance is zero AND there's no transaction history
     bool showFundingScreen = isBalanceZero && !hasTransactionHistory;

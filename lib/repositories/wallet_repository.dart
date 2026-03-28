@@ -1,7 +1,7 @@
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/generated/rust/api/backup.dart';
-import 'package:danawallet/generated/rust/api/history.dart';
+import 'package:danawallet/generated/rust/api/legacy/history.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:danawallet/generated/rust/api/wallet/setup.dart';
@@ -195,7 +195,6 @@ class WalletRepository {
       await secureStorage.write(key: _keySeedPhrase, value: backup.seedPhrase);
     }
 
-    await saveLastSync(backup.lastScan); 
+    await saveLastSync(backup.lastScan);
   }
-
 }

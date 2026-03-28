@@ -8,8 +8,8 @@ use spdk_wallet::bitcoin::{absolute::Height, Amount, Txid};
 use spdk_wallet::client::Recipient;
 
 use crate::api::structs::recorded_transaction::{
-    ApiRecordedTransaction, ApiRecordedTransactionIncoming, ApiRecordedTransactionOutgoing,
-    ApiRecordedTransactionUnknownOutgoing,
+    RecordedTransaction, RecordedTransactionIncoming, RecordedTransactionOutgoing,
+    RecordedTransactionUnknownOutgoing,
 };
 
 use anyhow::Result;
@@ -41,7 +41,7 @@ impl LegacyTxHistoryStruct {
     /// Convert to API transaction list for migration.
     /// Only used during migration from SharedPreferences to SQLite.
     #[flutter_rust_bridge::frb(sync)]
-    pub fn to_api_transactions(&self) -> Vec<ApiRecordedTransaction> {
+    pub fn to_api_transactions(&self) -> Vec<RecordedTransaction> {
         self.0.iter().map(|x| x.clone().into()).collect()
     }
 }
@@ -78,7 +78,7 @@ pub struct LegacyRecordedTransactionUnknownOutgoingStruct {
     confirmed_at: Height,
 }
 
-impl From<LegacyRecordedTransactionStruct> for ApiRecordedTransaction {
+impl From<LegacyRecordedTransactionStruct> for RecordedTransaction {
     fn from(value: LegacyRecordedTransactionStruct) -> Self {
         match value {
             LegacyRecordedTransactionStruct::Incoming(incoming) => Self::Incoming(incoming.into()),
@@ -90,12 +90,12 @@ impl From<LegacyRecordedTransactionStruct> for ApiRecordedTransaction {
     }
 }
 
-impl From<ApiRecordedTransaction> for LegacyRecordedTransactionStruct {
-    fn from(value: ApiRecordedTransaction) -> Self {
+impl From<RecordedTransaction> for LegacyRecordedTransactionStruct {
+    fn from(value: RecordedTransaction) -> Self {
         match value {
-            ApiRecordedTransaction::Incoming(incoming) => Self::Incoming(incoming.into()),
-            ApiRecordedTransaction::Outgoing(outgoing) => Self::Outgoing(outgoing.into()),
-            ApiRecordedTransaction::UnknownOutgoing(unknown) => {
+            RecordedTransaction::Incoming(incoming) => Self::Incoming(incoming.into()),
+            RecordedTransaction::Outgoing(outgoing) => Self::Outgoing(outgoing.into()),
+            RecordedTransaction::UnknownOutgoing(unknown) => {
                 Self::UnknownOutgoing(unknown.into())
             }
         }
@@ -103,7 +103,7 @@ impl From<ApiRecordedTransaction> for LegacyRecordedTransactionStruct {
 }
 
 impl From<LegacyRecordedTransactionUnknownOutgoingStruct>
-    for ApiRecordedTransactionUnknownOutgoing
+    for RecordedTransactionUnknownOutgoing
 {
     fn from(value: LegacyRecordedTransactionUnknownOutgoingStruct) -> Self {
         Self {
@@ -119,10 +119,10 @@ impl From<LegacyRecordedTransactionUnknownOutgoingStruct>
     }
 }
 
-impl From<ApiRecordedTransactionUnknownOutgoing>
+impl From<RecordedTransactionUnknownOutgoing>
     for LegacyRecordedTransactionUnknownOutgoingStruct
 {
-    fn from(value: ApiRecordedTransactionUnknownOutgoing) -> Self {
+    fn from(value: RecordedTransactionUnknownOutgoing) -> Self {
         Self {
             amount: value.amount.into(),
             confirmed_at: Height::from_consensus(value.confirmation_height).unwrap(),
@@ -135,7 +135,7 @@ impl From<ApiRecordedTransactionUnknownOutgoing>
     }
 }
 
-impl From<LegacyRecordedTransactionIncomingStruct> for ApiRecordedTransactionIncoming {
+impl From<LegacyRecordedTransactionIncomingStruct> for RecordedTransactionIncoming {
     fn from(value: LegacyRecordedTransactionIncomingStruct) -> Self {
         let confirmation_height = value.confirmed_at.map(|height| height.to_consensus_u32());
         let confirmation_blockhash = None;
@@ -149,8 +149,8 @@ impl From<LegacyRecordedTransactionIncomingStruct> for ApiRecordedTransactionInc
     }
 }
 
-impl From<ApiRecordedTransactionIncoming> for LegacyRecordedTransactionIncomingStruct {
-    fn from(value: ApiRecordedTransactionIncoming) -> Self {
+impl From<RecordedTransactionIncoming> for LegacyRecordedTransactionIncomingStruct {
+    fn from(value: RecordedTransactionIncoming) -> Self {
         let confirmation_height = value
             .confirmation_height
             .map(|height| Height::from_consensus(height).unwrap());
@@ -163,7 +163,7 @@ impl From<ApiRecordedTransactionIncoming> for LegacyRecordedTransactionIncomingS
     }
 }
 
-impl From<LegacyRecordedTransactionOutgoingStruct> for ApiRecordedTransactionOutgoing {
+impl From<LegacyRecordedTransactionOutgoingStruct> for RecordedTransactionOutgoing {
     fn from(value: LegacyRecordedTransactionOutgoingStruct) -> Self {
         let confirmation_height = value.confirmed_at.map(|height| height.to_consensus_u32());
         let confirmation_blockhash = None;
@@ -184,8 +184,8 @@ impl From<LegacyRecordedTransactionOutgoingStruct> for ApiRecordedTransactionOut
     }
 }
 
-impl From<ApiRecordedTransactionOutgoing> for LegacyRecordedTransactionOutgoingStruct {
-    fn from(value: ApiRecordedTransactionOutgoing) -> Self {
+impl From<RecordedTransactionOutgoing> for LegacyRecordedTransactionOutgoingStruct {
+    fn from(value: RecordedTransactionOutgoing) -> Self {
         let confirmed_at = value
             .confirmation_height
             .map(|height| Height::from_consensus(height).unwrap());
