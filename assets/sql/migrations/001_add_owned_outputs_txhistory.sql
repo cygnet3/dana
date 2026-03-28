@@ -2,7 +2,7 @@ CREATE TABLE owned_outputs (
   txid TEXT NOT NULL,
   vout INTEGER NOT NULL,
   tweak BLOB NOT NULL,
-  amount INTEGER NOT NULL,
+  amount_sat INTEGER NOT NULL,
   script TEXT NOT NULL,
   label TEXT,
   created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
@@ -78,7 +78,7 @@ CREATE TABLE tx_recipients (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   tx_outgoing_id INTEGER NOT NULL,
   payment_code TEXT NOT NULL,
-  amount INTEGER NOT NULL,
+  amount_sat INTEGER NOT NULL,
   FOREIGN KEY (tx_outgoing_id) REFERENCES tx_outgoing(id) ON DELETE CASCADE
 );
 CREATE INDEX idx_recipients_tx_outgoing_id ON tx_recipients(tx_outgoing_id);

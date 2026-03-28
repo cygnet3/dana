@@ -79,14 +79,14 @@ class TxHistoryRepository {
 
       // Fetch recipients (empty for unknown-outgoing)
       final recipientRows = await db.rawQuery('''
-        SELECT payment_code, amount
+        SELECT payment_code, amount_sat
         FROM tx_recipients
         WHERE tx_outgoing_id = ?
       ''', [txOutgoingId]);
       final recipients = recipientRows
           .map((r) => ApiRecipient(
                 paymentCode: r['payment_code'] as String,
-                amount: ApiAmount(field0: BigInt.from(r['amount'] as int)),
+                amount: ApiAmount(field0: BigInt.from(r['amount_sat'] as int)),
               ))
           .toList();
 
@@ -214,7 +214,7 @@ class TxHistoryRepository {
 
       for (final recipient in recipients) {
         await txn.rawInsert('''
-          INSERT INTO tx_recipients (tx_outgoing_id, payment_code, amount)
+          INSERT INTO tx_recipients (tx_outgoing_id, payment_code, amount_sat)
           VALUES (?, ?, ?)
         ''', [txOutgoingId, recipient.paymentCode, recipient.amount.toSat()]);
       }
@@ -352,7 +352,7 @@ Future<void> _insertTransaction(
         await executor.insert('tx_recipients', {
           'tx_outgoing_id': txOutgoingId,
           'payment_code': recipient.paymentCode,
-          'amount': recipient.amount.toSat(),
+          'amount_sat': recipient.amount.toSat(),
         });
       }
       break;

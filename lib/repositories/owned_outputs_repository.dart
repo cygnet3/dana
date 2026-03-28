@@ -28,7 +28,7 @@ class OwnedOutputsRepository {
   Future<ApiAmount> getUnspentBalance() async {
     final db = await _db;
     final result = await db.rawQuery('''
-      SELECT COALESCE(SUM(o.amount), 0) as total
+      SELECT COALESCE(SUM(o.amount_sat), 0) as total
       FROM owned_outputs o
       LEFT JOIN tx_spent_outpoints s ON s.outpoint_txid = o.txid AND s.outpoint_vout = o.vout
       WHERE s.tx_outgoing_id IS NULL
@@ -52,7 +52,7 @@ class OwnedOutputsRepository {
         txid: row['txid'] as String,
         vout: row['vout'] as int,
         tweak: U8Array32(row['tweak'] as Uint8List),
-        amount: ApiAmountExtension.fromDbValue(row['amount']),
+        amount: ApiAmountExtension.fromDbValue(row['amount_sat']),
         script: row['script'] as String,
         label: row['label'] as String?,
       ));
@@ -77,12 +77,12 @@ class OwnedOutputsRepository {
   Future<int?> getOutputAmount(String txid, int vout) async {
     final db = await _db;
     final rows = await db.rawQuery('''
-      SELECT amount FROM owned_outputs 
+      SELECT amount_sat FROM owned_outputs 
       WHERE txid = ? AND vout = ?
     ''', [txid, vout]);
 
     if (rows.isEmpty) return null;
-    return rows.first['amount'] as int;
+    return rows.first['amount_sat'] as int;
   }
 
   /// Insert a new output (during scanning).
@@ -93,7 +93,7 @@ class OwnedOutputsRepository {
     try {
       await db.rawInsert('''
         INSERT OR FAIL INTO owned_outputs (
-          txid, vout, tweak, amount, script, label
+          txid, vout, tweak, amount_sat, script, label
         ) VALUES (?, ?, ?, ?, ?, ?)
       ''', [
         output.txid,
@@ -146,7 +146,7 @@ Future<void> migrateOutputsFromSharedPreferences() async {
         'txid': output.txid,
         'vout': output.vout,
         'tweak': Uint8List.fromList(output.tweak.toList()),
-        'amount': output.amount.toSat(),
+        'amount_sat': output.amount.toSat(),
         'script': output.script,
         'label': output.label,
       });
