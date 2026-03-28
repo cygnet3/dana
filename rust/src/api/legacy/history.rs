@@ -8,11 +8,10 @@ use spdk_wallet::bitcoin::{absolute::Height, Amount, Txid};
 use spdk_wallet::client::Recipient;
 
 use crate::api::structs::recorded_transaction::{
-    ApiRecordedTransactionIncoming, ApiRecordedTransactionOutgoing,
+    ApiRecordedTransaction, ApiRecordedTransactionIncoming, ApiRecordedTransactionOutgoing,
     ApiRecordedTransactionUnknownOutgoing,
 };
 
-use super::structs::recorded_transaction::ApiRecordedTransaction;
 use anyhow::Result;
 
 /// Legacy TxHistory type for migration only.
