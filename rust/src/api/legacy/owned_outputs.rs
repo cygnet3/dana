@@ -4,7 +4,7 @@ use anyhow::Result;
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
 use spdk_wallet::{
-    bitcoin::{absolute::Height, Amount, OutPoint, ScriptBuf, Txid},
+    bitcoin::{Amount, OutPoint, ScriptBuf, Txid},
     silentpayments::receiving::Label,
 };
 
@@ -16,7 +16,6 @@ pub struct LegacyOwnedOutputsStruct(HashMap<OutPoint, LegacyOwnedOutputStruct>);
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub(crate) struct LegacyOwnedOutputStruct {
-    blockheight: Height,
     tweak: [u8; 32], // scalar in big endian format
     amount: Amount,
     script: ScriptBuf,
@@ -56,7 +55,6 @@ impl From<(OutPoint, LegacyOwnedOutputStruct)> for OwnedOutput {
         OwnedOutput {
             txid: outpoint.txid.to_string(),
             vout: outpoint.vout,
-            blockheight: value.blockheight.to_consensus_u32(),
             tweak: value.tweak,
             amount: value.amount.into(),
             script: value.script.to_hex_string(),
@@ -70,7 +68,6 @@ impl From<OwnedOutput> for (OutPoint, LegacyOwnedOutputStruct) {
         (
             OutPoint::new(Txid::from_str(&value.txid).unwrap(), value.vout),
             LegacyOwnedOutputStruct {
-                blockheight: Height::from_consensus(value.blockheight).unwrap(),
                 tweak: value.tweak,
                 amount: value.amount.into(),
                 script: ScriptBuf::from_hex(&value.script).unwrap(),

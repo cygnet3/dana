@@ -1,7 +1,6 @@
 CREATE TABLE owned_outputs (
   txid TEXT NOT NULL,
   vout INTEGER NOT NULL,
-  blockheight INTEGER NOT NULL,
   tweak BLOB NOT NULL,
   amount INTEGER NOT NULL,
   script TEXT NOT NULL,
@@ -9,7 +8,6 @@ CREATE TABLE owned_outputs (
   created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
   PRIMARY KEY (txid, vout)
 );
-CREATE INDEX idx_outputs_blockheight ON owned_outputs(blockheight);
 CREATE INDEX idx_outputs_txid ON owned_outputs(txid);
 
 -- INCOMING TRANSACTIONS
