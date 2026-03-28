@@ -9,7 +9,10 @@ use spdk_wallet::{
     updater::DiscoveredOutput,
 };
 
-use crate::stream::{OwnedOutput, StateUpdate, send_sync_progress, send_sync_update};
+use crate::{
+    api::structs::owned_output::OwnedOutput,
+    stream::{send_sync_progress, send_sync_update, StateUpdate},
+};
 
 use anyhow::Result;
 
@@ -50,16 +53,22 @@ impl Updater for StateUpdater {
             let update = StateUpdate {
                 blkheight: blkheight.to_consensus_u32(),
                 blkhash: blkhash.to_string(),
-                found_outputs: discovered_outputs.into_iter().map(|(outpoint, output)| OwnedOutput {
-                    txid: outpoint.txid.to_string(),
-                    vout: outpoint.vout,
-                    blockheight: blkheight.to_consensus_u32(),
-                    tweak: output.tweak.to_be_bytes(),
-                    amount: output.value.into(),
-                    script: output.script_pubkey.to_hex_string(),
-                    label: output.label.map(|l| l.as_string()),
-                }).collect(),
-                found_inputs: discovered_inputs.into_iter().map(|outpoint| outpoint.into()).collect(),
+                found_outputs: discovered_outputs
+                    .into_iter()
+                    .map(|(outpoint, output)| OwnedOutput {
+                        txid: outpoint.txid.to_string(),
+                        vout: outpoint.vout,
+                        blockheight: blkheight.to_consensus_u32(),
+                        tweak: output.tweak.to_be_bytes(),
+                        amount: output.value.into(),
+                        script: output.script_pubkey.to_hex_string(),
+                        label: output.label.map(|l| l.as_string()),
+                    })
+                    .collect(),
+                found_inputs: discovered_inputs
+                    .into_iter()
+                    .map(|outpoint| outpoint.into())
+                    .collect(),
             };
 
             send_sync_update(update);
