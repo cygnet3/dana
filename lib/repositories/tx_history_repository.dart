@@ -255,7 +255,7 @@ class TxHistoryRepository {
 
   /// Get outpoints whose spending transaction has been broadcast but not yet confirmed.
   /// These must be included in the scan list so the scanner can detect when they are mined.
-  Future<List<String>> getUnconfirmedSpentOutpoints() async {
+  Future<List<OutPoint>> getUnconfirmedSpentOutpoints() async {
     final db = await _db;
     final rows = await db.rawQuery('''
       SELECT s.outpoint_txid, s.outpoint_vout
@@ -265,7 +265,8 @@ class TxHistoryRepository {
     ''');
 
     return rows
-        .map((row) => '${row['outpoint_txid']}:${row['outpoint_vout']}')
+        .map((row) =>
+            OutPoint(txid: row['txid'] as String, vout: row['vout'] as int))
         .toList();
   }
 
