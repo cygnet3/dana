@@ -93,7 +93,7 @@ class TxHistoryRepository {
           ApiRecordedTransactionUnknownOutgoing(
             amount: ApiAmount(field0: BigInt.from(amountSpentSat)),
             confirmationHeight: row['confirmation_height'] as int,
-            confirmationBlockhash: row['confirmation_blockhash'] as String,
+            confirmationBlockhash: row['confirmation_blockhash'] as String?,
             spentOutpoints: spentOutpoints,
           ),
         ));
