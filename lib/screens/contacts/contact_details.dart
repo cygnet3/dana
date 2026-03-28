@@ -341,7 +341,8 @@ class ContactDetailsScreen extends StatelessWidget {
     final field0 = tx.field0;
     final recipient = contact.displayName;
     final date = field0.confirmationHeight?.toString() ?? 'Unconfirmed';
-    final color = field0.confirmationHeight == null ? Bitcoin.neutral4 : Bitcoin.red;
+    final color =
+        field0.confirmationHeight == null ? Bitcoin.neutral4 : Bitcoin.red;
     final amount = field0.totalOutgoing().displayBtc();
     const amountprefix = '-';
     final amountFiat = exchangeRate.displayFiat(field0.totalOutgoing());
