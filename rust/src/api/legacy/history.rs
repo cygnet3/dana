@@ -19,7 +19,7 @@ use anyhow::Result;
 /// Only kept for reading old wallet data from SharedPreferences during migration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[frb(opaque)]
-pub struct LegacyTxHistoryStruct(Vec<RecordedTransaction>);
+pub struct LegacyTxHistoryStruct(Vec<LegacyRecordedTransactionStruct>);
 
 impl LegacyTxHistoryStruct {
     /// Create an empty transaction history.
@@ -47,21 +47,21 @@ impl LegacyTxHistoryStruct {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum RecordedTransaction {
-    Incoming(RecordedTransactionIncoming),
-    Outgoing(RecordedTransactionOutgoing),
-    UnknownOutgoing(RecordedTransactionUnknownOutgoing),
+pub enum LegacyRecordedTransactionStruct {
+    Incoming(LegacyRecordedTransactionIncomingStruct),
+    Outgoing(LegacyRecordedTransactionOutgoingStruct),
+    UnknownOutgoing(LegacyRecordedTransactionUnknownOutgoingStruct),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct RecordedTransactionIncoming {
+pub struct LegacyRecordedTransactionIncomingStruct {
     txid: Txid,
     amount: Amount,
     confirmed_at: Option<Height>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct RecordedTransactionOutgoing {
+pub struct LegacyRecordedTransactionOutgoingStruct {
     txid: Txid,
     spent_outpoints: Vec<OutPoint>,
     recipients: Vec<Recipient>,
@@ -72,23 +72,25 @@ pub struct RecordedTransactionOutgoing {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct RecordedTransactionUnknownOutgoing {
+pub struct LegacyRecordedTransactionUnknownOutgoingStruct {
     spent_outpoints: Vec<OutPoint>,
     amount: Amount,
     confirmed_at: Height,
 }
 
-impl From<RecordedTransaction> for ApiRecordedTransaction {
-    fn from(value: RecordedTransaction) -> Self {
+impl From<LegacyRecordedTransactionStruct> for ApiRecordedTransaction {
+    fn from(value: LegacyRecordedTransactionStruct) -> Self {
         match value {
-            RecordedTransaction::Incoming(incoming) => Self::Incoming(incoming.into()),
-            RecordedTransaction::Outgoing(outgoing) => Self::Outgoing(outgoing.into()),
-            RecordedTransaction::UnknownOutgoing(unknown) => Self::UnknownOutgoing(unknown.into()),
+            LegacyRecordedTransactionStruct::Incoming(incoming) => Self::Incoming(incoming.into()),
+            LegacyRecordedTransactionStruct::Outgoing(outgoing) => Self::Outgoing(outgoing.into()),
+            LegacyRecordedTransactionStruct::UnknownOutgoing(unknown) => {
+                Self::UnknownOutgoing(unknown.into())
+            }
         }
     }
 }
 
-impl From<ApiRecordedTransaction> for RecordedTransaction {
+impl From<ApiRecordedTransaction> for LegacyRecordedTransactionStruct {
     fn from(value: ApiRecordedTransaction) -> Self {
         match value {
             ApiRecordedTransaction::Incoming(incoming) => Self::Incoming(incoming.into()),
@@ -100,8 +102,10 @@ impl From<ApiRecordedTransaction> for RecordedTransaction {
     }
 }
 
-impl From<RecordedTransactionUnknownOutgoing> for ApiRecordedTransactionUnknownOutgoing {
-    fn from(value: RecordedTransactionUnknownOutgoing) -> Self {
+impl From<LegacyRecordedTransactionUnknownOutgoingStruct>
+    for ApiRecordedTransactionUnknownOutgoing
+{
+    fn from(value: LegacyRecordedTransactionUnknownOutgoingStruct) -> Self {
         Self {
             confirmation_height: value.confirmed_at.to_consensus_u32(),
             confirmation_blockhash: None,
@@ -115,7 +119,9 @@ impl From<RecordedTransactionUnknownOutgoing> for ApiRecordedTransactionUnknownO
     }
 }
 
-impl From<ApiRecordedTransactionUnknownOutgoing> for RecordedTransactionUnknownOutgoing {
+impl From<ApiRecordedTransactionUnknownOutgoing>
+    for LegacyRecordedTransactionUnknownOutgoingStruct
+{
     fn from(value: ApiRecordedTransactionUnknownOutgoing) -> Self {
         Self {
             amount: value.amount.into(),
@@ -129,8 +135,8 @@ impl From<ApiRecordedTransactionUnknownOutgoing> for RecordedTransactionUnknownO
     }
 }
 
-impl From<RecordedTransactionIncoming> for ApiRecordedTransactionIncoming {
-    fn from(value: RecordedTransactionIncoming) -> Self {
+impl From<LegacyRecordedTransactionIncomingStruct> for ApiRecordedTransactionIncoming {
+    fn from(value: LegacyRecordedTransactionIncomingStruct) -> Self {
         let confirmation_height = value.confirmed_at.map(|height| height.to_consensus_u32());
         let confirmation_blockhash = None;
 
@@ -143,7 +149,7 @@ impl From<RecordedTransactionIncoming> for ApiRecordedTransactionIncoming {
     }
 }
 
-impl From<ApiRecordedTransactionIncoming> for RecordedTransactionIncoming {
+impl From<ApiRecordedTransactionIncoming> for LegacyRecordedTransactionIncomingStruct {
     fn from(value: ApiRecordedTransactionIncoming) -> Self {
         let confirmation_height = value
             .confirmation_height
@@ -157,8 +163,8 @@ impl From<ApiRecordedTransactionIncoming> for RecordedTransactionIncoming {
     }
 }
 
-impl From<RecordedTransactionOutgoing> for ApiRecordedTransactionOutgoing {
-    fn from(value: RecordedTransactionOutgoing) -> Self {
+impl From<LegacyRecordedTransactionOutgoingStruct> for ApiRecordedTransactionOutgoing {
+    fn from(value: LegacyRecordedTransactionOutgoingStruct) -> Self {
         let confirmation_height = value.confirmed_at.map(|height| height.to_consensus_u32());
         let confirmation_blockhash = None;
 
@@ -178,7 +184,7 @@ impl From<RecordedTransactionOutgoing> for ApiRecordedTransactionOutgoing {
     }
 }
 
-impl From<ApiRecordedTransactionOutgoing> for RecordedTransactionOutgoing {
+impl From<ApiRecordedTransactionOutgoing> for LegacyRecordedTransactionOutgoingStruct {
     fn from(value: ApiRecordedTransactionOutgoing) -> Self {
         let confirmed_at = value
             .confirmation_height
