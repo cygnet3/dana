@@ -58,7 +58,6 @@ impl Updater for StateUpdater {
                     .map(|(outpoint, output)| OwnedOutput {
                         txid: outpoint.txid.to_string(),
                         vout: outpoint.vout,
-                        blockheight: blkheight.to_consensus_u32(),
                         tweak: output.tweak.to_be_bytes(),
                         amount: output.value.into(),
                         script: output.script_pubkey.to_hex_string(),

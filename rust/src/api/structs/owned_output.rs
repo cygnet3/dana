@@ -7,7 +7,6 @@ use crate::api::structs::amount::ApiAmount;
 pub struct OwnedOutput {
     pub txid: String,
     pub vout: u32,
-    pub blockheight: u32,
     pub tweak: [u8; 32],
     pub amount: ApiAmount,
     pub script: String,

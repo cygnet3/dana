@@ -51,7 +51,6 @@ class OwnedOutputsRepository {
       result.add(OwnedOutput(
         txid: row['txid'] as String,
         vout: row['vout'] as int,
-        blockheight: row['blockheight'] as int,
         tweak: U8Array32(row['tweak'] as Uint8List),
         amount: ApiAmountExtension.fromDbValue(row['amount']),
         script: row['script'] as String,
@@ -94,12 +93,11 @@ class OwnedOutputsRepository {
     try {
       await db.rawInsert('''
         INSERT OR FAIL INTO owned_outputs (
-          txid, vout, blockheight, tweak, amount, script, label
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          txid, vout, tweak, amount, script, label
+        ) VALUES (?, ?, ?, ?, ?, ?)
       ''', [
         output.txid,
         output.vout,
-        output.blockheight,
         Uint8List.fromList(output.tweak),
         output.amount.toSat(),
         output.script,
@@ -147,7 +145,6 @@ Future<void> migrateOutputsFromSharedPreferences() async {
       await txn.insert('owned_outputs', {
         'txid': output.txid,
         'vout': output.vout,
-        'blockheight': output.blockheight,
         'tweak': Uint8List.fromList(output.tweak.toList()),
         'amount': output.amount.toSat(),
         'script': output.script,
