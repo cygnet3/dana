@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS owned_outputs (
   vout INTEGER NOT NULL,
   tweak BLOB NOT NULL,
   amount_sat INTEGER NOT NULL,
-  script TEXT NOT NULL,
+  script BLOB NOT NULL,
   label TEXT,
   created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
   PRIMARY KEY (txid, vout)

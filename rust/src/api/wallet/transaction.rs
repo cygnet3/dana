@@ -31,7 +31,7 @@ impl SpWallet {
                 let output = DiscoveredOutput {
                     tweak: Scalar::from_be_bytes(output.tweak)?,
                     value: output.amount.into(),
-                    script_pubkey: ScriptBuf::from_hex(&output.script)?,
+                    script_pubkey: ScriptBuf::from_bytes(output.script),
                     label: output.label.map(|l| l.try_into().unwrap()),
                 };
                 Ok((outpoint, output))
@@ -67,7 +67,7 @@ impl SpWallet {
                 let output = DiscoveredOutput {
                     tweak: Scalar::from_be_bytes(output.tweak)?,
                     value: output.amount.into(),
-                    script_pubkey: ScriptBuf::from_hex(&output.script)?,
+                    script_pubkey: ScriptBuf::from_bytes(output.script),
                     label: output.label.map(|l| l.try_into().unwrap()),
                 };
                 Ok((outpoint, output))
