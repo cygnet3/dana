@@ -265,8 +265,9 @@ class TxHistoryRepository {
     ''');
 
     return rows
-        .map((row) =>
-            OutPoint(txid: row['txid'] as String, vout: row['vout'] as int))
+        .map((row) => OutPoint(
+            txid: row['outpoint_txid'] as String,
+            vout: row['outpoint_vout'] as int))
         .toList();
   }
 
