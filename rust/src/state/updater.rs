@@ -59,7 +59,7 @@ impl Updater for StateUpdater {
                         outpoint: outpoint.into(),
                         tweak: output.tweak.to_be_bytes(),
                         amount: output.value.into(),
-                        script: output.script_pubkey.to_hex_string(),
+                        script: output.script_pubkey.to_bytes(),
                         label: output.label.map(|l| l.as_string()),
                     })
                     .collect(),

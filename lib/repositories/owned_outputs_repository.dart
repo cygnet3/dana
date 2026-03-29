@@ -54,7 +54,7 @@ class OwnedOutputsRepository {
             OutPoint(txid: row['txid'] as String, vout: row['vout'] as int),
         tweak: U8Array32(row['tweak'] as Uint8List),
         amount: ApiAmountExtension.fromDbValue(row['amount_sat']),
-        script: row['script'] as String,
+        script: row['script'] as Uint8List,
         label: row['label'] as String?,
       ));
     }

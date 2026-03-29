@@ -9,6 +9,6 @@ pub struct OwnedOutput {
     pub outpoint: OutPoint,
     pub tweak: [u8; 32],
     pub amount: ApiAmount,
-    pub script: String,
+    pub script: Vec<u8>,
     pub label: Option<String>,
 }
