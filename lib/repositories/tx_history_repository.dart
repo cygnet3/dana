@@ -276,16 +276,12 @@ class TxHistoryRepository {
   /// Delete transactions above a certain blockheight (for resetToHeight).
   Future<void> deleteTransactionsAboveHeight(int height) async {
     final db = await _db;
-    await db.transaction((txn) async {
-      await txn.rawDelete('''
-        DELETE FROM tx_incoming
-        WHERE confirmation_height IS NOT NULL AND confirmation_height > ?
-      ''', [height]);
-      await txn.rawDelete('''
-        DELETE FROM tx_outgoing
-        WHERE confirmation_height IS NOT NULL AND confirmation_height > ?
-      ''', [height]);
-    });
+    await db.delete('tx_outgoing',
+        where: 'confirmation_height IS NOT NULL AND confirmation_height > ?',
+        whereArgs: [height]);
+    await db.delete('tx_incoming',
+        where: 'confirmation_height IS NOT NULL AND confirmation_height > ?',
+        whereArgs: [height]);
   }
 }
 
