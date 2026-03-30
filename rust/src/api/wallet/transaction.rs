@@ -28,11 +28,15 @@ impl SpWallet {
             .into_iter()
             .map(|output| {
                 let outpoint = output.outpoint.into();
+                let label = match output.label {
+                    Some(l) => Some(Scalar::from_be_bytes(l)?.into()),
+                    None => None,
+                };
                 let output = DiscoveredOutput {
                     tweak: Scalar::from_be_bytes(output.tweak)?,
                     value: output.amount.into(),
                     script_pubkey: ScriptBuf::from_bytes(output.script),
-                    label: output.label.map(|l| l.try_into().unwrap()),
+                    label,
                 };
                 Ok((outpoint, output))
             })
@@ -64,11 +68,15 @@ impl SpWallet {
             .into_iter()
             .map(|output| {
                 let outpoint = output.outpoint.into();
+                let label = match output.label {
+                    Some(l) => Some(Scalar::from_be_bytes(l)?.into()),
+                    None => None,
+                };
                 let output = DiscoveredOutput {
                     tweak: Scalar::from_be_bytes(output.tweak)?,
                     value: output.amount.into(),
                     script_pubkey: ScriptBuf::from_bytes(output.script),
-                    label: output.label.map(|l| l.try_into().unwrap()),
+                    label,
                 };
                 Ok((outpoint, output))
             })

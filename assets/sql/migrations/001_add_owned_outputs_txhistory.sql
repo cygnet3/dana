@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS owned_outputs (
   tweak BLOB NOT NULL,
   amount_sat INTEGER NOT NULL,
   script BLOB NOT NULL,
-  label TEXT,
+  label BLOB,
   created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
   PRIMARY KEY (txid, vout)
 );
