@@ -153,11 +153,6 @@ class WalletRepository {
     }
   }
 
-  /// Reset wallet data to a specific height.
-  Future<void> resetToHeight(int height) async {
-    await saveLastSync(height);
-  }
-
   Future<WalletBackup> createWalletBackup() async {
     final wallet = await readWallet();
     final birthday = await readBirthday();

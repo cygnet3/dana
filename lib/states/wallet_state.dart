@@ -267,11 +267,11 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<void> resetToSyncHeight(int height) async {
-    // note: this feature is not stable, as it does not take output spent status into account
-    await ownedOutputsRepository.reset();
-    await txHistoryRepository.reset();
+    // note: this feature is not stable, as it requires the foreign_keys pragma
+    // to correctly cascade deletion of owned outputs.
+    await txHistoryRepository.deleteTransactionsAboveHeight(height);
 
-    await walletRepository.resetToHeight(height);
+    await walletRepository.saveLastSync(height);
 
     await _updateWalletState();
     notifyListeners();
