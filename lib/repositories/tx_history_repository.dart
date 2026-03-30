@@ -20,8 +20,10 @@ class TxHistoryRepository {
 
   Future<void> reset() async {
     final db = await _db;
-    await db.rawDelete('DELETE FROM tx_incoming');
-    await db.rawDelete('DELETE FROM tx_outgoing');
+    await db.delete('tx_outgoing');
+    await db.delete('tx_recipients');
+    await db.delete('tx_spent_outpoints');
+    await db.delete('tx_incoming');
   }
 
   /// Get all transactions for UI display.
