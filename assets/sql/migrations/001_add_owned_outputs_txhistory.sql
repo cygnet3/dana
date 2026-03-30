@@ -1,15 +1,3 @@
-CREATE TABLE IF NOT EXISTS owned_outputs (
-  txid TEXT NOT NULL,
-  vout INTEGER NOT NULL,
-  tweak BLOB NOT NULL,
-  amount_sat INTEGER NOT NULL,
-  script BLOB NOT NULL,
-  label BLOB,
-  created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-  PRIMARY KEY (txid, vout)
-);
-CREATE INDEX IF NOT EXISTS idx_outputs_txid ON owned_outputs(txid);
-
 -- INCOMING TRANSACTIONS
 -- Transactions where we received funds
 CREATE TABLE IF NOT EXISTS tx_incoming (
@@ -32,6 +20,22 @@ CREATE INDEX IF NOT EXISTS idx_incoming_unconfirmed ON tx_incoming(confirmation_
   WHERE confirmation_height IS NULL;
 CREATE INDEX IF NOT EXISTS idx_incoming_missing_confirmation_timestamp ON tx_incoming(confirmation_height, confirmation_blockhash)
   WHERE confirmation_height IS NOT NULL AND confirmation_blockhash IS NOT NULL AND confirmation_timestamp IS NULL;
+
+-- owned outputs are derived from incoming transactions
+-- when we delete the incoming transaction (e.g. on a block reorg),
+-- we should delete the corresponding owned_output as well.
+CREATE TABLE IF NOT EXISTS owned_outputs (
+  txid TEXT NOT NULL,
+  vout INTEGER NOT NULL,
+  tweak BLOB NOT NULL,
+  amount_sat INTEGER NOT NULL,
+  script BLOB NOT NULL,
+  label BLOB,
+  created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+  PRIMARY KEY (txid, vout),
+  FOREIGN KEY (txid) REFERENCES tx_incoming(txid) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_outputs_txid ON owned_outputs(txid);
 
 -- OUTGOING TRANSACTIONS
 -- Transactions where we spent funds
