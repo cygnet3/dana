@@ -60,7 +60,7 @@ impl Updater for StateUpdater {
                         tweak: output.tweak.to_be_bytes(),
                         amount: output.value.into(),
                         script: output.script_pubkey.to_bytes(),
-                        label: output.label.map(|l| l.as_string()),
+                        label: output.label.map(|l| l.as_inner().to_be_bytes()),
                     })
                     .collect(),
                 found_inputs: discovered_inputs

@@ -4,7 +4,7 @@ use anyhow::Result;
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
 use spdk_wallet::{
-    bitcoin::{Amount, OutPoint, ScriptBuf},
+    bitcoin::{secp256k1::Scalar, Amount, OutPoint, ScriptBuf},
     silentpayments::receiving::Label,
 };
 
@@ -57,7 +57,7 @@ impl From<(OutPoint, LegacyOwnedOutputStruct)> for OwnedOutput {
             tweak: value.tweak,
             amount: value.amount.into(),
             script: value.script.to_bytes(),
-            label: value.label.map(|l| l.as_string()),
+            label: value.label.map(|l| l.as_inner().to_be_bytes()),
         }
     }
 }
@@ -70,7 +70,9 @@ impl From<OwnedOutput> for (OutPoint, LegacyOwnedOutputStruct) {
                 tweak: value.tweak,
                 amount: value.amount.into(),
                 script: ScriptBuf::from_bytes(value.script),
-                label: value.label.map(|l| l.try_into().unwrap()),
+                label: value
+                    .label
+                    .map(|l| Scalar::from_be_bytes(l).unwrap().into()),
             },
         )
     }

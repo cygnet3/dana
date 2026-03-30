@@ -49,13 +49,19 @@ class OwnedOutputsRepository {
 
     final result = <OwnedOutput>[];
     for (final row in rows) {
+      final labelbytes = row['label'] as Uint8List?;
+      U8Array32? label;
+      if (labelbytes != null) {
+        label = U8Array32(labelbytes);
+      }
+
       result.add(OwnedOutput(
         outpoint:
             OutPoint(txid: row['txid'] as String, vout: row['vout'] as int),
         tweak: U8Array32(row['tweak'] as Uint8List),
         amount: ApiAmountExtension.fromDbValue(row['amount_sat']),
         script: row['script'] as Uint8List,
-        label: row['label'] as String?,
+        label: label,
       ));
     }
     return result;
@@ -95,6 +101,11 @@ class OwnedOutputsRepository {
   }) async {
     final db = await _db;
     try {
+      Uint8List? label;
+      if (output.label != null) {
+        label = Uint8List.fromList(output.label!);
+      }
+
       await db.rawInsert('''
         INSERT OR FAIL INTO owned_outputs (
           txid, vout, tweak, amount_sat, script, label
@@ -105,7 +116,7 @@ class OwnedOutputsRepository {
         Uint8List.fromList(output.tweak),
         output.amount.toSat(),
         output.script,
-        output.label,
+        label,
       ]);
     } catch (e) {
       Logger().e("Failed to insert output: $e");
@@ -146,13 +157,17 @@ Future<void> migrateOutputsFromSharedPreferences() async {
   final db = await DatabaseHelper.instance.database;
   await db.transaction((txn) async {
     for (final output in outputs) {
+      Uint8List? label;
+      if (output.label != null) {
+        label = Uint8List.fromList(output.label!);
+      }
       await txn.insert('owned_outputs', {
         'txid': output.outpoint.txid,
         'vout': output.outpoint.vout,
         'tweak': Uint8List.fromList(output.tweak.toList()),
         'amount_sat': output.amount.toSat(),
         'script': output.script,
-        'label': output.label,
+        'label': label,
       });
       migrated++;
     }
