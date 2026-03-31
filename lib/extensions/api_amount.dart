@@ -6,6 +6,14 @@ extension ApiAmountExtension on ApiAmount {
     return ApiAmount(field0: field0 + other.field0);
   }
 
+  ApiAmount operator -(ApiAmount other) {
+    return ApiAmount(field0: field0 - other.field0);
+  }
+
+  bool operator >(ApiAmount other) {
+    return field0 > other.field0;
+  }
+
   String displayBtc() {
     final btcPart = field0 ~/ BigInt.from(bitcoinUnits);
     final satsPart = (field0 % BigInt.from(bitcoinUnits));

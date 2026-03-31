@@ -301,8 +301,9 @@ class WalletScreenState extends State<WalletScreen> {
         } else {
           color = Bitcoin.red;
         }
-        amount =
-            hideAmount ? hideAmountFormat : field0.totalOutgoing().displayBtc();
+        amount = hideAmount
+            ? hideAmountFormat
+            : (field0.totalOutgoing()).displayBtc();
         amountprefix = '-';
         amountFiat = hideAmount
             ? hideAmountFormat

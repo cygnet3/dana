@@ -5,3 +5,9 @@ extension OutpointExtension on OutPoint {
     return '$txid:$vout';
   }
 }
+
+extension OutpointListExtension on List<OutPoint> {
+  String toDisplayString() {
+    return '[${map((e) => "\"${e.toDisplayString()}\"").join(', ')}]';
+  }
+}

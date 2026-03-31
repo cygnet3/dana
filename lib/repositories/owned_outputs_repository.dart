@@ -32,7 +32,7 @@ class OwnedOutputsRepository {
       SELECT COALESCE(SUM(o.amount_sat), 0) as total
       FROM owned_outputs o
       LEFT JOIN tx_spent_outpoints s ON s.outpoint_txid = o.txid AND s.outpoint_vout = o.vout
-      WHERE s.tx_outgoing_id IS NULL
+      WHERE s.transaction_id IS NULL
     ''');
     return ApiAmount(field0: BigInt.from(result.first['total'] as int));
   }
@@ -44,7 +44,7 @@ class OwnedOutputsRepository {
       SELECT o.*
       FROM owned_outputs o
       LEFT JOIN tx_spent_outpoints s ON s.outpoint_txid = o.txid AND s.outpoint_vout = o.vout
-      WHERE s.tx_outgoing_id IS NULL
+      WHERE s.transaction_id IS NULL
     ''');
 
     final result = <OwnedOutput>[];
@@ -74,7 +74,7 @@ class OwnedOutputsRepository {
       SELECT o.txid, o.vout
       FROM owned_outputs o
       LEFT JOIN tx_spent_outpoints s ON s.outpoint_txid = o.txid AND s.outpoint_vout = o.vout
-      WHERE s.tx_outgoing_id IS NULL
+      WHERE s.transaction_id IS NULL
     ''');
 
     return rows

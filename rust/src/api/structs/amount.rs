@@ -1,8 +1,16 @@
+use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
 use spdk_wallet::bitcoin;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 pub struct ApiAmount(pub u64);
+
+impl ApiAmount {
+    #[frb(sync)]
+    pub fn zero() -> Self {
+        Self(0)
+    }
+}
 
 impl From<bitcoin::Amount> for ApiAmount {
     fn from(value: bitcoin::Amount) -> Self {
