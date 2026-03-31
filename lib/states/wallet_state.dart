@@ -63,71 +63,52 @@ class WalletState extends ChangeNotifier {
 
   Future<void> _initStreams() async {
     syncResultSubscription = createSyncResultStream().listen(((event) async {
-      lastSync = event.blkheight;
-
       // Process found outputs (new UTXOs we own)
       for (final found in event.foundOutputs) {
+        // first, insert the transaction data in the known transactions table
+        await txHistoryRepository.addIncomingTransaction(
+          txid: found.outpoint.txid,
+          confirmationHeight: event.blkheight,
+          confirmationBlockhash: event.blkhash,
+        );
+
         // Insert output into database
         await ownedOutputsRepository.insertOutput(output: found);
-
-        // Check if this is a self-send (skip change outputs)
-        final isOwnTx =
-            await txHistoryRepository.isOwnOutgoingTx(found.outpoint.txid);
-        if (!isOwnTx || found.label == null) {
-          // Add incoming transaction
-          await txHistoryRepository.addIncomingTransaction(
-            txid: found.outpoint.txid,
-            amountSat: found.amount,
-            confirmationHeight: event.blkheight,
-            confirmationBlockhash: event.blkhash,
-          );
-        }
       }
+
+      List<OutPoint> unknownSpends = [];
 
       // Process found inputs (our UTXOs being spent)
       for (final outpoint in event.foundInputs) {
         // Try to confirm an outgoing transaction
         final confirmed = await txHistoryRepository.confirmOutgoingTransaction(
-          spentOutpointTxid: outpoint.txid,
-          spentOutpointVout: outpoint.vout,
+          confirmedOutpointTxid: outpoint.txid,
+          confirmedOutpointVout: outpoint.vout,
           confirmationHeight: event.blkheight,
           confirmationBlockhash: event.blkhash,
         );
 
-        // This should never happen, it means user is using the same wallet on multiple devices
+        // this output does not have an associated transaction
+        // this can occur if a user imported their seed phrase in multiple wallets
+        // generally we should discourage this, but it's inevitable that it will happen
         if (!confirmed) {
-          try {
-            // For unknown outgoing transactions we don't know the spending txid.
-            // We store `tx_outgoing.txid = NULL` and link the outpoints via `tx_outgoing.id`.
-            final spentAmountSat = await ownedOutputsRepository.getOutputAmount(
-              outpoint,
-            );
-            await txHistoryRepository.addOutgoingTransaction(
-              spentOutpoints: [outpoint],
-              recipients: [],
-              changeSat: null, // unknown for externally-created spend
-              feeSat: null, // unknown for externally-created spend
-              txid: null,
-              amountSpentSat: spentAmountSat ?? 0,
-            );
-            final confirmed =
-                await txHistoryRepository.confirmOutgoingTransaction(
-              spentOutpointTxid: outpoint.txid,
-              spentOutpointVout: outpoint.vout,
-              confirmationHeight: event.blkheight,
-              confirmationBlockhash: event.blkhash,
-            );
-            if (!confirmed) {
-              throw Exception(
-                  "Failed to confirm unknown outgoing transaction for ${outpoint.toDisplayString()}");
-            }
-          } catch (e) {
-            Logger().e("Failed to add unknown outgoing transaction: $e");
-          }
+          unknownSpends.add(outpoint);
         }
       }
 
-      await walletRepository.saveLastSync(lastSync!);
+      if (unknownSpends.isNotEmpty) {
+        Logger().w(
+            "Unknown spends detected, marking the following outpoints as spent: ${unknownSpends.toDisplayString()}");
+        await txHistoryRepository.addOutgoingTransaction(
+          spentOutpoints: unknownSpends,
+          recipients: [],
+          txid: null,
+          confirmationHeight: event.blkheight,
+          confirmationBlockhash: event.blkhash,
+        );
+      }
+
+      await walletRepository.saveLastSync(event.blkheight);
 
       // update UI
       await _updateWalletState();
@@ -283,7 +264,12 @@ class WalletState extends ChangeNotifier {
     // Get cached data from SQLite
     amount = await ownedOutputsRepository.getUnspentBalance();
 
-    unconfirmedChange = await txHistoryRepository.getUnconfirmedChange();
+    // fetch the unconfirmed change from the transaction history
+    // in the future, we probably want to save change outputs in owned_outputs before they are confirmed
+    // in that case, we can get the unconfirmed change from the owned outputs repository,
+    // but for now we have to look at the transaction recipients
+    unconfirmedChange = await txHistoryRepository.getUnconfirmedChange(
+        receivePaymentCode, changePaymentCode);
 
     // Cache outputs for spending and scanning
     unspentOutputs = await ownedOutputsRepository.getUnspentOutputs();
@@ -293,7 +279,8 @@ class WalletState extends ChangeNotifier {
     outpointsToScan = [...unspentOutpoints, ...unconfirmedSpentOutpoints];
 
     // Cache transactions for UI
-    transactions = await txHistoryRepository.getAllTransactions();
+    transactions = await txHistoryRepository.getAllTransactions(
+        receivePaymentCode, changePaymentCode);
   }
 
   Future<ApiSilentPaymentUnsignedTransaction> createUnsignedTxToThisRecipient(
@@ -325,13 +312,7 @@ class WalletState extends ChangeNotifier {
     List<OutPoint> selectedOutpoints =
         selectedOutputs.map((tuple) => tuple.$1).toList();
 
-    final changeValue =
-        unsignedTx.getChangeAmount(changeAddress: changePaymentCode);
-
-    final feeAmount = unsignedTx.getFeeAmount();
-
-    final recipients =
-        unsignedTx.getRecipients(changeAddress: changePaymentCode);
+    final recipients = unsignedTx.recipients;
 
     final finalizedTx =
         SpWallet.finalizeTransaction(unsignedTransaction: unsignedTx);
@@ -372,8 +353,6 @@ class WalletState extends ChangeNotifier {
       txid: txid,
       spentOutpoints: selectedOutpoints,
       recipients: recipients,
-      changeSat: changeValue.field0.toInt(),
-      feeSat: feeAmount.field0.toInt(),
     );
 
     // refresh variables and notify listeners
