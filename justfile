@@ -25,6 +25,9 @@ run flags="":
 run-release:
     just run --release
 
+format:
+    fvm dart format ./lib
+
 clean-bin:
     cd rust && just clean-bin
 gen:
