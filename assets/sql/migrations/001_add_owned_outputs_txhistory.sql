@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS transactions (
+CREATE TABLE transactions (
   -- note: this is the table id, not txid
   -- we need this variable because we may detect transactions that we don't know the txid for
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -15,11 +15,11 @@ CREATE TABLE IF NOT EXISTS transactions (
   created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
   updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 );
-CREATE INDEX IF NOT EXISTS idx_transactions_confirmation_height ON transactions(confirmation_height);
-CREATE INDEX IF NOT EXISTS idx_transactions_unconfirmed ON transactions(confirmation_height)
+CREATE INDEX idx_transactions_confirmation_height ON transactions(confirmation_height);
+CREATE INDEX idx_transactions_unconfirmed ON transactions(confirmation_height)
   WHERE confirmation_height IS NULL;
 
-CREATE TABLE IF NOT EXISTS owned_outputs (
+CREATE TABLE owned_outputs (
   txid TEXT NOT NULL,
   vout INTEGER NOT NULL,
   tweak BLOB NOT NULL,
@@ -30,9 +30,9 @@ CREATE TABLE IF NOT EXISTS owned_outputs (
   PRIMARY KEY (txid, vout),
   FOREIGN KEY (txid) REFERENCES transactions(txid) ON DELETE CASCADE
 );
-CREATE INDEX IF NOT EXISTS idx_outputs_txid ON owned_outputs(txid);
+CREATE INDEX idx_outputs_txid ON owned_outputs(txid);
 
-CREATE TABLE IF NOT EXISTS tx_spent_outpoints (
+CREATE TABLE tx_spent_outpoints (
   transaction_id INTEGER NOT NULL,
   outpoint_txid TEXT NOT NULL,
   outpoint_vout INTEGER NOT NULL,
@@ -40,14 +40,14 @@ CREATE TABLE IF NOT EXISTS tx_spent_outpoints (
   FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
   FOREIGN KEY (outpoint_txid, outpoint_vout) REFERENCES owned_outputs(txid, vout)
 );
-CREATE INDEX IF NOT EXISTS idx_tx_spent_outpoints_transaction_id ON tx_spent_outpoints(transaction_id);
-CREATE INDEX IF NOT EXISTS idx_tx_spent_outpoints_outpoint ON tx_spent_outpoints(outpoint_txid, outpoint_vout);
-CREATE TABLE IF NOT EXISTS tx_recipients (
+CREATE INDEX idx_tx_spent_outpoints_transaction_id ON tx_spent_outpoints(transaction_id);
+CREATE INDEX idx_tx_spent_outpoints_outpoint ON tx_spent_outpoints(outpoint_txid, outpoint_vout);
+CREATE TABLE tx_recipients (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   transaction_id INTEGER NOT NULL,
   payment_code TEXT NOT NULL,
   amount_sat INTEGER NOT NULL,
   FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
 );
-CREATE INDEX IF NOT EXISTS idx_recipients_transaction_id ON tx_recipients(transaction_id);
-CREATE INDEX IF NOT EXISTS idx_recipients_payment_code ON tx_recipients(payment_code);
+CREATE INDEX idx_recipients_transaction_id ON tx_recipients(transaction_id);
+CREATE INDEX idx_recipients_payment_code ON tx_recipients(payment_code);
