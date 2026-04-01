@@ -360,7 +360,7 @@ class TxHistoryRepository {
 ///
 /// LEGACY: TxHistory.decode() is only used here for migration.
 /// Can be removed once no users remain on pre-SQLite versions.
-Future<void> migrateTxHistoryFromSharedPreferences() async {
+Future<void> migrateTxHistoryFromSharedPreferences(String changeCode) async {
   final prefs = SharedPreferencesAsync();
   final encoded = await prefs.getString('txhistory');
   if (encoded == null) return;
@@ -373,7 +373,7 @@ Future<void> migrateTxHistoryFromSharedPreferences() async {
   final db = await DatabaseHelper.instance.database;
   await db.transaction((txn) async {
     for (final tx in transactions) {
-      await _insertTransaction(txn, tx);
+      await _insertTransaction(txn, tx, changeCode);
     }
   });
 
@@ -381,8 +381,8 @@ Future<void> migrateTxHistoryFromSharedPreferences() async {
   await prefs.remove('txhistory');
 }
 
-Future<void> _insertTransaction(
-    DatabaseExecutor executor, RecordedTransaction tx) async {
+Future<void> _insertTransaction(DatabaseExecutor executor,
+    RecordedTransaction tx, String changeCode) async {
   switch (tx) {
     case RecordedTransaction_Incoming(:final field0):
       await executor.insert(
@@ -414,13 +414,22 @@ Future<void> _insertTransaction(
       }
 
       for (final recipient in field0.recipients) {
-        // TODO: insert recipient change output
         await executor.insert('tx_recipients', {
           'transaction_id': txOutgoingId,
           'payment_code': recipient.paymentCode,
           'amount_sat': recipient.amount.toSat(),
         });
       }
+      // in the legacy output format we used to store the change amount separately
+      // to migrate, we need to add a new change output ourselves manually
+      if (field0.change > ApiAmount.zero()) {
+        await executor.insert('tx_recipients', {
+          'transaction_id': txOutgoingId,
+          'payment_code': changeCode,
+          'amount_sat': field0.change.toSat(),
+        });
+      }
+
       break;
 
     case RecordedTransaction_UnknownOutgoing(:final field0):
