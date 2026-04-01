@@ -294,7 +294,8 @@ class WalletScreenState extends State<WalletScreen> {
             : null;
         recipientWidget = paymentCode != null
             ? contactsState.getDisplayNameWidget(context, paymentCode)
-            : Text('Unknown', style: BitcoinTextStyle.body4(Bitcoin.black));
+            // if an outgoing transaction has no recipients, this is very likely a self-spend
+            : Text('Send-to-Self', style: BitcoinTextStyle.body4(Bitcoin.black));
         date = field0.confirmationHeight?.toString() ?? 'Unconfirmed';
         if (field0.confirmationHeight == null) {
           color = Bitcoin.neutral4;
