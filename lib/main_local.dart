@@ -49,6 +49,9 @@ void main() async {
     await migrateTxHistoryFromSharedPreferences(spWallet.getChangeAddress());
   }
 
+  // after database migration, enable foreign_keys pragma
+  DatabaseHelper.instance.enableForeignKeysPragma();
+
   final walletState = await WalletState.create();
   final scanNotifier = await SyncProgressNotifier.create();
   final chainState = ChainState();
