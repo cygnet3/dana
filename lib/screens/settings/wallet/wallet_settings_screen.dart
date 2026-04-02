@@ -21,13 +21,6 @@ class WalletSettingsScreen extends StatelessWidget {
         subtitle: 'View your recovery phrase',
         onTap: () => _onShowMnemonic(context),
       ),
-      if (isDevEnv)
-        _WalletSettingsItem(
-          icon: Icons.backup_outlined,
-          title: 'File backup wallet',
-          subtitle: 'Export encrypted wallet backup',
-          onTap: () => _onBackupWalletButtonPressed(),
-        ),
       _WalletSettingsItem(
         icon: Icons.restore,
         title: 'Reset wallet data',
