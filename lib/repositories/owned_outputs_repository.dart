@@ -20,8 +20,6 @@ class OwnedOutputsRepository {
 
   Future<Database> get _db async => await DatabaseHelper.instance.database;
 
-  /// reset all owned outputs
-  /// note: this function is redundant in most cases, since resetting the transactions with cascade delete the owned outputs
   Future<void> reset() async {
     final db = await _db;
     await db.rawDelete('DELETE FROM owned_outputs');

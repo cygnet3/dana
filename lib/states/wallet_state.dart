@@ -147,9 +147,8 @@ class WalletState extends ChangeNotifier {
 
   Future<void> reset() async {
     danaAddress = null;
-    await txHistoryRepository.reset();
-    // this is redudant, but we do it to be sure
     await ownedOutputsRepository.reset();
+    await txHistoryRepository.reset();
     await walletRepository.reset();
   }
 
@@ -238,10 +237,8 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<void> resetToBirthday() async {
-    await txHistoryRepository.reset();
-
-    // owned outputs should be deleted automatically, but we do it explicitly to be sure
     await ownedOutputsRepository.reset();
+    await txHistoryRepository.reset();
 
     // the sync service will handle setting the lastSync to the birthday height
     await walletRepository.saveLastSync(null);
@@ -251,8 +248,9 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<void> resetToSyncHeight(int height) async {
+    // note: this feature is not stable, as it requires the foreign_keys pragma
+    // to correctly cascade deletion of owned outputs.
     await txHistoryRepository.deleteTransactionsAboveHeight(height);
-    // note: owned outputs are deleted automatically when their corresponding transactions are dropped
 
     await walletRepository.saveLastSync(height);
 
