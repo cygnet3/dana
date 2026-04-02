@@ -36,15 +36,12 @@ class DatabaseHelper {
     // database version is the number of migrations
     final version = migrations.length;
 
-    return await openDatabase(path,
-        version: version,
-        onUpgrade: (db, oldVersion, newVersion) =>
-            _performMigrations(db, oldVersion, migrations),
-        onConfigure: _onConfigure);
-  }
-
-  Future<void> _onConfigure(Database db) async {
-    await db.execute("PRAGMA foreign_keys = ON");
+    return await openDatabase(
+      path,
+      version: version,
+      onUpgrade: (db, oldVersion, newVersion) =>
+          _performMigrations(db, oldVersion, migrations),
+    );
   }
 
   Future _performMigrations(
