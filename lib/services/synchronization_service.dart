@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:danawallet/constants.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/sync_progress_notifier.dart';
@@ -118,6 +119,12 @@ class SynchronizationService {
   }
 
   Future<void> _initializeLastSync() async {
+    // if we're using regtest, we ignore the date and set last_sync to 0
+    if (chainState.network == ApiNetwork.regtest) {
+      walletState.lastSync = 0;
+      return;
+    }
+
     // if wallet birthday isn't known, use the default birthday timestamp
     final timestamp = walletState.birthday ?? defaultBirthday;
 
