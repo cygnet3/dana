@@ -224,14 +224,6 @@ class _OverviewScreenState extends State<OverviewScreen> {
 
     final footer = Column(
       children: [
-        if (isDevEnv)
-          FooterButtonOutlined(
-              title: 'Restore (file backup)',
-              onPressed: () => onRestoreFile(context)),
-        if (isDevEnv)
-          const SizedBox(
-            height: 15,
-          ),
         FooterButtonOutlined(
             title: 'Restore', onPressed: () => onRestoreMnemonic(context)),
         const SizedBox(
