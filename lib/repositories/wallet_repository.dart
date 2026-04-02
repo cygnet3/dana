@@ -1,7 +1,5 @@
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/date_time.dart';
-import 'package:danawallet/generated/rust/api/backup.dart';
-import 'package:danawallet/generated/rust/api/legacy/history.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:danawallet/generated/rust/api/wallet/setup.dart';
@@ -151,45 +149,5 @@ class WalletRepository {
     } else {
       return null;
     }
-  }
-
-  Future<WalletBackup> createWalletBackup() async {
-    final wallet = await readWallet();
-    final birthday = await readBirthday();
-    final seedPhrase = await readSeedPhrase();
-    final lastSync = await readLastSync();
-    final network = await readNetwork();
-
-    // LEGACY: TxHistory is deprecated — wallet recovery relies on seed phrase (rescan from birthday).
-    // TxHistory.empty() is only used here for backup compatibility.
-    // TODO: Remove TxHistory from backup format entirely.
-    final history = LegacyTxHistoryStruct.empty();
-
-    return WalletBackup(
-        wallet: wallet!,
-        birthday: birthday?.toSeconds(),
-        lastScan: lastSync!,
-        txHistory: history,
-        seedPhrase: seedPhrase,
-        network: network);
-  }
-
-  Future<void> restoreWalletBackup(WalletBackup backup) async {
-    await reset();
-
-    await secureStorage.write(key: _keyScanSk, value: backup.scanKey.encode());
-    await secureStorage.write(
-        key: _keySpendKey, value: backup.spendKey.encode());
-    await nonSecureStorage.setString(_keyNetwork, backup.network.name);
-
-    if (backup.birthday != null) {
-      await nonSecureStorage.setInt(_keyBirthday, backup.birthday!);
-    }
-
-    if (backup.seedPhrase != null) {
-      await secureStorage.write(key: _keySeedPhrase, value: backup.seedPhrase);
-    }
-
-    await saveLastSync(backup.lastScan);
   }
 }

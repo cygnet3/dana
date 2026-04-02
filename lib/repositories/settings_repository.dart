@@ -1,4 +1,3 @@
-import 'package:danawallet/generated/rust/api/backup.dart';
 import 'package:danawallet/data/enums/fiat_currency.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -56,22 +55,5 @@ class SettingsRepository {
     final currency = await prefs.getString(_keyFiatCurrency);
 
     return currency != null ? FiatCurrency.values.byName(currency) : null;
-  }
-
-  Future<SettingsBackup> createSettingsBackup() async {
-    final blindbitUrl = await getBlindbitUrl();
-    final dustLimit = await getDustLimit();
-
-    return SettingsBackup(blindbitUrl: blindbitUrl, dustLimit: dustLimit);
-  }
-
-  Future<void> restoreSettingsBackup(SettingsBackup backup) async {
-    await resetAll();
-    if (backup.blindbitUrl != null) {
-      await setBlindbitUrl(backup.blindbitUrl!);
-    }
-    if (backup.dustLimit != null) {
-      await setDustLimit(backup.dustLimit!);
-    }
   }
 }
