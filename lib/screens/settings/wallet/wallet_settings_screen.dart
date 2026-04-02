@@ -5,7 +5,6 @@ import 'package:danawallet/screens/settings/wallet/confirm_reset_wallet.dart';
 import 'package:danawallet/screens/settings/wallet/confirm_wallet_deletion.dart';
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
-import 'package:danawallet/services/backup_service.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -36,22 +35,6 @@ class WalletSettingsScreen extends StatelessWidget {
         isDestructive: true,
       ),
     ];
-  }
-
-  Future<void> _onBackupWalletButtonPressed() async {
-    final controller = TextEditingController();
-
-    final password = await showInputAlertDialog(controller, TextInputType.text,
-        'Set backup password', 'set password for backup file',
-        showReset: false);
-
-    if (password is String) {
-      try {
-        await BackupService.backupToFile(password);
-      } catch (e) {
-        displayNotification("backup failed");
-      }
-    }
   }
 
   void _onResetToBirthdayButtonPressed(BuildContext context) {
