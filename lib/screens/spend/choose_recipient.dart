@@ -45,6 +45,33 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
     super.dispose();
   }
 
+  Widget _buildContactSuggestionItem(Contact contact) {
+    return ListTile(
+      dense: true,
+      leading: CircleAvatar(
+        radius: 16,
+        backgroundColor: contact.avatarColor,
+        child: Text(
+          contact.displayNameInitial,
+          style:
+              BitcoinTextStyle.body5(Bitcoin.white).apply(fontWeightDelta: 2),
+        ),
+      ),
+      title: Text(
+        contact.displayName,
+        style: BitcoinTextStyle.body5(Bitcoin.black),
+      ),
+      onTap: () {
+        setState(() {
+          _addressErrorText = null;
+          textFieldController.text = contact.paymentCode;
+        });
+        FocusScope.of(context).unfocus();
+        onContinue();
+      },
+    );
+  }
+
   Future<void> onContinue() async {
     RecipientForm form = RecipientForm();
     // reset all fields
@@ -100,7 +127,6 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
       }
 
       try {
-        if (!mounted) return;
         validateAddressWithNetwork(address: paymentCode, network: network);
       } catch (e) {
         if (e.toString().contains('network')) {
@@ -110,18 +136,25 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
         }
       }
 
-      // note: from the send screen, the payment code is not guaranteed to be reusable;
-      // a user might use a regular on-chain address.
-      form.recipient =
+      // Use existing contact so amount screen shows name; otherwise minimal Contact.
+      if (!mounted) return;
+      final contactsState = Provider.of<ContactsState>(context, listen: false);
+      final existingContact =
+          contactsState.getContactByPaymentCode(paymentCode);
+      form.recipient = existingContact ??
           Contact(bip353Address: bip353Address, paymentCode: paymentCode);
 
-      if (mounted) {
-        Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const AmountSelectionScreen()));
-      }
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const AmountSelectionScreen()),
+      );
+      if (!mounted) return;
+      setState(() {
+        textFieldController.clear();
+        _addressErrorText = null;
+      });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _addressErrorText = exceptionToString(e);
       });
@@ -151,6 +184,11 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final contactsState = Provider.of<ContactsState>(context);
+    final query = textFieldController.text.toLowerCase().trim();
+    final filteredContacts = contactsState.filterContacts(query);
+    final hasQuery = query.isNotEmpty;
+
     return ScreenSkeleton(
         showBackButton: true,
         title: 'Choose recipient(s)',
@@ -167,17 +205,37 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
                     height: 20.0,
                   ),
                   TextField(
-                    onTap: () => setState(() => _addressErrorText = null),
+                    onTap: () => setState(() {
+                      _addressErrorText = null;
+                    }),
+                    onChanged: (_) => setState(() {
+                      _addressErrorText = null;
+                    }),
                     style: BitcoinTextStyle.body4(Bitcoin.black),
                     controller: textFieldController,
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       border: const OutlineInputBorder(),
-                      labelText: 'Enter any payment info you have',
-                      hintText: 'satoshi@bitcoin.org, sp1q..., bc1q...',
+                      labelText: 'Look for a contact',
+                      hintText:
+                          'Type the first letters of one of your contacts',
                       errorText: _addressErrorText,
                     ),
                   ),
+                  if (hasQuery && filteredContacts.isNotEmpty) ...[
+                    const SizedBox(height: 8.0),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 180),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: filteredContacts.length,
+                        separatorBuilder: (context, index) => const Divider(),
+                        itemBuilder: (context, index) =>
+                            _buildContactSuggestionItem(
+                                filteredContacts[index]),
+                      ),
+                    ),
+                  ],
                 ],
               ),
               const Center(child: Text('or')),
@@ -185,7 +243,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   FooterButtonOutlined(
-                      title: "Paste from clipboard",
+                      title: "Paste an address from clipboard",
                       onPressed: onPasteFromClipboard),
                   const SizedBox(
                     height: 10.0,
