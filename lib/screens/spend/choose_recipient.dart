@@ -6,6 +6,7 @@ import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/spend/amount_selection.dart';
+import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/states/chain_state.dart';
@@ -54,46 +55,53 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
     });
 
     final network = Provider.of<ChainState>(context, listen: false).network;
+    final youContact =
+        Provider.of<ContactsState>(context, listen: false).getYouContact();
+
     try {
       Bip353Address? bip353Address;
       String paymentCode;
 
       String textField = textFieldController.text.trim();
 
+      if (textField.isEmpty) {
+        throw Exception("Please enter a valid payment info");
+      } else if (textField == youContact.paymentCode) {
+        throw Exception("You cannot send to yourself");
+      }
+
       if (textField.contains('@')) {
         // we interpret the input as a bip353 address
-        try {
-          Logger().d('Resolving dana address: "$textField"');
+        Logger().d('Resolving dana address: "$textField"');
 
-          bip353Address = Bip353Address.fromString(textField);
+        bip353Address = Bip353Address.fromString(textField);
 
-          final resolvedPaymentCode =
-              await Bip353Resolver.resolve(bip353Address, network);
+        final resolvedPaymentCode =
+            await Bip353Resolver.resolve(bip353Address, network);
 
-          if (resolvedPaymentCode == null) {
-            // DNS resolution returned null - address not registered
-            Logger().w('Dana address "$textField" not found in DNS');
-            throw Exception('Dana address not found or not registered');
-          }
-
-          // set payment code to resolved code
-          paymentCode = resolvedPaymentCode;
-
-          Logger().d(
-              'Successfully resolved dana address to SP address: ${resolvedPaymentCode.substring(0, 20)}...');
-        } catch (e) {
-          displayError('Failed to resolve dana address "$textField"', e);
-          return;
+        if (resolvedPaymentCode == null) {
+          // DNS resolution returned null - address not registered
+          Logger().w('Dana address "$textField" not found in DNS');
+          throw Exception('Dana address not found or not registered');
         }
+
+        // set payment code to resolved code
+        paymentCode = resolvedPaymentCode;
+
+        if (paymentCode == youContact.paymentCode) {
+          throw Exception("You cannot send to yourself");
+        }
+
+        Logger().d(
+            'Successfully resolved dana address to SP address: ${resolvedPaymentCode.substring(0, 20)}...');
       } else {
         // we interpret the input field as an on-chain address
         paymentCode = textField;
       }
 
       try {
-        if (context.mounted) {
-          validateAddressWithNetwork(address: paymentCode, network: network);
-        }
+        if (!mounted) return;
+        validateAddressWithNetwork(address: paymentCode, network: network);
       } catch (e) {
         if (e.toString().contains('network')) {
           throw InvalidNetworkException();
