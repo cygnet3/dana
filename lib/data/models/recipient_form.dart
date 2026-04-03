@@ -3,7 +3,7 @@ import 'package:danawallet/data/models/recipient_form_filled.dart';
 import 'package:danawallet/data/models/recommended_fee_model.dart';
 import 'package:danawallet/data/enums/selected_fee.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
-import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart';
+import 'package:danawallet/generated/rust/api/structs/silent_payment_psbt.dart';
 
 // this singleton class contains all filled data during the send flow
 // to save data in a global state, we use a singleton class.
@@ -14,7 +14,7 @@ class RecipientForm {
   SelectedFee? selectedFee;
   int? customFeeRate;
   RecommendedFeeResponse? currentFeeRates;
-  ApiSilentPaymentUnsignedTransaction? unsignedTx;
+  SilentPaymentPsbt? unsignedTx;
 
   static final RecipientForm _instance = RecipientForm._internal();
 

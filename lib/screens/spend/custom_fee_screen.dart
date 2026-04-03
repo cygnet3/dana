@@ -51,15 +51,8 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
       final filled = form.toFilled();
       final feeEstimationTx =
           await walletState.createUnsignedTxToThisRecipient(filled);
-      BigInt inputSum = BigInt.from(0);
-      for (var (_, utxo) in feeEstimationTx.selectedUtxos) {
-        inputSum += utxo.value.field0;
-      }
-      BigInt outputSum = BigInt.from(0);
-      for (var recipient in feeEstimationTx.recipients) {
-        outputSum += recipient.amount.field0;
-      }
-      _feeAmounts[_selectedFeeRate] = ApiAmount(field0: inputSum - outputSum);
+      final feeAmount = feeEstimationTx.getFeeAmount();
+      _feeAmounts[_selectedFeeRate] = feeAmount;
 
       if (mounted) {
         setState(() {
@@ -98,7 +91,7 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
     form.unsignedTx = unsignedTx;
 
     // update the send amount to the actual sent amount (can be different e.g. dust)
-    form.amount = form.unsignedTx!.getSendAmount(changeAddress: changeAddress);
+    form.amount = form.unsignedTx!.getSendAmount(changePaymentCode: changeAddress);
 
     if (mounted) {
       Navigator.push(context,

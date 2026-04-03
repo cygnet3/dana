@@ -11,7 +11,7 @@ import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/owned_output.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart';
-import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart';
+import 'package:danawallet/generated/rust/api/structs/silent_payment_psbt.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:danawallet/generated/rust/api/wallet/setup.dart';
@@ -285,7 +285,7 @@ class WalletState extends ChangeNotifier {
         receivePaymentCode, changePaymentCode);
   }
 
-  Future<ApiSilentPaymentUnsignedTransaction> createUnsignedTxToThisRecipient(
+  Future<SilentPaymentPsbt> createUnsignedTxToThisRecipient(
       RecipientFormFilled form) async {
     final wallet = await getWalletFromSecureStorage();
 
@@ -308,22 +308,17 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<String> signAndBroadcastUnsignedTx(
-      ApiSilentPaymentUnsignedTransaction unsignedTx) async {
-    final selectedOutputs = unsignedTx.selectedUtxos;
-
-    List<OutPoint> selectedOutpoints =
-        selectedOutputs.map((tuple) => tuple.$1).toList();
-
-    final recipients = unsignedTx.recipients;
-
+      SilentPaymentPsbt unsignedTx) async {
     final finalizedTx =
         SpWallet.finalizeTransaction(unsignedTransaction: unsignedTx);
+
+    final selectedOutpoints = finalizedTx.getSelectedOutpoints();
+
+    final recipients = finalizedTx.getRecipients(changePaymentCode: changePaymentCode);
 
     final wallet = await getWalletFromSecureStorage();
 
     final signedTx = wallet.signTransaction(unsignedTransaction: finalizedTx);
-
-    Logger().d("signed tx: $signedTx");
 
     String txid;
     try {
