@@ -1,7 +1,7 @@
 use crate::api::structs::network::ApiNetwork;
 use crate::api::structs::owned_output::OwnedOutput;
 use crate::api::structs::recipient::ApiRecipient;
-use crate::api::structs::unsigned_transaction::ApiSilentPaymentUnsignedTransaction;
+use crate::api::structs::silent_payment_psbt::SilentPaymentPsbt;
 
 use anyhow::Result;
 use bip39::rand::{thread_rng, RngCore};
@@ -22,7 +22,7 @@ impl SpWallet {
         api_recipients: Vec<ApiRecipient>,
         feerate: f32,
         network: ApiNetwork,
-    ) -> Result<ApiSilentPaymentUnsignedTransaction> {
+    ) -> Result<SilentPaymentPsbt> {
         let client = &self.client;
         let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = owned_outputs
             .into_iter()
@@ -62,7 +62,7 @@ impl SpWallet {
         wipe_address: String,
         feerate: f32,
         network: ApiNetwork,
-    ) -> Result<ApiSilentPaymentUnsignedTransaction> {
+    ) -> Result<SilentPaymentPsbt> {
         let client = &self.client;
         let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = owned_outputs
             .into_iter()
@@ -83,20 +83,20 @@ impl SpWallet {
             .collect();
 
         let recipient_address: RecipientAddress = RecipientAddress::try_from(wipe_address)?;
-        let res = client.create_drain_transaction(
+        let res: SilentPaymentPsbt = client.create_drain_transaction(
             available_utxos?,
             recipient_address,
             FeeRate::from_sat_per_vb(feerate),
             network.into(),
-        )?;
+        )?.into();
 
-        Ok(res.into())
+        Ok(res)
     }
 
     #[flutter_rust_bridge::frb(sync)]
     pub fn sign_transaction(
         &self,
-        unsigned_transaction: ApiSilentPaymentUnsignedTransaction,
+        unsigned_transaction: SilentPaymentPsbt,
     ) -> Result<String> {
         let mut aux_rand = [0u8; 32];
 
@@ -104,16 +104,17 @@ impl SpWallet {
         rng.fill_bytes(&mut aux_rand);
 
         let client = &self.client;
-        let tx = client.sign_transaction(unsigned_transaction.into(), &aux_rand)?;
+        let tx = client.sign_transaction(unsigned_transaction.try_into()?, &aux_rand)?;
         Ok(serialize(&tx).to_lower_hex_string())
     }
 
     #[flutter_rust_bridge::frb(sync)]
     pub fn finalize_transaction(
-        unsigned_transaction: ApiSilentPaymentUnsignedTransaction,
-    ) -> Result<ApiSilentPaymentUnsignedTransaction> {
-        let res = SpClient::finalize_transaction(unsigned_transaction.into())?;
-        Ok(res.into())
+        unsigned_transaction: SilentPaymentPsbt,
+    ) -> Result<SilentPaymentPsbt> {
+        let mut signed_transaction = unsigned_transaction.try_into()?;
+        let _ = SpClient::finalize_transaction(&mut signed_transaction)?;
+        Ok(signed_transaction.into())
     }
 
     // note: should only be used when using regtest, else there is privacy loss!
