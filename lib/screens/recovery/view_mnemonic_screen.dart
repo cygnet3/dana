@@ -37,12 +37,13 @@ class ViewMnemonicScreen extends StatelessWidget {
     Widget? birthdayText;
     if (birthday != null) {
       final locale = Localizations.localeOf(context);
-      final birthdayDateString = DateFormat('d MMM yyyy', locale.toString()).format(birthday!);
+      final birthdayDateString =
+          DateFormat('d MMM yyyy', locale.toString()).format(birthday!);
       birthdayText = AutoSizeText(
         "Wallet birthday: $birthdayDateString",
         style: BitcoinTextStyle.body3(Bitcoin.neutral1Dark).copyWith(
           fontFamily: 'Inter',
-        ), 
+        ),
         textAlign: TextAlign.center,
         maxLines: 1,
       );

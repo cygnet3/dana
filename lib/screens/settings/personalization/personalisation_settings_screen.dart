@@ -6,7 +6,6 @@ import 'package:danawallet/screens/settings/personalization/change_fiat_screen.d
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
-import 'package:danawallet/states/home_state.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -26,7 +25,6 @@ class PersonalisationSettingsScreen extends StatelessWidget {
 
   // Business logic methods
   void _onChangeFiat(BuildContext context) async {
-    final homeState = Provider.of<HomeState>(context, listen: false);
     final fiatExchangeRate =
         Provider.of<FiatExchangeRateState>(context, listen: false);
     final currentCurrency =
@@ -39,9 +37,9 @@ class PersonalisationSettingsScreen extends StatelessWidget {
               currentCurrency: currentCurrency,
               onConfirm: (chosen) async {
                 await fiatExchangeRate.updateCurrency(chosen);
-                homeState.showMainScreen();
+
                 if (context.mounted) {
-                  Navigator.popUntil(context, (route) => route.isFirst);
+                  goToHomeScreen(context);
                 }
               }));
     }

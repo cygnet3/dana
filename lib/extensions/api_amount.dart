@@ -6,6 +6,14 @@ extension ApiAmountExtension on ApiAmount {
     return ApiAmount(field0: field0 + other.field0);
   }
 
+  ApiAmount operator -(ApiAmount other) {
+    return ApiAmount(field0: field0 - other.field0);
+  }
+
+  bool operator >(ApiAmount other) {
+    return field0 > other.field0;
+  }
+
   String displayBtc() {
     final btcPart = field0 ~/ BigInt.from(bitcoinUnits);
     final satsPart = (field0 % BigInt.from(bitcoinUnits));
@@ -15,5 +23,28 @@ extension ApiAmountExtension on ApiAmount {
 
   String displaySats() {
     return '$field0 sats';
+  }
+
+  /// Converts a [BigInt] satoshi amount to [int] for SQLite storage.
+  /// Throws a [StateError] if the value exceeds the safe integer range,
+  /// preventing silent data corruption on overflow.
+  int toSat() {
+    if (!field0.isValidInt) {
+      throw StateError('Amount overflows int: $field0');
+    }
+    return field0.toInt();
+  }
+
+  static ApiAmount fromDbValue(Object? value) {
+    if (value == null) {
+      throw StateError('Db value is null');
+    }
+    if (value is int) {
+      return ApiAmount(field0: BigInt.from(value.toInt()));
+    } else if (value is BigInt) {
+      return ApiAmount(field0: value);
+    } else {
+      throw StateError('Invalid amount type: ${value.runtimeType}');
+    }
   }
 }

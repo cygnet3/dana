@@ -1,58 +1,42 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Mutex,
-};
+use std::{collections::HashSet, sync::Mutex};
 
+use crate::api::structs::owned_output::OwnedOutput;
 use crate::frb_generated::StreamSink;
+use flutter_rust_bridge::frb;
 use lazy_static::lazy_static;
-use spdk_wallet::{
-    bitcoin::{absolute::Height, BlockHash, OutPoint},
-    updater::DiscoveredOutput,
-};
 
 lazy_static! {
-    static ref SCAN_PROGRESS_STREAM_SINK: Mutex<Option<StreamSink<ScanProgress>>> =
-        Mutex::new(None);
+    static ref SCAN_PROGRESS_STREAM_SINK: Mutex<Option<StreamSink<u32>>> = Mutex::new(None);
     static ref STATE_UPDATE_STREAM_SINK: Mutex<Option<StreamSink<StateUpdate>>> = Mutex::new(None);
 }
 
 #[derive(Debug)]
-pub enum StateUpdate {
-    NoUpdate {
-        blkheight: Height,
-    },
-    Update {
-        blkheight: Height,
-        blkhash: BlockHash,
-        found_outputs: HashMap<OutPoint, DiscoveredOutput>,
-        found_inputs: HashSet<OutPoint>,
-    },
+#[frb]
+pub struct StateUpdate {
+    pub blkheight: u32,
+    pub blkhash: String,
+    pub found_outputs: Vec<OwnedOutput>,
+    pub found_inputs: HashSet<crate::api::structs::outpoint::OutPoint>,
 }
 
-pub struct ScanProgress {
-    pub start: u32,
-    pub current: u32,
-    pub end: u32,
-}
-
-pub fn create_scan_progress_stream(s: StreamSink<ScanProgress>) {
+pub fn create_sync_progress_stream(s: StreamSink<u32>) {
     let mut stream_sink = SCAN_PROGRESS_STREAM_SINK.lock().unwrap();
     *stream_sink = Some(s);
 }
 
-pub fn create_scan_update_stream(s: StreamSink<StateUpdate>) {
+pub fn create_sync_update_stream(s: StreamSink<StateUpdate>) {
     let mut stream_sink = STATE_UPDATE_STREAM_SINK.lock().unwrap();
     *stream_sink = Some(s);
 }
 
-pub(crate) fn send_scan_progress(scan_progress: ScanProgress) {
+pub(crate) fn send_sync_progress(scan_progress: u32) {
     let stream_sink = SCAN_PROGRESS_STREAM_SINK.lock().unwrap();
     if let Some(stream_sink) = stream_sink.as_ref() {
         stream_sink.add(scan_progress).unwrap();
     }
 }
 
-pub(crate) fn send_state_update(update: StateUpdate) {
+pub(crate) fn send_sync_update(update: StateUpdate) {
     let stream_sink = STATE_UPDATE_STREAM_SINK.lock().unwrap();
     if let Some(stream_sink) = stream_sink.as_ref() {
         stream_sink.add(update).unwrap();

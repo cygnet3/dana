@@ -1,55 +1,14 @@
-use serde::{Deserialize, Serialize};
-use spdk_wallet::bitcoin::secp256k1::Scalar;
-use spdk_wallet::bitcoin::{absolute::Height, ScriptBuf};
-use spdk_wallet::updater::DiscoveredOutput;
+use flutter_rust_bridge::frb;
 
-use crate::api::outputs::OwnedOutput;
 use crate::api::structs::amount::ApiAmount;
-use crate::api::structs::output_spend_status::ApiOutputSpendStatus;
+use crate::api::structs::outpoint::OutPoint;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct ApiOwnedOutput {
-    pub blockheight: u32,
+#[derive(Debug, Clone)]
+#[frb]
+pub struct OwnedOutput {
+    pub outpoint: OutPoint,
     pub tweak: [u8; 32],
     pub amount: ApiAmount,
-    pub script: String,
-    pub label: Option<String>,
-    pub spend_status: ApiOutputSpendStatus,
-}
-
-impl From<OwnedOutput> for ApiOwnedOutput {
-    fn from(value: OwnedOutput) -> Self {
-        ApiOwnedOutput {
-            blockheight: value.blockheight.to_consensus_u32(),
-            tweak: value.tweak,
-            amount: value.amount.into(),
-            script: value.script.to_hex_string(),
-            label: value.label.map(|l| l.as_string()),
-            spend_status: value.spend_status.into(),
-        }
-    }
-}
-
-impl From<ApiOwnedOutput> for OwnedOutput {
-    fn from(value: ApiOwnedOutput) -> Self {
-        OwnedOutput {
-            blockheight: Height::from_consensus(value.blockheight).unwrap(),
-            tweak: value.tweak,
-            amount: value.amount.into(),
-            script: ScriptBuf::from_hex(&value.script).unwrap(),
-            label: value.label.map(|l| l.try_into().unwrap()),
-            spend_status: value.spend_status.into(),
-        }
-    }
-}
-
-impl From<ApiOwnedOutput> for DiscoveredOutput {
-    fn from(value: ApiOwnedOutput) -> Self {
-        Self {
-            tweak: Scalar::from_be_bytes(value.tweak).unwrap(),
-            value: value.amount.into(),
-            script_pubkey: ScriptBuf::from_hex(&value.script).unwrap(),
-            label: value.label.map(|l| l.try_into().unwrap()),
-        }
-    }
+    pub script: Vec<u8>,
+    pub label: Option<[u8; 32]>,
 }

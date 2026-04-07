@@ -184,10 +184,7 @@ class _EditContactSheetState extends State<EditContactSheet> {
         displayError("Failed to delete contact", e);
       }
 
-      if (mounted) {
-        // contact deleted, go to home screen
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      }
+      if (mounted) goToHomeScreen(context);
     }
   }
 

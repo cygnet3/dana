@@ -10,10 +10,9 @@ import 'package:danawallet/screens/onboarding/choose_network.dart';
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/screens/onboarding/onboarding_skeleton.dart';
 import 'package:danawallet/screens/onboarding/recovery/seed_phrase.dart';
-import 'package:danawallet/services/backup_service.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
-import 'package:danawallet/states/scan_progress_notifier.dart';
+import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button_outlined.dart';
@@ -31,68 +30,6 @@ class OverviewScreen extends StatefulWidget {
 }
 
 class _OverviewScreenState extends State<OverviewScreen> {
-  Future<void> onRestoreFile(BuildContext context) async {
-    try {
-      final walletState = Provider.of<WalletState>(context, listen: false);
-      final chainState = Provider.of<ChainState>(context, listen: false);
-      final contactsState = Provider.of<ContactsState>(context, listen: false);
-      final scanProgress =
-          Provider.of<ScanProgressNotifier>(context, listen: false);
-      final encryptedBackup = await BackupService.getEncryptedBackupFromFile();
-
-      if (encryptedBackup != null) {
-        final controller = TextEditingController();
-
-        final password = await showInputAlertDialog(
-            controller,
-            TextInputType.text,
-            'Backup password',
-            'provide password for backup',
-            showReset: false);
-
-        if (password is String) {
-          await BackupService.restoreFromEncryptedBackup(
-              encryptedBackup, password);
-
-          await walletState.initialize();
-          final network = walletState.network;
-          final blindbitUrl =
-              await SettingsRepository.instance.getBlindbitUrl() ??
-                  network.defaultBlindbitUrl;
-          chainState.initialize(network);
-
-          // we can safely ignore the result of connecting, since we get the birthday from the backup
-          await chainState.connect(blindbitUrl);
-
-          chainState.startSyncService(walletState, scanProgress, true);
-
-          final goToDanaAddressSetup =
-              await walletState.checkDanaAddressRegistrationNeeded();
-
-          // initialize contacts state using restored wallet state
-          contactsState.initialize(
-              walletState.receivePaymentCode, walletState.danaAddress);
-
-          if (context.mounted) {
-            Widget nextScreen = goToDanaAddressSetup
-                ? const RegisterDanaAddressScreen()
-                : const PinGuard();
-            Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => nextScreen),
-                (Route<dynamic> route) => false);
-          }
-        }
-      }
-    } catch (e) {
-      if (e is InvalidNetworkException) {
-        displayWarning("Backup file is for a different network");
-      } else {
-        displayWarning("restore failed, wrong password?");
-      }
-    }
-  }
-
   Future<void> onCreateNewWallet(BuildContext context) async {
     ApiNetwork network;
     // in dev environment, allow user to choose network
@@ -112,7 +49,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
     final chainState = Provider.of<ChainState>(context, listen: false);
     final contactsState = Provider.of<ContactsState>(context, listen: false);
     final scanProgress =
-        Provider.of<ScanProgressNotifier>(context, listen: false);
+        Provider.of<SyncProgressNotifier>(context, listen: false);
 
     final blindbitUrl = network.defaultBlindbitUrl;
 
@@ -142,7 +79,10 @@ class _OverviewScreenState extends State<OverviewScreen> {
       }
 
       // clear path (don't allow users to go back to registration screen by pressing 'back')
-      goToScreenAndResetPath(context, nextScreen);
+      Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => nextScreen),
+          (Route<dynamic> route) => false);
     }
   }
 
@@ -221,14 +161,6 @@ class _OverviewScreenState extends State<OverviewScreen> {
 
     final footer = Column(
       children: [
-        if (isDevEnv)
-          FooterButtonOutlined(
-              title: 'Restore (file backup)',
-              onPressed: () => onRestoreFile(context)),
-        if (isDevEnv)
-          const SizedBox(
-            height: 15,
-          ),
         FooterButtonOutlined(
             title: 'Restore', onPressed: () => onRestoreMnemonic(context)),
         const SizedBox(

@@ -2,11 +2,9 @@
 // Do not put code in `mod.rs`, but put in e.g. `simple.rs`.
 //
 
-pub mod backup;
 pub mod bip39;
 pub mod chain;
-pub mod history;
-pub mod outputs;
+pub mod legacy;
 pub mod simple;
 pub mod stream;
 pub mod structs;

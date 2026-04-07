@@ -1,15 +1,10 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/global_functions.dart';
-import 'package:danawallet/repositories/settings_repository.dart';
-import 'package:danawallet/screens/onboarding/introduction.dart';
 import 'package:danawallet/screens/recovery/view_mnemonic_screen.dart';
+import 'package:danawallet/screens/settings/wallet/confirm_reset_wallet.dart';
+import 'package:danawallet/screens/settings/wallet/confirm_wallet_deletion.dart';
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
-import 'package:danawallet/services/backup_service.dart';
-import 'package:danawallet/states/chain_state.dart';
-import 'package:danawallet/states/contacts_state.dart';
-import 'package:danawallet/states/home_state.dart';
-import 'package:danawallet/states/scan_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -25,13 +20,13 @@ class WalletSettingsScreen extends StatelessWidget {
         subtitle: 'View your recovery phrase',
         onTap: () => _onShowMnemonic(context),
       ),
-      if (isDevEnv)
-        _WalletSettingsItem(
-          icon: Icons.backup_outlined,
-          title: 'File backup wallet',
-          subtitle: 'Export encrypted wallet backup',
-          onTap: () => _onBackupWalletButtonPressed(),
-        ),
+      _WalletSettingsItem(
+        icon: Icons.restore,
+        title: 'Reset wallet data',
+        subtitle: 'Reset wallet data to its birthday',
+        onTap: () => _onResetToBirthdayButtonPressed(context),
+        isDestructive: true,
+      ),
       _WalletSettingsItem(
         icon: Icons.delete_outline,
         title: 'Wipe wallet',
@@ -42,63 +37,12 @@ class WalletSettingsScreen extends StatelessWidget {
     ];
   }
 
-  // Business logic methods
-  Future<void> _onRemoveWallet(
-    WalletState walletState,
-    ChainState chainState,
-    ScanProgressNotifier scanProgress,
-    HomeState homeState,
-    ContactsState contacts,
-  ) async {
-    try {
-      await scanProgress.interruptScan();
-      chainState.reset();
-      await walletState.reset();
-      await SettingsRepository.instance.resetAll();
-      contacts.reset();
-      homeState.reset();
-    } catch (e) {
-      rethrow;
-    }
+  void _onResetToBirthdayButtonPressed(BuildContext context) {
+    goToScreen(context, const ConfirmWalletResetScreen());
   }
 
-  Future<void> _onBackupWalletButtonPressed() async {
-    final controller = TextEditingController();
-
-    final password = await showInputAlertDialog(controller, TextInputType.text,
-        'Set backup password', 'set password for backup file',
-        showReset: false);
-
-    if (password is String) {
-      try {
-        await BackupService.backupToFile(password);
-      } catch (e) {
-        displayNotification("backup failed");
-      }
-    }
-  }
-
-  Future<void> _onWipeWalletButtonPressed(BuildContext context) async {
-    final confirmed = await showConfirmationAlertDialog('Confirm deletion',
-        "Are you sure you want to wipe your wallet? Without a backup, you will lose your funds!");
-
-    if (confirmed && context.mounted) {
-      final walletState = Provider.of<WalletState>(context, listen: false);
-      final homeState = Provider.of<HomeState>(context, listen: false);
-      final chainState = Provider.of<ChainState>(context, listen: false);
-      final scanProgress =
-          Provider.of<ScanProgressNotifier>(context, listen: false);
-      final contacts = Provider.of<ContactsState>(context, listen: false);
-
-      await _onRemoveWallet(
-          walletState, chainState, scanProgress, homeState, contacts);
-      if (context.mounted) {
-        Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const IntroductionScreen()));
-      }
-    }
+  void _onWipeWalletButtonPressed(BuildContext context) {
+    goToScreen(context, const ConfirmWalletDeletionScreen());
   }
 
   void _onShowMnemonic(BuildContext context) async {
@@ -107,7 +51,8 @@ class WalletSettingsScreen extends StatelessWidget {
 
     if (context.mounted) {
       if (mnemonic != null) {
-        goToScreen(context, ViewMnemonicScreen(mnemonic: mnemonic, birthday: wallet.birthday));
+        goToScreen(context,
+            ViewMnemonicScreen(mnemonic: mnemonic, birthday: wallet.birthday));
       } else {
         showAlertDialog("Seed phrase unknown",
             "Seed phrase unknown! Did you import from keys?");

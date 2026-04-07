@@ -1,5 +1,5 @@
 mod info;
-mod scan;
+mod sync;
 pub mod setup;
 mod transaction;
 
@@ -10,10 +10,11 @@ use serde::{Deserialize, Serialize};
 use spdk_wallet::bitcoin::secp256k1::SecretKey;
 use spdk_wallet::client::{SpClient, SpendKey};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 #[frb(opaque)]
 pub struct SpWallet {
     client: SpClient,
+    #[allow(unused)]
     wallet_fingerprint: WalletFingerprint,
 }
 
@@ -28,16 +29,6 @@ impl SpWallet {
             client,
             wallet_fingerprint,
         })
-    }
-
-    #[frb(sync)]
-    pub fn decode(encoded_wallet: String) -> Result<Self> {
-        Ok(serde_json::from_str(&encoded_wallet)?)
-    }
-
-    #[frb(sync)]
-    pub fn encode(&self) -> Result<String> {
-        Ok(serde_json::to_string(&self)?)
     }
 
     #[frb(sync)]

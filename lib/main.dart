@@ -6,7 +6,10 @@ import 'package:danawallet/generated/rust/frb_generated.dart';
 
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/repositories/database_helper.dart';
+import 'package:danawallet/repositories/owned_outputs_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
+import 'package:danawallet/repositories/tx_history_repository.dart';
+import 'package:danawallet/repositories/wallet_repository.dart';
 import 'package:danawallet/screens/onboarding/introduction.dart';
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/services/app_info_service.dart';
@@ -15,7 +18,7 @@ import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/home_state.dart';
-import 'package:danawallet/states/scan_progress_notifier.dart';
+import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/pin_guard.dart';
 import 'package:flutter/material.dart';
@@ -38,10 +41,22 @@ void main() async {
 
   final appInfo = AppInfoService(packageInfo: await PackageInfo.fromPlatform());
 
-  // Initialize contacts database
+  // Initialize database
   await DatabaseHelper.instance.database;
+
+  // Migrate legacy SharedPreferences data to SQLite (for users upgrading from older app versions)
+  final spWallet = await WalletRepository.instance.readWallet();
+
+  if (spWallet != null) {
+    await migrateOutputsFromSharedPreferences();
+    await migrateTxHistoryFromSharedPreferences(spWallet.getChangeAddress());
+  }
+
+  // after database migration, enable foreign_keys pragma
+  DatabaseHelper.instance.enableForeignKeysPragma();
+
   final walletState = await WalletState.create();
-  final scanNotifier = await ScanProgressNotifier.create();
+  final scanNotifier = await SyncProgressNotifier.create();
   final chainState = ChainState();
   final contactsState = ContactsState();
   final fiatExchangeRate = await FiatExchangeRateState.create();

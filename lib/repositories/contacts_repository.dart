@@ -106,6 +106,7 @@ class ContactsRepository {
     final db = await _dbHelper.database;
     final maps = await db.query(
       'contacts',
+      orderBy: 'name COLLATE NOCASE ASC',
     );
 
     if (!loadCustomFields) {

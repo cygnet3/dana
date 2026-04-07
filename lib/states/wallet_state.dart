@@ -4,17 +4,21 @@ import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/recipient_form_filled.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
-import 'package:danawallet/generated/rust/api/history.dart';
-import 'package:danawallet/generated/rust/api/outputs.dart';
+import 'package:danawallet/extensions/outpoint.dart';
 import 'package:danawallet/generated/rust/api/stream.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
+import 'package:danawallet/generated/rust/api/structs/owned_output.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
+import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart';
 import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:danawallet/generated/rust/api/wallet/setup.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
+import 'package:danawallet/repositories/owned_outputs_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
+import 'package:danawallet/repositories/tx_history_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/services/dana_address_service.dart';
@@ -23,6 +27,8 @@ import 'package:logger/logger.dart';
 
 class WalletState extends ChangeNotifier {
   final walletRepository = WalletRepository.instance;
+  final ownedOutputsRepository = OwnedOutputsRepository.instance;
+  final txHistoryRepository = TxHistoryRepository.instance;
 
   // variables that never change (unless wallet is reset)
   late ApiNetwork network;
@@ -33,15 +39,18 @@ class WalletState extends ChangeNotifier {
   // variables that change
   late ApiAmount amount;
   late ApiAmount unconfirmedChange;
-  late int? lastScan;
-  late TxHistory txHistory;
-  late OwnedOutputs ownedOutputs;
+  late int? lastSync;
+
+  // Cached data from SQLite (updated via _updateWalletState)
+  late List<OwnedOutput> unspentOutputs;
+  late List<OutPoint> outpointsToScan;
+  late List<RecordedTransaction> transactions;
 
   // this variable may change in some exceptional cases
   Bip353Address? danaAddress;
 
   // stream to receive updates while scanning
-  late StreamSubscription scanResultSubscription;
+  late StreamSubscription syncResultSubscription;
 
   // private constructor
   WalletState._();
@@ -53,16 +62,53 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<void> _initStreams() async {
-    scanResultSubscription = createScanResultStream().listen(((event) async {
-      // process update
-      lastScan = event.getHeight();
-      txHistory.processStateUpdate(update: event, ownedOutputs: ownedOutputs);
-      ownedOutputs.processStateUpdate(update: event);
+    syncResultSubscription = createSyncResultStream().listen(((event) async {
+      // Process found outputs (new UTXOs we own)
+      for (final found in event.foundOutputs) {
+        // first, insert the transaction data in the known transactions table
+        await txHistoryRepository.addIncomingTransaction(
+          txid: found.outpoint.txid,
+          confirmationHeight: event.blkheight,
+          confirmationBlockhash: event.blkhash,
+        );
 
-      // save updates to storage
-      await walletRepository.saveHistory(txHistory);
-      await walletRepository.saveOwnedOutputs(ownedOutputs);
-      await walletRepository.saveLastScan(lastScan);
+        // Insert output into database
+        await ownedOutputsRepository.insertOutput(output: found);
+      }
+
+      List<OutPoint> unknownSpends = [];
+
+      // Process found inputs (our UTXOs being spent)
+      for (final outpoint in event.foundInputs) {
+        // Try to confirm an outgoing transaction
+        final confirmed = await txHistoryRepository.confirmOutgoingTransaction(
+          confirmedOutpointTxid: outpoint.txid,
+          confirmedOutpointVout: outpoint.vout,
+          confirmationHeight: event.blkheight,
+          confirmationBlockhash: event.blkhash,
+        );
+
+        // this output does not have an associated transaction
+        // this can occur if a user imported their seed phrase in multiple wallets
+        // generally we should discourage this, but it's inevitable that it will happen
+        if (!confirmed) {
+          unknownSpends.add(outpoint);
+        }
+      }
+
+      if (unknownSpends.isNotEmpty) {
+        Logger().w(
+            "Unknown spends detected, marking the following outpoints as spent: ${unknownSpends.toDisplayString()}");
+        await txHistoryRepository.addOutgoingTransaction(
+          spentOutpoints: unknownSpends,
+          recipients: [],
+          txid: null,
+          confirmationHeight: event.blkheight,
+          confirmationBlockhash: event.blkhash,
+        );
+      }
+
+      await walletRepository.saveLastSync(event.blkheight);
 
       // update UI
       await _updateWalletState();
@@ -95,12 +141,15 @@ class WalletState extends ChangeNotifier {
 
   @override
   void dispose() {
-    scanResultSubscription.cancel();
+    syncResultSubscription.cancel();
     super.dispose();
   }
 
   Future<void> reset() async {
     danaAddress = null;
+    await txHistoryRepository.reset();
+    // this is redudant, but we do it to be sure
+    await ownedOutputsRepository.reset();
     await walletRepository.reset();
   }
 
@@ -118,8 +167,8 @@ class WalletState extends ChangeNotifier {
     this.birthday = birthday;
     this.network = network;
 
-    // lastScan will be initialized by chainState synchronization service
-    lastScan = null;
+    // lastSync will be initialized by chainState synchronization service
+    lastSync = null;
 
     await _updateWalletState();
   }
@@ -138,7 +187,7 @@ class WalletState extends ChangeNotifier {
     changePaymentCode = wallet.getChangeAddress();
     birthday = now;
     this.network = network;
-    lastScan = currentTip;
+    lastSync = currentTip;
     await _updateWalletState();
   }
 
@@ -188,46 +237,70 @@ class WalletState extends ChangeNotifier {
     }
   }
 
-  Future<void> resetToScanHeight(int height) async {
-    lastScan = height;
+  Future<void> resetToBirthday() async {
+    await txHistoryRepository.reset();
 
-    ownedOutputs.resetToHeight(height: height);
-    txHistory.resetToHeight(height: height);
+    // owned outputs should be deleted automatically, but we do it explicitly to be sure
+    await ownedOutputsRepository.reset();
 
-    await walletRepository.saveLastScan(height);
-    await walletRepository.saveHistory(txHistory);
-    await walletRepository.saveOwnedOutputs(ownedOutputs);
+    // the sync service will handle setting the lastSync to the birthday height
+    await walletRepository.saveLastSync(null);
+
+    await _updateWalletState();
+    notifyListeners();
+  }
+
+  Future<void> resetToSyncHeight(int height) async {
+    await txHistoryRepository.deleteTransactionsAboveHeight(height);
+    // note: owned outputs are deleted automatically when their corresponding transactions are dropped
+
+    await walletRepository.saveLastSync(height);
 
     await _updateWalletState();
     notifyListeners();
   }
 
   Future<void> _updateWalletState() async {
-    txHistory = await walletRepository.readHistory();
-    ownedOutputs = await walletRepository.readOwnedOutputs();
-    lastScan = await walletRepository.readLastScan();
+    lastSync = await walletRepository.readLastSync();
 
-    amount = ownedOutputs.getUnspentAmount();
-    unconfirmedChange = txHistory.getUnconfirmedChange();
+    // Get cached data from SQLite
+    amount = await ownedOutputsRepository.getUnspentBalance();
+
+    // fetch the unconfirmed change from the transaction history
+    // in the future, we probably want to save change outputs in owned_outputs before they are confirmed
+    // in that case, we can get the unconfirmed change from the owned outputs repository,
+    // but for now we have to look at the transaction recipients
+    unconfirmedChange = await txHistoryRepository.getUnconfirmedChange(
+        receivePaymentCode, changePaymentCode);
+
+    // Cache outputs for spending and scanning
+    unspentOutputs = await ownedOutputsRepository.getUnspentOutputs();
+    final unspentOutpoints = await ownedOutputsRepository.getUnspentOutpoints();
+    final unconfirmedSpentOutpoints =
+        await txHistoryRepository.getUnconfirmedSpentOutpoints();
+    outpointsToScan = [...unspentOutpoints, ...unconfirmedSpentOutpoints];
+
+    // Cache transactions for UI
+    transactions = await txHistoryRepository.getAllTransactions(
+        receivePaymentCode, changePaymentCode);
   }
 
   Future<ApiSilentPaymentUnsignedTransaction> createUnsignedTxToThisRecipient(
       RecipientFormFilled form) async {
     final wallet = await getWalletFromSecureStorage();
 
-    final unspentOutputs = ownedOutputs.getUnspentOutputs();
     if (form.amount.field0 < amount.field0 - BigInt.from(546)) {
       return wallet.createNewTransaction(
-          apiOutputs: unspentOutputs,
+          ownedOutputs: unspentOutputs,
           apiRecipients: [
             ApiRecipient(
-                address: form.recipient.paymentCode, amount: form.amount)
+                paymentCode: form.recipient.paymentCode, amount: form.amount)
           ],
           feerate: form.feerate.toDouble(),
           network: network);
     } else {
       return wallet.createDrainTransaction(
-          apiOutputs: unspentOutputs,
+          ownedOutputs: unspentOutputs,
           wipeAddress: form.recipient.paymentCode,
           feerate: form.feerate.toDouble(),
           network: network);
@@ -238,16 +311,10 @@ class WalletState extends ChangeNotifier {
       ApiSilentPaymentUnsignedTransaction unsignedTx) async {
     final selectedOutputs = unsignedTx.selectedUtxos;
 
-    List<String> selectedOutpoints =
+    List<OutPoint> selectedOutpoints =
         selectedOutputs.map((tuple) => tuple.$1).toList();
 
-    final changeValue =
-        unsignedTx.getChangeAmount(changeAddress: changePaymentCode);
-
-    final feeAmount = unsignedTx.getFeeAmount();
-
-    final recipients =
-        unsignedTx.getRecipients(changeAddress: changePaymentCode);
+    final recipients = unsignedTx.recipients;
 
     final finalizedTx =
         SpWallet.finalizeTransaction(unsignedTransaction: unsignedTx);
@@ -284,18 +351,11 @@ class WalletState extends ChangeNotifier {
           'Unable to broadcast transaction. Please check your connection and try again.');
     }
 
-    ownedOutputs.markOutpointsSpent(spentBy: txid, spent: selectedOutpoints);
-
-    txHistory.addOutgoingTxToHistory(
-        txid: txid,
-        spentOutpoints: selectedOutpoints,
-        recipients: recipients,
-        change: changeValue,
-        fee: feeAmount);
-
-    // save the updated wallet
-    await walletRepository.saveOwnedOutputs(ownedOutputs);
-    await walletRepository.saveHistory(txHistory);
+    await txHistoryRepository.addOutgoingTransaction(
+      txid: txid,
+      spentOutpoints: selectedOutpoints,
+      recipients: recipients,
+    );
 
     // refresh variables and notify listeners
     await _updateWalletState();

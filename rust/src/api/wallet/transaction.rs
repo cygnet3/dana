@@ -1,13 +1,13 @@
-use std::{collections::HashMap, str::FromStr};
-
 use crate::api::structs::network::ApiNetwork;
-use crate::api::structs::owned_output::ApiOwnedOutput;
+use crate::api::structs::owned_output::OwnedOutput;
 use crate::api::structs::recipient::ApiRecipient;
 use crate::api::structs::unsigned_transaction::ApiSilentPaymentUnsignedTransaction;
 
 use anyhow::Result;
 use bip39::rand::{thread_rng, RngCore};
 use spdk_wallet::backend_blindbit_v1::BlindbitClient;
+use spdk_wallet::bitcoin::secp256k1::Scalar;
+use spdk_wallet::bitcoin::ScriptBuf;
 use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex, OutPoint};
 use spdk_wallet::client::{FeeRate, Recipient, RecipientAddress, SpClient};
 use spdk_wallet::updater::DiscoveredOutput;
@@ -18,17 +18,27 @@ impl SpWallet {
     #[flutter_rust_bridge::frb(sync)]
     pub fn create_new_transaction(
         &self,
-        api_outputs: HashMap<String, ApiOwnedOutput>,
+        owned_outputs: Vec<OwnedOutput>,
         api_recipients: Vec<ApiRecipient>,
         feerate: f32,
         network: ApiNetwork,
     ) -> Result<ApiSilentPaymentUnsignedTransaction> {
         let client = &self.client;
-        let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = api_outputs
+        let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = owned_outputs
             .into_iter()
-            .map(|(string, output)| {
-                let outpoint = OutPoint::from_str(&string)?;
-                Ok((outpoint, output.into()))
+            .map(|output| {
+                let outpoint = output.outpoint.into();
+                let label = match output.label {
+                    Some(l) => Some(Scalar::from_be_bytes(l)?.into()),
+                    None => None,
+                };
+                let output = DiscoveredOutput {
+                    tweak: Scalar::from_be_bytes(output.tweak)?,
+                    value: output.amount.into(),
+                    script_pubkey: ScriptBuf::from_bytes(output.script),
+                    label,
+                };
+                Ok((outpoint, output))
             })
             .collect();
         let recipients: Vec<Recipient> = api_recipients
@@ -48,17 +58,27 @@ impl SpWallet {
     #[flutter_rust_bridge::frb(sync)]
     pub fn create_drain_transaction(
         &self,
-        api_outputs: HashMap<String, ApiOwnedOutput>,
+        owned_outputs: Vec<OwnedOutput>,
         wipe_address: String,
         feerate: f32,
         network: ApiNetwork,
     ) -> Result<ApiSilentPaymentUnsignedTransaction> {
         let client = &self.client;
-        let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = api_outputs
+        let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = owned_outputs
             .into_iter()
-            .map(|(string, output)| {
-                let outpoint = OutPoint::from_str(&string)?;
-                Ok((outpoint, output.into()))
+            .map(|output| {
+                let outpoint = output.outpoint.into();
+                let label = match output.label {
+                    Some(l) => Some(Scalar::from_be_bytes(l)?.into()),
+                    None => None,
+                };
+                let output = DiscoveredOutput {
+                    tweak: Scalar::from_be_bytes(output.tweak)?,
+                    value: output.amount.into(),
+                    script_pubkey: ScriptBuf::from_bytes(output.script),
+                    label,
+                };
+                Ok((outpoint, output))
             })
             .collect();
 
@@ -98,7 +118,7 @@ impl SpWallet {
 
     // note: should only be used when using regtest, else there is privacy loss!
     pub async fn broadcast_using_blindbit(blindbit_url: String, tx: String) -> Result<String> {
-        let blindbit_client = BlindbitClient::new(blindbit_url)?;
+        let blindbit_client = BlindbitClient::new(&blindbit_url)?;
 
         let res = blindbit_client.forward_tx(tx).await?;
 

@@ -12,7 +12,7 @@ import 'package:danawallet/screens/spend/choose_recipient.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
-import 'package:danawallet/states/scan_progress_notifier.dart';
+import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -44,11 +44,18 @@ class WalletScreenState extends State<WalletScreen> {
     });
   }
 
-  Widget buildScanProgress(double scanProgress) {
+  Widget buildScanProgress(double? scanProgress) {
     return Row(
       children: [
-        Text('Scanning: ${(scanProgress * 100.0).toStringAsFixed(0)} %  ',
-            style: BitcoinTextStyle.body5(Bitcoin.neutral7)),
+        if (scanProgress != null)
+          SizedBox(
+              width: 40,
+              child: Text('${(scanProgress * 100.0).toStringAsFixed(0)} %',
+                  textAlign: TextAlign.right,
+                  style: BitcoinTextStyle.body5(Bitcoin.neutral7))),
+        const SizedBox(
+          width: 5,
+        ),
         Expanded(
           child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
@@ -250,7 +257,7 @@ class WalletScreenState extends State<WalletScreen> {
   }
 
   ListTile toListTile(
-      ApiRecordedTransaction tx, FiatExchangeRateState exchangeRate) {
+      RecordedTransaction tx, FiatExchangeRateState exchangeRate) {
     Color? color;
     String amount;
     String amountprefix;
@@ -264,12 +271,12 @@ class WalletScreenState extends State<WalletScreen> {
     final contactsState = Provider.of<ContactsState>(context);
 
     switch (tx) {
-      case ApiRecordedTransaction_Incoming(:final field0):
+      case RecordedTransaction_Incoming(:final field0):
         recipientWidget = Text(
           'Incoming',
           style: BitcoinTextStyle.body4(Bitcoin.black),
         );
-        date = field0.confirmedAt?.toString() ?? 'Unconfirmed';
+        date = field0.confirmationHeight?.toString() ?? 'Unconfirmed';
         color = Bitcoin.green;
         amount = hideAmount ? hideAmountFormat : field0.amount.displayBtc();
         amountprefix = '+';
@@ -281,18 +288,24 @@ class WalletScreenState extends State<WalletScreen> {
         image = Image(
             image: const AssetImage("icons/receive.png", package: "bitcoin_ui"),
             color: Bitcoin.neutral3Dark);
-      case ApiRecordedTransaction_Outgoing(:final field0):
-        final paymentCode = field0.recipients[0].address;
-        recipientWidget =
-            contactsState.getDisplayNameWidget(context, paymentCode);
-        date = field0.confirmedAt?.toString() ?? 'Unconfirmed';
-        if (field0.confirmedAt == null) {
+      case RecordedTransaction_Outgoing(:final field0):
+        final paymentCode = field0.recipients.isNotEmpty
+            ? field0.recipients[0].paymentCode
+            : null;
+        recipientWidget = paymentCode != null
+            ? contactsState.getDisplayNameWidget(context, paymentCode)
+            // if an outgoing transaction has no recipients, this is very likely a self-spend
+            : Text('Send-to-Self',
+                style: BitcoinTextStyle.body4(Bitcoin.black));
+        date = field0.confirmationHeight?.toString() ?? 'Unconfirmed';
+        if (field0.confirmationHeight == null) {
           color = Bitcoin.neutral4;
         } else {
           color = Bitcoin.red;
         }
-        amount =
-            hideAmount ? hideAmountFormat : field0.totalOutgoing().displayBtc();
+        amount = hideAmount
+            ? hideAmountFormat
+            : (field0.totalOutgoing()).displayBtc();
         amountprefix = '-';
         amountFiat = hideAmount
             ? hideAmountFormat
@@ -303,12 +316,12 @@ class WalletScreenState extends State<WalletScreen> {
             image: const AssetImage("icons/send.png", package: "bitcoin_ui"),
             color: Bitcoin.neutral3Dark);
 
-      case ApiRecordedTransaction_UnknownOutgoing(:final field0):
+      case RecordedTransaction_UnknownOutgoing(:final field0):
         recipientWidget = Text(
           'Unknown',
           style: BitcoinTextStyle.body4(Bitcoin.black),
         );
-        date = field0.confirmedAt.toString();
+        date = field0.confirmationHeight.toString();
         color = Bitcoin.red;
         amount = hideAmount ? hideAmountFormat : field0.amount.displayBtc();
         amountprefix = '-';
@@ -349,7 +362,7 @@ class WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget buildTransactionHistory(List<ApiRecordedTransaction> transactions,
+  Widget buildTransactionHistory(List<RecordedTransaction> transactions,
       FiatExchangeRateState exchangeRate) {
     Widget history;
     if (transactions.isEmpty) {
@@ -363,8 +376,7 @@ class WalletScreenState extends State<WalletScreen> {
           reverse: false,
           itemCount: transactions.length,
           itemBuilder: (context, index) {
-            return toListTile(
-                transactions[transactions.length - 1 - index], exchangeRate);
+            return toListTile(transactions[index], exchangeRate);
           });
     }
 
@@ -464,14 +476,14 @@ class WalletScreenState extends State<WalletScreen> {
   }
 
   Widget buildFundingScreen(String silentPaymentAddress, String? danaAddress,
-      ScanProgressNotifier scanProgress, ChainState chainState) {
+      SyncProgressNotifier scanProgress, ChainState chainState) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Column(
         children: [
           // Show sync progress when actively scanning
           Visibility(
-              visible: scanProgress.scanning,
+              visible: scanProgress.isScanning,
               maintainAnimation: true,
               maintainSize: true,
               maintainState: true,
@@ -547,7 +559,7 @@ class WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  AppBar buildAppBar(bool isScanning, Color networkColor) {
+  AppBar buildAppBar(Color networkColor) {
     return AppBar(
       forceMaterialTransparency: true,
       title: Row(
@@ -571,7 +583,7 @@ class WalletScreenState extends State<WalletScreen> {
   Widget build(BuildContext context) {
     final walletState = Provider.of<WalletState>(context);
     final exchangeRate = Provider.of<FiatExchangeRateState>(context);
-    final scanProgress = Provider.of<ScanProgressNotifier>(context);
+    final scanProgress = Provider.of<SyncProgressNotifier>(context);
     final chainState = Provider.of<ChainState>(context);
     final danaAddress = walletState.danaAddress;
 
@@ -580,14 +592,13 @@ class WalletScreenState extends State<WalletScreen> {
     // Check if balance is zero
     bool isBalanceZero = amount.field0 == BigInt.zero;
     // Check if there's transaction history
-    bool hasTransactionHistory =
-        walletState.txHistory.toApiTransactions().isNotEmpty;
+    bool hasTransactionHistory = walletState.transactions.isNotEmpty;
 
     // Show funding screen only if balance is zero AND there's no transaction history
     bool showFundingScreen = isBalanceZero && !hasTransactionHistory;
 
     return Scaffold(
-        appBar: buildAppBar(scanProgress.scanning, walletState.network.toColor),
+        appBar: buildAppBar(walletState.network.toColor),
         body: showFundingScreen
             ? buildFundingScreen(
                 walletState.receivePaymentCode,
@@ -605,7 +616,7 @@ class WalletScreenState extends State<WalletScreen> {
                         children: [
                           // Show sync progress when actively scanning
                           Visibility(
-                              visible: scanProgress.scanning,
+                              visible: scanProgress.isScanning,
                               maintainAnimation: true,
                               maintainSize: true,
                               maintainState: true,
@@ -628,7 +639,7 @@ class WalletScreenState extends State<WalletScreen> {
                             buildDanaAddressBanner(danaAddress),
                           const Spacer(),
                           buildTransactionHistory(
-                            walletState.txHistory.toApiTransactions(),
+                            walletState.transactions,
                             exchangeRate,
                           ),
                           buildBottomButtons(walletState.receivePaymentCode),

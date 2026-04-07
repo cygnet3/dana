@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:danawallet/constants.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/states/chain_state.dart';
-import 'package:danawallet/states/scan_progress_notifier.dart';
+import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:logger/logger.dart';
@@ -11,7 +12,13 @@ import 'package:logger/logger.dart';
 class SynchronizationService {
   WalletState walletState;
   ChainState chainState;
-  ScanProgressNotifier scanProgress;
+  SyncProgressNotifier scanProgress;
+
+  // first sync will set the start height, all other syncs will keep the same height
+  // this is useful if we receive an error while syncing, and restart the sync process.
+  // this way, we make it explicit that we're continuing from the last sync,
+  // instead of completely restarting.
+  int? _startHeight;
 
   Timer? _timer;
   final Duration _interval = const Duration(seconds: 10);
@@ -83,41 +90,55 @@ class SynchronizationService {
   }
 
   Future<void> _performSynchronizationTask() async {
-    if (walletState.lastScan == null) {
-      // if we just recovered a wallet, we haven't set the lastScan variable yet.
-      Logger().d("Setting last scan to block height of birthday");
+    if (walletState.lastSync == null) {
+      // if we just recovered a wallet, we haven't set the lastSync variable yet.
+      Logger().d("Setting last sync to block height of birthday");
       try {
-        await _initializeLastScan();
+        await _initializeLastSync();
       } catch (e) {
         Logger().e("Error initializing last scan: $e");
         return;
       }
     }
 
-    if (walletState.lastScan! < chainState.tip) {
-      if (!scanProgress.scanning) {
+    if (walletState.lastSync! < chainState.tip) {
+      if (!scanProgress.isScanning) {
         Logger().i("Starting sync");
-        await scanProgress.scan(walletState);
+
+        // set start height if not yet set
+        _startHeight ??= walletState.lastSync!;
+
+        await scanProgress.scan(walletState, _startHeight!, chainState.tip);
       }
     }
 
-    if (chainState.tip < walletState.lastScan!) {
+    if (chainState.tip < walletState.lastSync!) {
       // not sure what we should do here, that's really bad
       Logger().e('Current height is less than wallet last scan');
     }
   }
 
-  Future<void> _initializeLastScan() async {
+  Future<void> _initializeLastSync() async {
+    // if we're using regtest, we ignore the date and set last_sync to 0
+    if (chainState.network == ApiNetwork.regtest) {
+      walletState.lastSync = 0;
+      return;
+    }
+
     // if wallet birthday isn't known, use the default birthday timestamp
     final timestamp = walletState.birthday ?? defaultBirthday;
 
     final blockHeight = await chainState.getBlockHeightFromDate(timestamp);
 
-    walletState.lastScan = blockHeight;
+    walletState.lastSync = blockHeight;
   }
 
   void stopSyncTimer() {
     Logger().i("Stopping sync service");
     _timer?.cancel();
+  }
+
+  void clearSyncHistory() {
+    _startHeight = null;
   }
 }

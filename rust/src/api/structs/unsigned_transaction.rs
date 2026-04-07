@@ -1,11 +1,9 @@
-use std::str::FromStr;
-
 use flutter_rust_bridge::frb;
 use spdk_wallet::bitcoin::{
     consensus::{deserialize, serialize},
     hex::{DisplayHex, FromHex},
     secp256k1::SecretKey,
-    Network, OutPoint,
+    Network,
 };
 use spdk_wallet::client::SilentPaymentUnsignedTransaction;
 
@@ -14,7 +12,7 @@ use crate::api::structs::discovered_output::ApiDiscoveredOutput;
 use crate::api::structs::recipient::ApiRecipient;
 
 pub struct ApiSilentPaymentUnsignedTransaction {
-    pub selected_utxos: Vec<(String, ApiDiscoveredOutput)>,
+    pub selected_utxos: Vec<(super::outpoint::OutPoint, ApiDiscoveredOutput)>,
     pub recipients: Vec<ApiRecipient>,
     pub partial_secret: [u8; 32],
     pub unsigned_tx: Option<String>,
@@ -27,7 +25,7 @@ impl From<SilentPaymentUnsignedTransaction> for ApiSilentPaymentUnsignedTransact
             selected_utxos: value
                 .selected_utxos
                 .into_iter()
-                .map(|(outpoint, output)| (outpoint.to_string(), output.into()))
+                .map(|(outpoint, output)| (outpoint.into(), output.into()))
                 .collect(),
             recipients: value.recipients.into_iter().map(|r| r.into()).collect(),
             partial_secret: value.partial_secret.secret_bytes(),
@@ -45,7 +43,7 @@ impl From<ApiSilentPaymentUnsignedTransaction> for SilentPaymentUnsignedTransact
             selected_utxos: value
                 .selected_utxos
                 .into_iter()
-                .map(|(outpoint, output)| (OutPoint::from_str(&outpoint).unwrap(), output.into()))
+                .map(|(outpoint, output)| (outpoint.into(), output.into()))
                 .collect(),
             recipients: value
                 .recipients
@@ -68,7 +66,7 @@ impl ApiSilentPaymentUnsignedTransaction {
             .recipients
             .iter()
             .filter_map(|r| {
-                if r.address != change_address {
+                if r.payment_code != change_address {
                     Some(r.amount.0)
                 } else {
                     None
@@ -85,7 +83,7 @@ impl ApiSilentPaymentUnsignedTransaction {
             .recipients
             .iter()
             .filter_map(|r| {
-                if r.address == change_address {
+                if r.payment_code == change_address {
                     Some(r.amount.0)
                 } else {
                     None
@@ -108,7 +106,7 @@ impl ApiSilentPaymentUnsignedTransaction {
     pub fn get_recipients(&self, change_address: String) -> Vec<ApiRecipient> {
         self.recipients
             .iter()
-            .filter(|r| r.address != change_address)
+            .filter(|r| r.payment_code != change_address)
             .cloned()
             .collect()
     }
