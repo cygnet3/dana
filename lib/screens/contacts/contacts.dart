@@ -3,6 +3,7 @@ import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/screens/contacts/add_contact_sheet.dart';
 import 'package:danawallet/screens/contacts/contact_details.dart';
 import 'package:danawallet/states/contacts_state.dart';
+import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -80,52 +81,41 @@ class _ContactsScreenState extends State<ContactsScreen> {
     final contactsState = Provider.of<ContactsState>(context);
     final hasContacts = contactsState.getOtherContactsCount() > 0;
 
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Text(
-          'Contacts',
-          style: BitcoinTextStyle.title4(Bitcoin.black),
-        ),
-      ),
+    return ScreenSkeleton(
+      showBackButton: false,
+      title: 'Contacts',
       floatingActionButton: FloatingActionButton(
         onPressed: _openAddContactSheet,
         backgroundColor: Bitcoin.blue,
         child: const Icon(Icons.add, color: Colors.white),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          children: [
-            // 'You' contact at the top
-            _buildContactItem(contactsState.getYouContact()),
-            const SizedBox(height: 20),
-            // Search bar
-            TextField(
-              controller: _searchController,
-              enabled: hasContacts,
-              style: BitcoinTextStyle.body4(Bitcoin.black),
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'Search contacts',
-                hintText: 'Search by name or address',
-                prefixIcon: Icon(Icons.search),
-              ),
+      body: Column(
+        children: [
+          _buildContactItem(contactsState.getYouContact()),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _searchController,
+            enabled: hasContacts,
+            style: BitcoinTextStyle.body4(Bitcoin.black),
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: 'Search contacts',
+              hintText: 'Search by name or address',
+              prefixIcon: Icon(Icons.search),
             ),
-            const SizedBox(height: 20),
-            // List of contacts and remote addresses
-            Expanded(
-              child: !hasContacts
-                  ? Center(
-                      child: Text(
-                        'No contacts yet',
-                        style: BitcoinTextStyle.body3(Bitcoin.neutral6),
-                      ),
-                    )
-                  : _buildSearchResults(contactsState),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 20),
+          Expanded(
+            child: !hasContacts
+                ? Center(
+                    child: Text(
+                      'No contacts yet',
+                      style: BitcoinTextStyle.body3(Bitcoin.neutral6),
+                    ),
+                  )
+                : _buildSearchResults(contactsState),
+          ),
+        ],
       ),
     );
   }

@@ -10,12 +10,16 @@ class ScreenSkeleton extends StatelessWidget {
   final String? title;
   final Widget body;
   final Widget? footer;
-  const ScreenSkeleton(
-      {super.key,
-      this.title,
-      required this.body,
-      this.footer,
-      required this.showBackButton});
+  final Widget? floatingActionButton;
+
+  const ScreenSkeleton({
+    super.key,
+    this.title,
+    required this.body,
+    this.footer,
+    this.floatingActionButton,
+    required this.showBackButton,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +28,7 @@ class ScreenSkeleton extends StatelessWidget {
           automaticallyImplyLeading: false,
           title: showBackButton ? const BackButtonWidget() : null,
         ),
+        floatingActionButton: floatingActionButton,
         body: Padding(
             padding: const EdgeInsets.all(25.0),
             child: Column(
