@@ -52,7 +52,7 @@ impl SpWallet {
         );
 
         scanner
-            .scan_blocks(start, end, dust_limit, ENABLE_CUTTHROUGH)
+            .scan_blocks(start..=end, false, dust_limit, ENABLE_CUTTHROUGH)
             .await?;
 
         Ok(())
