@@ -120,13 +120,14 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 [[package]]
 name = "backend-blindbit-v1"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#595c53043d32dd04925dfe6538a7ef12b3250312"
+source = "git+https://github.com/cygnet3/spdk?branch=master#2cc1d1609885de0f59ab81fb644526aa74f89f8f"
 dependencies = [
  "anyhow",
  "async-trait",
  "bitcoin 0.32.8",
  "futures",
  "hex",
+ "itertools",
  "reqwest",
  "serde",
  "serde_json",
@@ -1156,6 +1157,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "469fb0b9cefa57e3ef31275ee7cacb78f2fdca44e4765491884a2b119d4eb130"
 
 [[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1960,7 +1970,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 [[package]]
 name = "silentpayments"
 version = "0.5.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#595c53043d32dd04925dfe6538a7ef12b3250312"
+source = "git+https://github.com/cygnet3/spdk?branch=master#2cc1d1609885de0f59ab81fb644526aa74f89f8f"
 dependencies = [
  "bech32 0.9.1",
  "bimap",
@@ -2020,7 +2030,7 @@ dependencies = [
 [[package]]
 name = "spdk-core"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#595c53043d32dd04925dfe6538a7ef12b3250312"
+source = "git+https://github.com/cygnet3/spdk?branch=master#2cc1d1609885de0f59ab81fb644526aa74f89f8f"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2033,7 +2043,7 @@ dependencies = [
 [[package]]
 name = "spdk-wallet"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#595c53043d32dd04925dfe6538a7ef12b3250312"
+source = "git+https://github.com/cygnet3/spdk?branch=master#2cc1d1609885de0f59ab81fb644526aa74f89f8f"
 dependencies = [
  "anyhow",
  "backend-blindbit-v1",
