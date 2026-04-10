@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::api::structs::amount::ApiAmount;
 use crate::api::structs::recipient::ApiRecipient;
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum RecordedTransaction {
     Incoming(RecordedTransactionIncoming),
@@ -51,7 +52,7 @@ impl RecordedTransactionUnknownOutgoing {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct RecordedTransactionOutgoing {
     pub txid: String,
-    pub spent_outpoints: Vec<super::outpoint::OutPoint>,
+    pub spent_outpoints: Vec<crate::api::structs::outpoint::OutPoint>,
     pub recipients: Vec<ApiRecipient>,
     pub confirmation_height: Option<u32>,
     pub confirmation_blockhash: Option<String>,
@@ -64,5 +65,5 @@ pub struct RecordedTransactionUnknownOutgoing {
     pub amount: ApiAmount,
     pub confirmation_height: u32,
     pub confirmation_blockhash: Option<String>,
-    pub spent_outpoints: Vec<super::outpoint::OutPoint>,
+    pub spent_outpoints: Vec<crate::api::structs::outpoint::OutPoint>,
 }
