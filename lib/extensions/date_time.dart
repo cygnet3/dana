@@ -1,5 +1,9 @@
+import 'package:intl/intl.dart';
+
 extension DateTimeExtension on DateTime {
   int toSeconds() => millisecondsSinceEpoch ~/ 1000;
+
+  String toDisplayString() => DateFormat.yMMMd().add_Hm().format(this);
 }
 
 extension TimestampExtension on int {
