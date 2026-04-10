@@ -286,6 +286,12 @@ class WalletState extends ChangeNotifier {
         receivePaymentCode, changePaymentCode);
   }
 
+  Future<void> saveNote(int transactionId, String note) async {
+    await transactionsRepository.saveNote(transactionId, note);
+    await _updateWalletState();
+    notifyListeners();
+  }
+
   Future<ApiSilentPaymentUnsignedTransaction> createUnsignedTxToThisRecipient(
       RecipientFormFilled form) async {
     final wallet = await getWalletFromSecureStorage();
