@@ -7,6 +7,11 @@ const String defaultTestnet = "https://silentpayments.dev/blindbit/testnet";
 const String defaultSignet = "https://silentpayments.dev/blindbit/signet";
 const String defaultRegtest = "https://silentpayments.dev/blindbit/regtest";
 
+// The default block explorer base URL per network (null for regtest)
+const String defaultBlockExplorerMainnet = "https://mempool.space";
+const String defaultBlockExplorerTestnet = "https://mempool.space/testnet";
+const String defaultBlockExplorerSignet = "https://mempool.space/signet";
+
 // Default birthday, this value is based on the first Dana release
 final DateTime defaultBirthday = DateTime.utc(2025, 6, 1);
 
