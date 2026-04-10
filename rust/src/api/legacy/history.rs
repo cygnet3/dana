@@ -7,7 +7,7 @@ use spdk_wallet::bitcoin::OutPoint;
 use spdk_wallet::bitcoin::{absolute::Height, Amount, Txid};
 use spdk_wallet::client::Recipient;
 
-use crate::api::structs::recorded_transaction::{
+use crate::api::legacy::recorded_transaction::{
     RecordedTransaction, RecordedTransactionIncoming, RecordedTransactionOutgoing,
     RecordedTransactionUnknownOutgoing,
 };
