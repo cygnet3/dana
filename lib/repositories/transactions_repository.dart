@@ -1,20 +1,23 @@
 import 'package:danawallet/extensions/api_amount.dart';
+import 'package:danawallet/extensions/date_time.dart';
+import 'package:danawallet/data/models/recorded_transaction.dart';
 import 'package:danawallet/generated/rust/api/legacy/history.dart';
+import 'package:danawallet/generated/rust/api/legacy/recorded_transaction.dart'
+    as frb_legacy;
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
-import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart';
 import 'package:danawallet/repositories/database_helper.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
-class TxHistoryRepository {
+class TransactionsRepository {
   // private constructor
-  TxHistoryRepository._();
+  TransactionsRepository._();
 
   // singleton
-  static final instance = TxHistoryRepository._();
+  static final instance = TransactionsRepository._();
 
   Future<Database> get _db async => await DatabaseHelper.instance.database;
 
@@ -144,12 +147,13 @@ class TxHistoryRepository {
 
     final result = <RecordedTransaction>[];
 
-    // Process incoming transactions
     for (final row in transactions) {
       final transactionId = row['id'] as int;
       final txid = row['txid'] as String?;
       final confirmationHeight = row['confirmation_height'] as int?;
       final confirmationBlockhash = row['confirmation_blockhash'] as String?;
+      final note = row['user_note'] as String?;
+      final confirmationTimestamp = row['confirmation_timestamp'] as int?;
 
       final spentSum = await _txSpentSum(transactionId);
 
@@ -162,12 +166,15 @@ class TxHistoryRepository {
         // for an incoming transaction we read all owned outputs that are created from this tx
         final receiveSum = await _txAssociatedOwnedOutputsSum(transactionId);
 
-        result.add(RecordedTransaction.incoming(RecordedTransactionIncoming(
-          txid: txid, // incoming transaction always has a txid present
+        result.add(RecordedTransactionIncoming(
+          id: transactionId,
+          note: note,
+          confirmationTimestamp: confirmationTimestamp,
+          txid: txid,
           amount: receiveSum,
           confirmationHeight: confirmationHeight,
           confirmationBlockhash: confirmationBlockhash,
-        )));
+        ));
       } else {
         // this is an outgoing transaction
         // there are 2 types of outgoing transactions: regular and 'unknown'
@@ -184,43 +191,30 @@ class TxHistoryRepository {
             await _txRecipients(transactionId, receiveCode, changeCode);
 
         if (txid != null) {
-          result.add(RecordedTransaction.outgoing(RecordedTransactionOutgoing(
-              txid: txid,
-              spentOutpoints: spentOutpoints,
-              recipients: recipients,
-              confirmationHeight: confirmationHeight,
-              confirmationBlockhash: confirmationBlockhash,
-              change: changeSum,
-              fee: fee)));
+          result.add(RecordedTransactionOutgoing(
+            id: transactionId,
+            note: note,
+            confirmationTimestamp: confirmationTimestamp,
+            txid: txid,
+            spentOutpoints: spentOutpoints,
+            recipients: recipients,
+            confirmationHeight: confirmationHeight,
+            confirmationBlockhash: confirmationBlockhash,
+            change: changeSum,
+            fee: fee,
+          ));
         } else {
-          // unknown outgoing transaction
-          // in this case, we don't know the txid and the fee
-          result.add(RecordedTransaction.unknownOutgoing(
-              RecordedTransactionUnknownOutgoing(
-                  amount: spentSum,
-                  confirmationHeight: confirmationHeight!,
-                  spentOutpoints: spentOutpoints)));
+          result.add(RecordedTransactionUnknownOutgoing(
+            id: transactionId,
+            note: note,
+            confirmationTimestamp: confirmationTimestamp,
+            amount: spentSum,
+            confirmationHeight: confirmationHeight!,
+            spentOutpoints: spentOutpoints,
+          ));
         }
       }
     }
-
-    // Sort by confirmation height (most recent first)
-    result.sort((a, b) {
-      int getConfirmationHeight(RecordedTransaction tx) {
-        return switch (tx) {
-          RecordedTransaction_Incoming(:final field0) =>
-            field0.confirmationHeight ?? 9999999999,
-          RecordedTransaction_Outgoing(:final field0) =>
-            field0.confirmationHeight ?? 9999999999,
-          RecordedTransaction_UnknownOutgoing(:final field0) =>
-            field0.confirmationHeight,
-        };
-      }
-
-      final aHeight = getConfirmationHeight(a);
-      final bHeight = getConfirmationHeight(b);
-      return -aHeight.compareTo(bHeight);
-    });
 
     return result;
   }
@@ -342,12 +336,31 @@ class TxHistoryRepository {
         .toList();
   }
 
+  Future<void> saveConfirmationTimestamp(
+      String txid, DateTime timestamp) async {
+    final db = await _db;
+    final timestampSeconds = timestamp.toSeconds();
+    await db.rawUpdate(
+      'UPDATE transactions SET confirmation_timestamp = ? WHERE txid = ?',
+      [timestampSeconds, txid],
+    );
+  }
+
   /// Delete transactions above a certain blockheight (for resetToHeight).
   Future<void> deleteTransactionsAboveHeight(int height) async {
     final db = await _db;
     await db.delete('transactions',
         where: 'confirmation_height IS NULL OR confirmation_height > ?',
         whereArgs: [height]);
+  }
+
+  Future<void> saveNote(int transactionId, String note) async {
+    final db = await _db;
+    final updatedAt = DateTime.now().toSeconds();
+    await db.rawUpdate(
+      'UPDATE transactions SET user_note = ?, user_note_updated_at = ? WHERE id = ?',
+      [note.isEmpty ? null : note, updatedAt, transactionId],
+    );
   }
 }
 
@@ -382,9 +395,9 @@ Future<void> migrateTxHistoryFromSharedPreferences(String changeCode) async {
 }
 
 Future<void> _insertTransaction(DatabaseExecutor executor,
-    RecordedTransaction tx, String changeCode) async {
+    frb_legacy.RecordedTransaction tx, String changeCode) async {
   switch (tx) {
-    case RecordedTransaction_Incoming(:final field0):
+    case frb_legacy.RecordedTransaction_Incoming(:final field0):
       await executor.insert(
           'transactions',
           {
@@ -395,7 +408,7 @@ Future<void> _insertTransaction(DatabaseExecutor executor,
           conflictAlgorithm: ConflictAlgorithm.ignore);
       break;
 
-    case RecordedTransaction_Outgoing(:final field0):
+    case frb_legacy.RecordedTransaction_Outgoing(:final field0):
       final txOutgoingId = await executor.insert(
           'transactions',
           {
@@ -432,7 +445,7 @@ Future<void> _insertTransaction(DatabaseExecutor executor,
 
       break;
 
-    case RecordedTransaction_UnknownOutgoing(:final field0):
+    case frb_legacy.RecordedTransaction_UnknownOutgoing(:final field0):
       final txOutgoingId = await executor.insert('transactions', {
         'txid': null,
         'confirmation_height': field0.confirmationHeight,

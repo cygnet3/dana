@@ -18,7 +18,7 @@ import 'package:danawallet/generated/rust/api/wallet/setup.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
 import 'package:danawallet/repositories/owned_outputs_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
-import 'package:danawallet/repositories/tx_history_repository.dart';
+import 'package:danawallet/repositories/transactions_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/services/dana_address_service.dart';
@@ -28,7 +28,7 @@ import 'package:logger/logger.dart';
 class WalletState extends ChangeNotifier {
   final walletRepository = WalletRepository.instance;
   final ownedOutputsRepository = OwnedOutputsRepository.instance;
-  final txHistoryRepository = TxHistoryRepository.instance;
+  final transactionsRepository = TransactionsRepository.instance;
 
   // variables that never change (unless wallet is reset)
   late ApiNetwork network;
@@ -66,7 +66,7 @@ class WalletState extends ChangeNotifier {
       // Process found outputs (new UTXOs we own)
       for (final found in event.foundOutputs) {
         // first, insert the transaction data in the known transactions table
-        await txHistoryRepository.addIncomingTransaction(
+        await transactionsRepository.addIncomingTransaction(
           txid: found.outpoint.txid,
           confirmationHeight: event.blkheight,
           confirmationBlockhash: event.blkhash,
@@ -81,7 +81,8 @@ class WalletState extends ChangeNotifier {
       // Process found inputs (our UTXOs being spent)
       for (final outpoint in event.foundInputs) {
         // Try to confirm an outgoing transaction
-        final confirmed = await txHistoryRepository.confirmOutgoingTransaction(
+        final confirmed =
+            await transactionsRepository.confirmOutgoingTransaction(
           confirmedOutpointTxid: outpoint.txid,
           confirmedOutpointVout: outpoint.vout,
           confirmationHeight: event.blkheight,
@@ -99,7 +100,7 @@ class WalletState extends ChangeNotifier {
       if (unknownSpends.isNotEmpty) {
         Logger().w(
             "Unknown spends detected, marking the following outpoints as spent: ${unknownSpends.toDisplayString()}");
-        await txHistoryRepository.addOutgoingTransaction(
+        await transactionsRepository.addOutgoingTransaction(
           spentOutpoints: unknownSpends,
           recipients: [],
           txid: null,
@@ -147,7 +148,7 @@ class WalletState extends ChangeNotifier {
 
   Future<void> reset() async {
     danaAddress = null;
-    await txHistoryRepository.reset();
+    await transactionsRepository.reset();
     // this is redudant, but we do it to be sure
     await ownedOutputsRepository.reset();
     await walletRepository.reset();
@@ -238,7 +239,7 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<void> resetToBirthday() async {
-    await txHistoryRepository.reset();
+    await transactionsRepository.reset();
 
     // owned outputs should be deleted automatically, but we do it explicitly to be sure
     await ownedOutputsRepository.reset();
@@ -251,7 +252,7 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<void> resetToSyncHeight(int height) async {
-    await txHistoryRepository.deleteTransactionsAboveHeight(height);
+    await transactionsRepository.deleteTransactionsAboveHeight(height);
     // note: owned outputs are deleted automatically when their corresponding transactions are dropped
 
     await walletRepository.saveLastSync(height);
@@ -270,18 +271,18 @@ class WalletState extends ChangeNotifier {
     // in the future, we probably want to save change outputs in owned_outputs before they are confirmed
     // in that case, we can get the unconfirmed change from the owned outputs repository,
     // but for now we have to look at the transaction recipients
-    unconfirmedChange = await txHistoryRepository.getUnconfirmedChange(
+    unconfirmedChange = await transactionsRepository.getUnconfirmedChange(
         receivePaymentCode, changePaymentCode);
 
     // Cache outputs for spending and scanning
     unspentOutputs = await ownedOutputsRepository.getUnspentOutputs();
     final unspentOutpoints = await ownedOutputsRepository.getUnspentOutpoints();
     final unconfirmedSpentOutpoints =
-        await txHistoryRepository.getUnconfirmedSpentOutpoints();
+        await transactionsRepository.getUnconfirmedSpentOutpoints();
     outpointsToScan = [...unspentOutpoints, ...unconfirmedSpentOutpoints];
 
     // Cache transactions for UI
-    transactions = await txHistoryRepository.getAllTransactions(
+    transactions = await transactionsRepository.getAllTransactions(
         receivePaymentCode, changePaymentCode);
   }
 
@@ -351,7 +352,7 @@ class WalletState extends ChangeNotifier {
           'Unable to broadcast transaction. Please check your connection and try again.');
     }
 
-    await txHistoryRepository.addOutgoingTransaction(
+    await transactionsRepository.addOutgoingTransaction(
       txid: txid,
       spentOutpoints: selectedOutpoints,
       recipients: recipients,
