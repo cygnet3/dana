@@ -9,6 +9,7 @@ import 'package:danawallet/data/models/recorded_transaction.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/spend/choose_recipient.dart';
+import 'package:danawallet/screens/home/wallet/transaction_details.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
@@ -358,15 +359,79 @@ class WalletScreenState extends State<WalletScreen> {
           Text(amountFiat, style: BitcoinTextStyle.body5(Bitcoin.neutral7)),
         ],
       ),
-      trailing: InkResponse(
-          onTap: () {
-            showAlertDialog(title, text);
-          },
-          child: Image(
-            image: const AssetImage("icons/caret_right.png",
-                package: "bitcoin_ui"),
-            color: Bitcoin.neutral7,
-          )),
+      onTap: () {
+        goToScreen(context, TransactionDetailsScreen(transactionId: tx.id));
+      },
+    );
+  }
+
+  void _showFullTransactionHistory(List<RecordedTransaction> transactions,
+      FiatExchangeRateState exchangeRate) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Bitcoin.neutral4,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header with close button
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'All transactions',
+                      style: BitcoinTextStyle.body2(Bitcoin.neutral8)
+                          .apply(fontWeightDelta: 2),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Icon(Icons.close, color: Bitcoin.neutral7),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Transaction list
+              Expanded(
+                child: transactions.isEmpty
+                    ? Center(
+                        child: Text('No transactions yet.',
+                            style: BitcoinTextStyle.body3(Bitcoin.neutral6)))
+                    : ListView.separated(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        separatorBuilder: (BuildContext context, int index) =>
+                            const Divider(),
+                        itemCount: transactions.length,
+                        itemBuilder: (context, index) {
+                          return toListTile(transactions[index], exchangeRate);
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -436,10 +501,8 @@ class WalletScreenState extends State<WalletScreen> {
                 )
               ]),
               cornerRadius: 6,
-              onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const ChooseRecipientScreen())),
+              onPressed: () =>
+                  goToScreen(context, const ChooseRecipientScreen()),
             ),
           ),
         ],
