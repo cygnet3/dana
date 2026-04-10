@@ -35,6 +35,21 @@ extension NetworkExtension on ApiNetwork {
     }
   }
 
+  /// Returns null for regtest, which has no public block explorer.
+  String? get defaultBlockExplorerUrl {
+    switch (this) {
+      case ApiNetwork.mainnet:
+        return defaultBlockExplorerMainnet;
+      case ApiNetwork.testnet3:
+      case ApiNetwork.testnet4:
+        return defaultBlockExplorerTestnet;
+      case ApiNetwork.signet:
+        return defaultBlockExplorerSignet;
+      case ApiNetwork.regtest:
+        return null;
+    }
+  }
+
   Color get toColor {
     switch (this) {
       case ApiNetwork.mainnet:
