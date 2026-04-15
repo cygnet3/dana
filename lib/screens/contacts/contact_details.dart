@@ -5,7 +5,7 @@ import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/data/models/recipient_form.dart';
-import 'package:danawallet/generated/rust/api/structs/recorded_transaction.dart';
+import 'package:danawallet/data/models/recorded_transaction.dart';
 import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/data/models/contact_field.dart';
@@ -320,12 +320,9 @@ class ContactDetailsScreen extends StatelessWidget {
     final allTransactions = walletState.transactions;
     final contactPaymentCode = contact.paymentCode;
 
-    // Filter to only outgoing transactions where recipient matches this contact's SP address
     return allTransactions.where((tx) {
-      if (tx is RecordedTransaction_Outgoing) {
-        // Check if any recipient matches the contact's SP address
-        return tx.field0.recipients
-            .any((recipient) => recipient.paymentCode == contactPaymentCode);
+      if (tx is RecordedTransactionOutgoing) {
+        return tx.recipients.any((r) => r.paymentCode == contactPaymentCode);
       }
       return false;
     }).toList();
@@ -333,21 +330,19 @@ class ContactDetailsScreen extends StatelessWidget {
 
   ListTile _buildTransactionTile(RecordedTransaction tx,
       FiatExchangeRateState exchangeRate, Contact contact) {
-    // Only handle outgoing transactions (we filter for those)
-    if (tx is! RecordedTransaction_Outgoing) {
+    if (tx is! RecordedTransactionOutgoing) {
       throw Exception('Expected outgoing transaction');
     }
 
-    final field0 = tx.field0;
     final recipient = contact.displayName;
-    final date = field0.confirmationHeight?.toString() ?? 'Unconfirmed';
+    final date = tx.confirmationHeight?.toString() ?? 'Unconfirmed';
     final color =
-        field0.confirmationHeight == null ? Bitcoin.neutral4 : Bitcoin.red;
-    final amount = field0.totalOutgoing().displayBtc();
+        tx.confirmationHeight == null ? Bitcoin.neutral4 : Bitcoin.red;
+    final amount = tx.totalOutgoing().displayBtc();
     const amountprefix = '-';
-    final amountFiat = exchangeRate.displayFiat(field0.totalOutgoing());
+    final amountFiat = exchangeRate.displayFiat(tx.totalOutgoing());
     const title = 'Outgoing transaction';
-    final text = field0.toString();
+    final text = tx.toString();
     final image = Image(
         image: const AssetImage("icons/send.png", package: "bitcoin_ui"),
         color: Bitcoin.neutral3Dark);
