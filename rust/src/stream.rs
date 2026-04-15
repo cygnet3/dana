@@ -32,13 +32,18 @@ pub fn create_sync_update_stream(s: StreamSink<StateUpdate>) {
 pub(crate) fn send_sync_progress(scan_progress: u32) {
     let stream_sink = SCAN_PROGRESS_STREAM_SINK.lock().unwrap();
     if let Some(stream_sink) = stream_sink.as_ref() {
-        stream_sink.add(scan_progress).unwrap();
+        // Silently ignore send errors: the main isolate may have died (app closed
+        // while service kept running) and its port is now closed.  The sink will
+        // be replaced with a fresh one the next time the main isolate calls
+        // create_sync_progress_stream().
+        let _ = stream_sink.add(scan_progress);
     }
 }
 
 pub(crate) fn send_sync_update(update: StateUpdate) {
     let stream_sink = STATE_UPDATE_STREAM_SINK.lock().unwrap();
     if let Some(stream_sink) = stream_sink.as_ref() {
-        stream_sink.add(update).unwrap();
+        // Same rationale as send_sync_progress above.
+        let _ = stream_sink.add(update);
     }
 }
