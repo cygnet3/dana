@@ -60,7 +60,12 @@ pub struct FlutterLogger {
 
 impl FlutterLogger {
     pub fn set_stream_sink(stream_sink: StreamSink<LogEntry>) {
-        let mut guard = FLUTTER_LOGGER_STREAM_SINK.write().unwrap();
+        // unwrap_or_else: recover from a poisoned lock.  The foreground service
+        // can keep the process alive across builds, so a panic from an old
+        // binary version that held this lock may still be present.
+        let mut guard = FLUTTER_LOGGER_STREAM_SINK
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         let overriding = guard.is_some();
 
         *guard = Some(stream_sink);
@@ -115,8 +120,19 @@ impl Log for FlutterLogger {
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             let entry = Self::record_to_entry(record);
-            if let Some(sink) = &*FLUTTER_LOGGER_STREAM_SINK.read().unwrap() {
-                sink.add(entry).unwrap();
+            // try_read instead of read:
+            //   • Never blocks — a log call can never delay set_stream_sink().
+            //     The only writer is set_stream_sink() which runs briefly and
+            //     infrequently; with try_read() no readers queue behind a
+            //     pending writer, so writer starvation is impossible.
+            //   • Never panics — try_read() returns Err on a poisoned lock
+            //     rather than panicking, and the if-let simply skips the
+            //     message.  A missed log line during the lock handover is an
+            //     acceptable trade-off.
+            if let Ok(guard) = FLUTTER_LOGGER_STREAM_SINK.try_read() {
+                if let Some(sink) = &*guard {
+                    let _ = sink.add(entry);
+                }
             }
         }
     }
