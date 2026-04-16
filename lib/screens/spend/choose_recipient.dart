@@ -1,7 +1,6 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact.dart';
-import 'package:danawallet/data/models/recipient_form.dart';
 import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/global_functions.dart';
@@ -73,10 +72,6 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
   }
 
   Future<void> onContinue() async {
-    RecipientForm form = RecipientForm();
-    // reset all fields
-    form.reset();
-
     setState(() {
       _addressErrorText = null;
     });
@@ -141,13 +136,10 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
       final contactsState = Provider.of<ContactsState>(context, listen: false);
       final existingContact =
           contactsState.getContactByPaymentCode(paymentCode);
-      form.recipient = existingContact ??
+      final recipient = existingContact ??
           Contact(bip353Address: bip353Address, paymentCode: paymentCode);
 
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const AmountSelectionScreen()),
-      );
+      goToScreen(context, AmountSelectionScreen(recipient: recipient));
       if (!mounted) return;
       setState(() {
         textFieldController.clear();
