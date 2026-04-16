@@ -283,6 +283,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
       setState(() {
         _errorMessage =
             'Either dana address or static address must be provided';
+        _isSaving = false;
       });
       return;
     }
