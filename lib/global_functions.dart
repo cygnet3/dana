@@ -74,9 +74,11 @@ void showAlertDialog(String title, String text) {
   }
 }
 
-void showWarningDialog(String message, WarningType type) {
-  showDialog(
-    context: globalNavigatorKey.currentContext!,
+Future<void> showWarningDialog(String message, WarningType type) async {
+  final ctx = globalNavigatorKey.currentContext;
+  if (ctx == null) return;
+  await showDialog<void>(
+    context: ctx,
     barrierDismissible: false,
     builder: (context) => PopScope(
         canPop: false, child: WarningMessage(message: message, type: type)),
