@@ -3,8 +3,13 @@ import 'package:danawallet/states/home_state.dart';
 import 'package:danawallet/screens/contacts/contacts.dart';
 import 'package:danawallet/screens/wallet/wallet.dart';
 import 'package:danawallet/screens/settings/settings_screen.dart';
+import 'package:danawallet/states/sync_orchestrator.dart';
+import 'package:danawallet/widgets/alerts/status_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+const Color bgSyncUnavailableColor = Color(0xFF1565C0);
+const String bgSyncUnavailableMsg = "Background syncing not available";
 
 class HomeScreen extends StatelessWidget {
   static const List<Widget> _widgetOptions = [
@@ -18,13 +23,27 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final homeState = Provider.of<HomeState>(context, listen: true);
+    final syncOrchestrator =
+        Provider.of<SyncOrchestrator>(context, listen: true);
 
     return PopScope(
         canPop: false,
         child: Scaffold(
-          body: IndexedStack(
-            index: homeState.selectedIndex,
-            children: _widgetOptions,
+          body: Column(
+            children: [
+              if (syncOrchestrator.inProcessFallback)
+                const StatusBanner(
+                  icon: Icons.sync,
+                  message: bgSyncUnavailableMsg,
+                  backgroundColor: bgSyncUnavailableColor,
+                ),
+              Expanded(
+                child: IndexedStack(
+                  index: homeState.selectedIndex,
+                  children: _widgetOptions,
+                ),
+              ),
+            ],
           ),
           bottomNavigationBar: BottomNavigationBar(
             items: <BottomNavigationBarItem>[
