@@ -1,11 +1,12 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/enums/selected_fee.dart';
-import 'package:danawallet/data/models/contact.dart';
+import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/extensions/payment_code.dart';
-import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart';
 import 'package:danawallet/global_functions.dart';
+import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/screens/spend/transaction_sent.dart';
 import 'package:danawallet/states/wallet_state.dart';
@@ -15,16 +16,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class ReadyToSendScreen extends StatefulWidget {
-  final Contact recipient;
-  final ApiAmount amount;
+  final ApiRecipient recipient;
+  final Bip353Address? providedBip353;
   final SelectedFee fee;
   final ApiSilentPaymentUnsignedTransaction unsignedTx;
   const ReadyToSendScreen(
       {super.key,
       required this.unsignedTx,
-      required this.amount,
       required this.fee,
-      required this.recipient});
+      required this.recipient,
+      this.providedBip353});
 
   @override
   ReadyToSendScreenState createState() => ReadyToSendScreenState();
@@ -55,6 +56,7 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
                       fee: widget.fee,
                       txid: txid,
                       network: walletState.network,
+                      providedBip353: widget.providedBip353,
                     )),
             (Route<dynamic> route) => route.isFirst);
       }
@@ -68,17 +70,24 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
 
   @override
   Widget build(BuildContext context) {
-    TextStyle displayRecipientStyle = BitcoinTextStyle.title5(Bitcoin.neutral8);
+    final contacts = Provider.of<ContactsState>(context, listen: false);
 
-    String displayRecipient = widget.recipient.displayName;
+    final contact =
+        contacts.getContactByPaymentCode(widget.recipient.paymentCode);
 
-    // format on-chain addresses nicely
-    if (displayRecipient == widget.recipient.paymentCode) {
-      displayRecipient =
-          displayRecipient.chunked(context, displayRecipientStyle, 0.85);
-    }
+    TextStyle displayRecipientStyle = BitcoinTextStyle.title5(Bitcoin.neutral7);
 
-    String displayAmount = widget.amount.displayBtc();
+    // if name is available, use this
+    String? displayRecipient = contact?.displayName;
+
+    // if no contact is available, use the bip353 address
+    displayRecipient ??= widget.providedBip353?.toString();
+
+    // if no human-readable name available, format payment code nicely
+    displayRecipient ??= widget.recipient.paymentCode
+        .chunked(context, displayRecipientStyle, 0.85);
+
+    String displayAmount = widget.recipient.amount.displayBtc();
 
     String displayArrivalTime = widget.fee.toEstimatedTime;
 

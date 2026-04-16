@@ -1,7 +1,8 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/enums/selected_fee.dart';
-import 'package:danawallet/data/models/contact.dart';
+import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
+import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/screens/contacts/add_contact_sheet.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
@@ -16,7 +17,8 @@ class TransactionSentScreen extends StatefulWidget {
   final String txid;
   final ApiNetwork network;
   final SelectedFee fee;
-  final Contact recipient;
+  final ApiRecipient recipient;
+  final Bip353Address? providedBip353;
 
   const TransactionSentScreen({
     super.key,
@@ -24,6 +26,7 @@ class TransactionSentScreen extends StatefulWidget {
     required this.network,
     required this.fee,
     required this.recipient,
+    this.providedBip353,
   });
 
   @override
@@ -74,7 +77,7 @@ class _TransactionSentScreenState extends State<TransactionSentScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => AddContactSheet(
-        initialDanaAddress: widget.recipient.bip353Address,
+        initialDanaAddress: widget.providedBip353,
         initialPaymentCode: widget.recipient.paymentCode,
       ),
     );
