@@ -137,7 +137,7 @@ class TransactionDetailsScreen extends StatelessWidget {
               radius: 20,
               backgroundColor: contact.avatarColor,
               child: Text(
-                contact.displayNameInitial,
+                contact.displayNameInitial ?? '?',
                 style: BitcoinTextStyle.body4(Bitcoin.white)
                     .apply(fontWeightDelta: 2),
               ),
@@ -145,7 +145,7 @@ class TransactionDetailsScreen extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                contact.displayName,
+                contact.displayName ?? '?',
                 style: BitcoinTextStyle.body4(Bitcoin.neutral8),
               ),
             ),
