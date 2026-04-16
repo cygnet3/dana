@@ -28,7 +28,7 @@ class OwnedOutputsRepository {
   }
 
   /// Get total balance of unspent outputs in satoshis.
-  Future<ApiAmount> getUnspentBalance() async {
+  Future<Amount> getUnspentBalance() async {
     final db = await _db;
     final result = await db.rawQuery('''
       SELECT COALESCE(SUM(o.amount_sat), 0) as total
@@ -36,7 +36,7 @@ class OwnedOutputsRepository {
       LEFT JOIN tx_spent_outpoints s ON s.outpoint_txid = o.txid AND s.outpoint_vout = o.vout
       WHERE s.transaction_id IS NULL
     ''');
-    return ApiAmount(field0: BigInt.from(result.first['total'] as int));
+    return Amount(field0: BigInt.from(result.first['total'] as int));
   }
 
   /// Get all unspent outputs for spending.
@@ -61,7 +61,7 @@ class OwnedOutputsRepository {
         outpoint:
             OutPoint(txid: row['txid'] as String, vout: row['vout'] as int),
         tweak: U8Array32(row['tweak'] as Uint8List),
-        amount: ApiAmountExtension.fromDbValue(row['amount_sat']),
+        amount: AmountExtension.fromDbValue(row['amount_sat']),
         script: row['script'] as Uint8List,
         label: label,
       ));

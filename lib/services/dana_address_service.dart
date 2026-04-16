@@ -11,7 +11,7 @@ import 'package:logger/logger.dart';
 
 class DanaAddressService {
   NameServerRepository nameServerRepository;
-  final ApiNetwork network;
+  final Network network;
   final Random _random = Random.secure();
   String? _domain;
 

@@ -82,7 +82,7 @@ class FiatExchangeRateState extends ChangeNotifier {
     }
   }
 
-  String displayFiat(ApiAmount amount) {
+  String displayFiat(Amount amount) {
     final symbol = currency.symbol();
     final minorUnits = currency.minorUnits();
     if (_cachedRate != null) {

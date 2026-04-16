@@ -14,14 +14,14 @@ import 'package:logger/logger.dart';
 class NameServerRepository {
   String baseUrl;
 
-  NameServerRepository({required ApiNetwork network})
+  NameServerRepository({required Network network})
       : baseUrl = (() {
           // live flavors only allow mainnet, so we don't need to separate based on the network
           if (appFlavor == 'live') {
             return nameServerLive;
           } else {
             // non-live flavors can have different networks
-            if (network == ApiNetwork.mainnet) {
+            if (network == Network.mainnet) {
               // used for mainnet
               return nameServerDevMainnet;
             } else {

@@ -7,13 +7,13 @@ use spdk_wallet::bitcoin::{
 };
 use spdk_wallet::client::SilentPaymentUnsignedTransaction;
 
-use crate::api::structs::amount::ApiAmount;
-use crate::api::structs::discovered_output::ApiDiscoveredOutput;
-use crate::api::structs::recipient::ApiRecipient;
+use crate::api::structs::amount::Amount;
+use crate::api::structs::discovered_output::DiscoveredOutput;
+use crate::api::structs::recipient::Recipient;
 
 pub struct ApiSilentPaymentUnsignedTransaction {
-    pub selected_utxos: Vec<(super::outpoint::OutPoint, ApiDiscoveredOutput)>,
-    pub recipients: Vec<ApiRecipient>,
+    pub selected_utxos: Vec<(super::outpoint::OutPoint, DiscoveredOutput)>,
+    pub recipients: Vec<Recipient>,
     pub partial_secret: [u8; 32],
     pub unsigned_tx: Option<String>,
     pub network: String,
@@ -61,7 +61,7 @@ impl From<ApiSilentPaymentUnsignedTransaction> for SilentPaymentUnsignedTransact
 
 impl ApiSilentPaymentUnsignedTransaction {
     #[frb(sync)]
-    pub fn get_send_amount(&self, change_address: String) -> ApiAmount {
+    pub fn get_send_amount(&self, change_address: String) -> Amount {
         let amount = self
             .recipients
             .iter()
@@ -74,11 +74,11 @@ impl ApiSilentPaymentUnsignedTransaction {
             })
             .sum();
 
-        ApiAmount(amount)
+        Amount(amount)
     }
 
     #[frb(sync)]
-    pub fn get_change_amount(&self, change_address: String) -> ApiAmount {
+    pub fn get_change_amount(&self, change_address: String) -> Amount {
         let amount = self
             .recipients
             .iter()
@@ -90,20 +90,20 @@ impl ApiSilentPaymentUnsignedTransaction {
                 }
             })
             .sum();
-        ApiAmount(amount)
+        Amount(amount)
     }
 
     #[frb(sync)]
-    pub fn get_fee_amount(&self) -> ApiAmount {
+    pub fn get_fee_amount(&self) -> Amount {
         let input_sum: u64 = self.selected_utxos.iter().map(|(_, o)| o.value.0).sum();
 
         let output_sum: u64 = self.recipients.iter().map(|r| r.amount.0).sum();
 
-        ApiAmount(input_sum - output_sum)
+        Amount(input_sum - output_sum)
     }
 
     #[frb(sync)]
-    pub fn get_recipients(&self, change_address: String) -> Vec<ApiRecipient> {
+    pub fn get_recipients(&self, change_address: String) -> Vec<Recipient> {
         self.recipients
             .iter()
             .filter(|r| r.payment_code != change_address)

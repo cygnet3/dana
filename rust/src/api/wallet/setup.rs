@@ -3,7 +3,7 @@ use std::str::FromStr;
 use spdk_wallet::bitcoin::secp256k1::{PublicKey, SecretKey};
 use spdk_wallet::client::SpendKey;
 
-use crate::api::structs::network::ApiNetwork;
+use crate::api::structs::network::Network;
 use crate::wallet::derive_keys_from_seed;
 
 use super::{ApiScanKey, ApiSpendKey, SpWallet};
@@ -14,7 +14,7 @@ const PASSPHRASE: &str = "";
 
 pub struct WalletSetupArgs {
     pub setup_type: WalletSetupType,
-    pub network: ApiNetwork,
+    pub network: Network,
 }
 
 pub enum WalletSetupType {

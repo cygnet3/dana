@@ -29,7 +29,7 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
   final TextEditingController amountController = TextEditingController();
   String? _amountErrorText;
 
-  void onContinue(ApiAmount availableBalance) {
+  void onContinue(Amount availableBalance) {
     setState(() {
       _amountErrorText = null;
     });
@@ -66,9 +66,9 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
       return;
     }
 
-    final recipient = ApiRecipient(
+    final recipient = Recipient(
       paymentCode: widget.paymentCode,
-      amount: ApiAmount(field0: amount),
+      amount: Amount(field0: amount),
     );
 
     goToScreen(

@@ -16,9 +16,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 class TransactionSentScreen extends StatefulWidget {
   final String txid;
-  final ApiNetwork network;
+  final Network network;
   final SelectedFee fee;
-  final ApiRecipient recipient;
+  final Recipient recipient;
   final Bip353Address? providedBip353;
 
   const TransactionSentScreen({
@@ -161,12 +161,12 @@ class _TransactionSentScreenState extends State<TransactionSentScreen> {
           ]),
       footer: Column(
         children: [
-          if (widget.network != ApiNetwork.regtest)
+          if (widget.network != Network.regtest)
             FooterButtonOutlined(
               title: 'View in block explorer',
               onPressed: () => _openInBlockExplorer(context),
             ),
-          if (widget.network != ApiNetwork.regtest)
+          if (widget.network != Network.regtest)
             const SizedBox(
               height: 10.0,
             ),

@@ -1,8 +1,8 @@
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
 
-use crate::api::structs::amount::ApiAmount;
-use crate::api::structs::recipient::ApiRecipient;
+use crate::api::structs::amount::Amount;
+use crate::api::structs::recipient::Recipient;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum RecordedTransaction {
@@ -14,7 +14,7 @@ pub enum RecordedTransaction {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct RecordedTransactionIncoming {
     pub txid: String,
-    pub amount: ApiAmount,
+    pub amount: Amount,
     pub confirmation_height: Option<u32>,
     pub confirmation_blockhash: Option<String>,
 }
@@ -33,12 +33,12 @@ impl RecordedTransactionOutgoing {
     }
 
     #[frb(sync)]
-    pub fn total_outgoing(&self) -> ApiAmount {
+    pub fn total_outgoing(&self) -> Amount {
         let sum: u64 = self.recipients.iter().map(|r| r.amount.0).sum();
         // include fee to the total as well
         let fee = self.fee.0;
 
-        ApiAmount(sum + fee)
+        Amount(sum + fee)
     }
 }
 
@@ -53,16 +53,16 @@ impl RecordedTransactionUnknownOutgoing {
 pub struct RecordedTransactionOutgoing {
     pub txid: String,
     pub spent_outpoints: Vec<crate::api::structs::outpoint::OutPoint>,
-    pub recipients: Vec<ApiRecipient>,
+    pub recipients: Vec<Recipient>,
     pub confirmation_height: Option<u32>,
     pub confirmation_blockhash: Option<String>,
-    pub change: ApiAmount,
-    pub fee: ApiAmount,
+    pub change: Amount,
+    pub fee: Amount,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct RecordedTransactionUnknownOutgoing {
-    pub amount: ApiAmount,
+    pub amount: Amount,
     pub confirmation_height: u32,
     pub confirmation_blockhash: Option<String>,
     pub spent_outpoints: Vec<crate::api::structs::outpoint::OutPoint>,

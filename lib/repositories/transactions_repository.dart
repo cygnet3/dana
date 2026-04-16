@@ -31,7 +31,7 @@ class TransactionsRepository {
 
   /// returns the sum of all owned outputs that were spent in this transaction
   /// for incoming transactions, we have no spent inputs and will return 0
-  Future<ApiAmount> _txSpentSum(int transactionId) async {
+  Future<Amount> _txSpentSum(int transactionId) async {
     final db = await _db;
     final res = await db.rawQuery('''
       SELECT COALESCE(SUM(o.amount_sat), 0) as total
@@ -42,10 +42,10 @@ class TransactionsRepository {
 
     final sum = res.first['total'] as int;
 
-    return ApiAmount(field0: BigInt.from(sum));
+    return Amount(field0: BigInt.from(sum));
   }
 
-  Future<ApiAmount> _txOutputSum(int transactionId) async {
+  Future<Amount> _txOutputSum(int transactionId) async {
     final db = await _db;
     final res = await db.rawQuery('''
       SELECT COALESCE(SUM(amount_sat), 0) as total
@@ -53,10 +53,10 @@ class TransactionsRepository {
       WHERE transaction_id = ?
     ''', [transactionId]);
 
-    return ApiAmount(field0: BigInt.from(res.first['total'] as int));
+    return Amount(field0: BigInt.from(res.first['total'] as int));
   }
 
-  Future<ApiAmount> _txAssociatedOwnedOutputsSum(int transactionId) async {
+  Future<Amount> _txAssociatedOwnedOutputsSum(int transactionId) async {
     final db = await _db;
     final res = await db.rawQuery('''
       SELECT COALESCE(SUM(o.amount_sat), 0) as total
@@ -65,12 +65,12 @@ class TransactionsRepository {
       WHERE t.id = ?
     ''', [transactionId]);
 
-    return ApiAmount(field0: BigInt.from(res.first['total'] as int));
+    return Amount(field0: BigInt.from(res.first['total'] as int));
   }
 
   /// sum of all 'change' outputs, aka recipients that we detect as ourselves
   /// note: we also count outputs that we send to our receive address as 'change'!
-  Future<ApiAmount> _txChangeSum(
+  Future<Amount> _txChangeSum(
       int transactionId, String receiveCode, String changeCode) async {
     final db = await _db;
     final res = await db.rawQuery('''
@@ -82,11 +82,11 @@ class TransactionsRepository {
 
     final sum = res.first['total'] as int;
 
-    return ApiAmount(field0: BigInt.from(sum));
+    return Amount(field0: BigInt.from(sum));
   }
 
   /// get the transaction fee, aka input_sum - output_sum
-  Future<ApiAmount> _txFee(int transactionId) async {
+  Future<Amount> _txFee(int transactionId) async {
     final inputSum = await _txSpentSum(transactionId);
 
     final outputSum = await _txOutputSum(transactionId);
@@ -96,7 +96,7 @@ class TransactionsRepository {
   }
 
   // returns all recipients for this transaction, with change outputs filtered out
-  Future<List<ApiRecipient>> _txRecipients(
+  Future<List<Recipient>> _txRecipients(
       int transactionId, String receiveCode, String changeCode) async {
     final db = await _db;
     final res = await db.rawQuery('''
@@ -107,12 +107,12 @@ class TransactionsRepository {
       AND payment_code != ?
     ''', [transactionId, receiveCode, changeCode]);
 
-    List<ApiRecipient> result = List.empty(growable: true);
+    List<Recipient> result = List.empty(growable: true);
 
     for (final row in res) {
-      result.add(ApiRecipient(
+      result.add(Recipient(
           paymentCode: row['payment_code'] as String,
-          amount: ApiAmount(field0: BigInt.from(row['amount_sat'] as int))));
+          amount: Amount(field0: BigInt.from(row['amount_sat'] as int))));
     }
 
     return result;
@@ -157,7 +157,7 @@ class TransactionsRepository {
 
       final spentSum = await _txSpentSum(transactionId);
 
-      if (spentSum == ApiAmount.zero()) {
+      if (spentSum == Amount.zero()) {
         // if spent sum is zero, we have not spent a single output during this transaction
         // in other words, this is an incoming transaction.
         // txid is always present for incoming transactions
@@ -220,7 +220,7 @@ class TransactionsRepository {
   }
 
   /// Get sum of unconfirmed change from outgoing transactions.
-  Future<ApiAmount> getUnconfirmedChange(
+  Future<Amount> getUnconfirmedChange(
       String receivePaymentCode, String changePaymentCode) async {
     final db = await _db;
     final result = await db.rawQuery('''
@@ -230,7 +230,7 @@ class TransactionsRepository {
       WHERE t.confirmation_height IS NULL
       AND (r.payment_code = ? OR r.payment_code = ?)
     ''', [receivePaymentCode, changePaymentCode]);
-    return ApiAmount(field0: BigInt.from(result.first['total'] as int));
+    return Amount(field0: BigInt.from(result.first['total'] as int));
   }
 
   /// Add an incoming transaction.
@@ -250,7 +250,7 @@ class TransactionsRepository {
   /// Add an outgoing transaction (when user sends).
   Future<void> addOutgoingTransaction({
     required List<OutPoint> spentOutpoints,
-    required List<ApiRecipient> recipients,
+    required List<Recipient> recipients,
     String? txid,
     int? confirmationHeight,
     String? confirmationBlockhash,
@@ -435,7 +435,7 @@ Future<void> _insertTransaction(DatabaseExecutor executor,
       }
       // in the legacy output format we used to store the change amount separately
       // to migrate, we need to add a new change output ourselves manually
-      if (field0.change > ApiAmount.zero()) {
+      if (field0.change > Amount.zero()) {
         await executor.insert('tx_recipients', {
           'transaction_id': txOutgoingId,
           'payment_code': changeCode,
