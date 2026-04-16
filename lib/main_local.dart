@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/frb_generated.dart';
 
+import 'package:danawallet/data/enums/warning_type.dart';
+import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/main.dart';
 import 'package:danawallet/repositories/database_helper.dart';
 import 'package:danawallet/repositories/owned_outputs_repository.dart';
@@ -13,14 +15,17 @@ import 'package:danawallet/screens/home/home.dart' show HomeScreen;
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/screens/onboarding/introduction.dart';
 import 'package:danawallet/services/app_info_service.dart';
+import 'package:danawallet/services/foreground_sync_service.dart';
 import 'package:danawallet/services/logging_service.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/home_state.dart';
+import 'package:danawallet/states/sync_orchestrator.dart';
 import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:logger/logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -34,6 +39,12 @@ void main() async {
   if (Platform.isLinux) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+  } else if (Platform.isAndroid) {
+    FlutterForegroundTask.initCommunicationPort();
+    ForegroundSyncService.instance.initialize();
+  } else {
+    Logger().e('Dana wallet is not supported on this platform');
+    exit(1);
   }
 
   final appInfo = AppInfoService(packageInfo: await PackageInfo.fromPlatform());
@@ -57,6 +68,34 @@ void main() async {
   final chainState = ChainState();
   final contactsState = ContactsState();
   final fiatExchangeRate = await FiatExchangeRateState.create();
+  final SyncBackend syncBackend;
+  if (Platform.isLinux) {
+    syncBackend = LinuxSyncBackend(
+      chainState: chainState,
+      syncProgress: scanNotifier,
+      walletState: walletState,
+    );
+  } else {
+    syncBackend = AndroidSyncBackend(
+      chainState: chainState,
+      syncProgress: scanNotifier,
+      walletState: walletState,
+      onUiEvent: (event) async {
+        switch (event) {
+          case SyncAppAction.notificationPermissionWarning:
+            await showWarningDialog(
+              'Dana syncs your wallet in the background using an Android '
+              'foreground service, which requires showing a notification while '
+              'it runs.\n\nWithout this permission your wallet will only sync '
+              'while the app is open, which may result in long sync times when '
+              'you reopen the app.',
+              WarningType.warn,
+            );
+        }
+      },
+    );
+  }
+  final syncOrchestrator = SyncOrchestrator(backend: syncBackend);
 
   // Try to update exchange rate, but don't crash if it fails
   try {
@@ -96,8 +135,6 @@ void main() async {
       Logger().w("Failed to connect");
     }
 
-    chainState.startSyncService(walletState, scanNotifier, true);
-
     final addressRegistrationNeeded =
         await walletState.checkDanaAddressRegistrationNeeded();
 
@@ -127,8 +164,15 @@ void main() async {
         ChangeNotifierProvider.value(value: HomeState()),
         ChangeNotifierProvider.value(value: fiatExchangeRate),
         ChangeNotifierProvider.value(value: contactsState),
+        ChangeNotifierProvider.value(value: syncOrchestrator),
       ],
       child: SilentPaymentApp(landingPage: landingPage),
     ),
   );
+
+  if (walletLoaded) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      syncOrchestrator.start();
+    });
+  }
 }
