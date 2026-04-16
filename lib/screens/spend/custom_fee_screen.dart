@@ -1,9 +1,10 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
-import 'package:danawallet/data/models/recipient_form.dart';
+import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/extensions/api_amount.dart';
-import 'package:danawallet/data/models/recipient_form_filled.dart';
 import 'package:danawallet/data/enums/selected_fee.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/generated/rust/api/structs/recipient.dart';
+import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/spend/ready_to_send.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
@@ -13,7 +14,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class CustomFeeScreen extends StatefulWidget {
-  const CustomFeeScreen({super.key});
+  final Contact recipient;
+  final ApiAmount amount;
+  const CustomFeeScreen(
+      {super.key, required this.recipient, required this.amount});
 
   @override
   State<CustomFeeScreen> createState() => _CustomFeeScreenState();
@@ -35,7 +39,6 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
 
   void _computeFeeAmounts() async {
     final walletState = Provider.of<WalletState>(context, listen: false);
-    RecipientForm form = RecipientForm();
 
     try {
       // Clear any previous error
@@ -46,11 +49,11 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
       }
 
       // Compute fee for the currently selected rate
-      form.selectedFee = SelectedFee.custom;
-      form.customFeeRate = _selectedFeeRate;
-      final filled = form.toFilled();
-      final feeEstimationTx =
-          await walletState.createUnsignedTxToThisRecipient(filled);
+      final recipient = ApiRecipient(
+          paymentCode: widget.recipient.paymentCode, amount: widget.amount);
+
+      final feeEstimationTx = await walletState.createUnsignedTxToThisRecipient(
+          recipient, _selectedFeeRate);
       BigInt inputSum = BigInt.from(0);
       for (var (_, utxo) in feeEstimationTx.selectedUtxos) {
         inputSum += utxo.value.field0;
@@ -83,26 +86,27 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
   }
 
   Future<void> onContinue() async {
-    // Store the custom fee rate in the recipient form
-    RecipientForm().customFeeRate = _selectedFeeRate;
-    RecipientForm().selectedFee = SelectedFee.custom;
-
     final walletState = Provider.of<WalletState>(context, listen: false);
     final changeAddress = walletState.changePaymentCode;
-    RecipientForm form = RecipientForm();
 
-    RecipientFormFilled filled = form.toFilled();
+    final recipient = ApiRecipient(
+        paymentCode: widget.recipient.paymentCode, amount: widget.amount);
 
-    final unsignedTx =
-        await walletState.createUnsignedTxToThisRecipient(filled);
-    form.unsignedTx = unsignedTx;
+    final unsignedTx = await walletState.createUnsignedTxToThisRecipient(
+        recipient, _selectedFeeRate);
 
     // update the send amount to the actual sent amount (can be different e.g. dust)
-    form.amount = form.unsignedTx!.getSendAmount(changeAddress: changeAddress);
+    final finalAmount = unsignedTx.getSendAmount(changeAddress: changeAddress);
 
     if (mounted) {
-      Navigator.push(context,
-          MaterialPageRoute(builder: (context) => const ReadyToSendScreen()));
+      goToScreen(
+          context,
+          ReadyToSendScreen(
+            recipient: widget.recipient,
+            fee: SelectedFee.custom,
+            amount: finalAmount,
+            unsignedTx: unsignedTx,
+          ));
     }
   }
 

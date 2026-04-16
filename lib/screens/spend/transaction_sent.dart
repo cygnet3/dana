@@ -1,5 +1,6 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
-import 'package:danawallet/data/models/recipient_form.dart';
+import 'package:danawallet/data/enums/selected_fee.dart';
+import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/screens/contacts/add_contact_sheet.dart';
@@ -14,11 +15,15 @@ import 'package:url_launcher/url_launcher.dart';
 class TransactionSentScreen extends StatefulWidget {
   final String txid;
   final ApiNetwork network;
+  final SelectedFee fee;
+  final Contact recipient;
 
   const TransactionSentScreen({
     super.key,
     required this.txid,
     required this.network,
+    required this.fee,
+    required this.recipient,
   });
 
   @override
@@ -35,13 +40,11 @@ class _TransactionSentScreenState extends State<TransactionSentScreen> {
   }
 
   void _checkEligibleToSaveContact() {
-    final form = RecipientForm();
+    final paymentCode = widget.recipient.paymentCode;
     final contacts = Provider.of<ContactsState>(context, listen: false);
 
-    final recipient = form.recipient!;
-
     // only reusable payment codes (sp-addresses) are eligible
-    final isReusable = isReusablePaymentCode(address: recipient.paymentCode);
+    final isReusable = isReusablePaymentCode(address: paymentCode);
     if (isReusable) {
       // We check by (reusable) payment codes instead of dana address.
       // This is important in the following case:
@@ -52,7 +55,7 @@ class _TransactionSentScreenState extends State<TransactionSentScreen> {
       // we already have this recipient in our contact list.
       final knownPaymentCodes = contacts.getKnownPaymentCodes();
 
-      final isInContacts = knownPaymentCodes.contains(recipient.paymentCode);
+      final isInContacts = knownPaymentCodes.contains(paymentCode);
       if (!isInContacts) {
         setState(() {
           _isEligible = true;
@@ -66,14 +69,13 @@ class _TransactionSentScreenState extends State<TransactionSentScreen> {
   }
 
   Future<void> _openAddContactSheet() async {
-    final form = RecipientForm();
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => AddContactSheet(
-        initialDanaAddress: form.recipient!.bip353Address,
-        initialPaymentCode: form.recipient!.paymentCode,
+        initialDanaAddress: widget.recipient.bip353Address,
+        initialPaymentCode: widget.recipient.paymentCode,
       ),
     );
     if (result == true) {
@@ -85,7 +87,7 @@ class _TransactionSentScreenState extends State<TransactionSentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    String estimatedTime = RecipientForm().selectedFee!.toEstimatedTime;
+    final estimatedTime = widget.fee.toEstimatedTime;
 
     return ScreenSkeleton(
       showBackButton: false,

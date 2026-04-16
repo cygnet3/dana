@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
-import 'package:danawallet/data/models/recipient_form_filled.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/extensions/outpoint.dart';
@@ -293,23 +292,22 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<ApiSilentPaymentUnsignedTransaction> createUnsignedTxToThisRecipient(
-      RecipientFormFilled form) async {
+      ApiRecipient recipient, int feerate) async {
     final wallet = await getWalletFromSecureStorage();
 
-    if (form.amount.field0 < amount.field0 - BigInt.from(546)) {
+    if (recipient.amount.field0 < amount.field0 - BigInt.from(546)) {
       return wallet.createNewTransaction(
           ownedOutputs: unspentOutputs,
           apiRecipients: [
-            ApiRecipient(
-                paymentCode: form.recipient.paymentCode, amount: form.amount)
+            recipient,
           ],
-          feerate: form.feerate.toDouble(),
+          feerate: feerate.toDouble(),
           network: network);
     } else {
       return wallet.createDrainTransaction(
           ownedOutputs: unspentOutputs,
-          wipeAddress: form.recipient.paymentCode,
-          feerate: form.feerate.toDouble(),
+          wipeAddress: recipient.paymentCode,
+          feerate: feerate.toDouble(),
           network: network);
     }
   }
