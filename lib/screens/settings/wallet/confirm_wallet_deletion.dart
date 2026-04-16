@@ -4,7 +4,7 @@ import 'package:danawallet/screens/onboarding/introduction.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/home_state.dart';
-import 'package:danawallet/states/sync_progress_notifier.dart';
+import 'package:danawallet/states/sync_orchestrator.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/icons/circular_icon.dart';
@@ -28,11 +28,10 @@ class ConfirmWalletDeletionScreen extends StatelessWidget {
     final walletState = Provider.of<WalletState>(context, listen: false);
     final homeState = Provider.of<HomeState>(context, listen: false);
     final chainState = Provider.of<ChainState>(context, listen: false);
-    final scanProgress =
-        Provider.of<SyncProgressNotifier>(context, listen: false);
+    final orchestrator = Provider.of<SyncOrchestrator>(context, listen: false);
     final contacts = Provider.of<ContactsState>(context, listen: false);
 
-    await scanProgress.interruptSync();
+    await orchestrator.stop();
     chainState.reset();
     await walletState.reset();
     await SettingsRepository.instance.resetAll();

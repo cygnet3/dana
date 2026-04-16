@@ -9,7 +9,7 @@ import 'package:danawallet/screens/onboarding/recovery/birthday_picker_screen.da
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
-import 'package:danawallet/states/sync_progress_notifier.dart';
+import 'package:danawallet/states/sync_orchestrator.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/loading_widget.dart';
@@ -50,8 +50,8 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
       final walletState = Provider.of<WalletState>(context, listen: false);
       final chainState = Provider.of<ChainState>(context, listen: false);
       final contactsState = Provider.of<ContactsState>(context, listen: false);
-      final scanProgress =
-          Provider.of<SyncProgressNotifier>(context, listen: false);
+      final orchestrator =
+          Provider.of<SyncOrchestrator>(context, listen: false);
 
       // Get birthday: navigate to picker if user knows it, else null
       DateTime? birthday;
@@ -98,14 +98,14 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
         }
       }
 
-      chainState.startSyncService(walletState, scanProgress, true);
-
       final goToDanaAddressSetup =
           await walletState.checkDanaAddressRegistrationNeeded();
 
       // initialize contacts state using restored wallet state
       contactsState.initialize(
           walletState.receivePaymentCode, walletState.danaAddress);
+
+      await orchestrator.start();
 
       if (context.mounted) {
         Widget nextScreen = goToDanaAddressSetup

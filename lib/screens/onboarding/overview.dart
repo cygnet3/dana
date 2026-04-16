@@ -11,7 +11,7 @@ import 'package:danawallet/screens/onboarding/onboarding_skeleton.dart';
 import 'package:danawallet/screens/onboarding/recovery/seed_phrase.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
-import 'package:danawallet/states/sync_progress_notifier.dart';
+import 'package:danawallet/states/sync_orchestrator.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button_outlined.dart';
@@ -46,8 +46,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
     final walletState = Provider.of<WalletState>(context, listen: false);
     final chainState = Provider.of<ChainState>(context, listen: false);
     final contactsState = Provider.of<ContactsState>(context, listen: false);
-    final scanProgress =
-        Provider.of<SyncProgressNotifier>(context, listen: false);
+    final orchestrator = Provider.of<SyncOrchestrator>(context, listen: false);
 
     final blindbitUrl = network.defaultBlindbitUrl;
 
@@ -63,10 +62,11 @@ class _OverviewScreenState extends State<OverviewScreen> {
 
     await walletState.createNewWallet(network, currentTip);
 
-    // start chain sync service only *after* we created the wallet
-    chainState.startSyncService(walletState, scanProgress, false);
     // initialize contacts state with the user's payment code
     contactsState.initialize(walletState.receivePaymentCode, null);
+
+    await orchestrator.start();
+
     if (context.mounted) {
       // skip the dana address registration if we are currently offline, or using regtest
       Widget nextScreen;
