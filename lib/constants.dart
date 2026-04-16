@@ -51,3 +51,13 @@ const String nameServerDevMainnet =
 // name server for other flavors that user testnet/signet
 const String nameServerDevTestnet =
     "https://test.dev.nameserver.danawallet.app/v1";
+
+// Message keys sent to the main isolate from the foreground sync service.
+const String bgKeyStartHeight = 'startHeight';
+const String bgKeyEndHeight = 'endHeight';
+const String bgKeyComplete = 'complete';
+const String bgKeyRefresh = 'refresh';
+const String bgKeyInterrupt = 'interrupt';
+
+// Message keys sent to the background sync service from the main isolate.
+const String bgKeySync = 'sync';
