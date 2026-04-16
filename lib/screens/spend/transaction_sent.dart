@@ -1,6 +1,7 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/enums/selected_fee.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
+import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/generated/rust/api/validate.dart';
@@ -88,6 +89,35 @@ class _TransactionSentScreenState extends State<TransactionSentScreen> {
     }
   }
 
+  Future<void> _openInBlockExplorer(BuildContext context) async {
+    final defaultUrl = widget.network.defaultBlockExplorerUrl;
+    final txid = widget.txid;
+    if (defaultUrl == null) return;
+
+    try {
+      final url = Uri.parse('$defaultUrl/tx/$txid');
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Unable to open block explorer'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to open block explorer: $e'),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final estimatedTime = widget.fee.toEstimatedTime;
@@ -134,45 +164,7 @@ class _TransactionSentScreenState extends State<TransactionSentScreen> {
           if (widget.network != ApiNetwork.regtest)
             FooterButtonOutlined(
               title: 'View in block explorer',
-              onPressed: () async {
-                try {
-                  String baseUrl;
-                  switch (widget.network) {
-                    case ApiNetwork.mainnet:
-                      baseUrl = 'https://mempool.space';
-                      break;
-                    case ApiNetwork.testnet3:
-                    case ApiNetwork.testnet4:
-                      baseUrl = 'https://mempool.space/testnet';
-                      break;
-                    case ApiNetwork.signet:
-                      baseUrl = 'https://mempool.space/signet';
-                      break;
-                    case ApiNetwork.regtest:
-                      return; // Should not reach here due to if condition
-                  }
-                  final url = Uri.parse('$baseUrl/tx/${widget.txid}');
-                  if (await canLaunchUrl(url)) {
-                    await launchUrl(url, mode: LaunchMode.externalApplication);
-                  } else {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Unable to open block explorer'),
-                        ),
-                      );
-                    }
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Failed to open block explorer: $e'),
-                      ),
-                    );
-                  }
-                }
-              },
+              onPressed: () => _openInBlockExplorer(context),
             ),
           if (widget.network != ApiNetwork.regtest)
             const SizedBox(
