@@ -16,7 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class ReadyToSendScreen extends StatefulWidget {
-  final ApiRecipient recipient;
+  final Recipient recipient;
   final Bip353Address? providedBip353;
   final SelectedFee fee;
   final ApiSilentPaymentUnsignedTransaction unsignedTx;

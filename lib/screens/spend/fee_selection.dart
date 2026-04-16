@@ -17,7 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class FeeSelectionScreen extends StatefulWidget {
-  final ApiRecipient recipient;
+  final Recipient recipient;
   final Bip353Address? providedBip353;
 
   const FeeSelectionScreen(
@@ -31,7 +31,7 @@ class FeeSelectionScreen extends StatefulWidget {
 class FeeSelectionScreenState extends State<FeeSelectionScreen> {
   RecommendedFeeResponse? _currentFeeRates;
   SelectedFee _selected = SelectedFee.normal;
-  final Map<SelectedFee, ApiAmount> _feeAmounts = {};
+  final Map<SelectedFee, Amount> _feeAmounts = {};
 
   @override
   void initState() {
@@ -62,7 +62,7 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
       for (var recipient in feeEstimationTx.recipients) {
         outputSum += recipient.amount.field0;
       }
-      _feeAmounts[fee] = ApiAmount(field0: inputSum - outputSum);
+      _feeAmounts[fee] = Amount(field0: inputSum - outputSum);
     }
 
     setState(() {
@@ -80,7 +80,7 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
         widget.recipient, feerate);
 
     // update the send amount to the actual sent amount (can be different e.g. dust)
-    final updatedRecipient = ApiRecipient(
+    final updatedRecipient = Recipient(
       paymentCode: widget.recipient.paymentCode,
       amount: unsignedTx.getSendAmount(changeAddress: changeAddress),
     );

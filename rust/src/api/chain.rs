@@ -5,7 +5,7 @@ use spdk_wallet::backend_blindbit_v1::BlindbitClient;
 use spdk_wallet::bitcoin;
 use tokio::time::sleep;
 
-use crate::api::structs::network::ApiNetwork;
+use crate::api::structs::network::Network;
 
 pub async fn get_chain_height(blindbit_url: String) -> anyhow::Result<u32> {
     let client = BlindbitClient::new(&blindbit_url)?;
@@ -30,7 +30,7 @@ pub async fn get_chain_height(blindbit_url: String) -> anyhow::Result<u32> {
     }
 }
 
-pub async fn check_network(blindbit_url: String, network: ApiNetwork) -> anyhow::Result<bool> {
+pub async fn check_network(blindbit_url: String, network: Network) -> anyhow::Result<bool> {
     let network: bitcoin::Network = network.into();
     let client = BlindbitClient::new(&blindbit_url)?;
 

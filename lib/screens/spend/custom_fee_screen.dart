@@ -14,7 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class CustomFeeScreen extends StatefulWidget {
-  final ApiRecipient recipient;
+  final Recipient recipient;
   final Bip353Address? providedBip353;
   const CustomFeeScreen(
       {super.key, required this.recipient, this.providedBip353});
@@ -26,7 +26,7 @@ class CustomFeeScreen extends StatefulWidget {
 class _CustomFeeScreenState extends State<CustomFeeScreen> {
   int _selectedFeeRate = 1; // Default to 1 sat/vB
   double _sliderValue = 1.0; // Start at 1 sat/vB
-  final Map<int, ApiAmount> _feeAmounts = {};
+  final Map<int, Amount> _feeAmounts = {};
   bool _isLoadingFees = true;
   String? _errorMessage;
 
@@ -59,7 +59,7 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
       for (var recipient in feeEstimationTx.recipients) {
         outputSum += recipient.amount.field0;
       }
-      _feeAmounts[_selectedFeeRate] = ApiAmount(field0: inputSum - outputSum);
+      _feeAmounts[_selectedFeeRate] = Amount(field0: inputSum - outputSum);
 
       if (mounted) {
         setState(() {
@@ -90,7 +90,7 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
         widget.recipient, _selectedFeeRate);
 
     // update the send amount to the actual sent amount (can be different e.g. dust)
-    final updatedRecipient = ApiRecipient(
+    final updatedRecipient = Recipient(
       paymentCode: widget.recipient.paymentCode,
       amount: unsignedTx.getSendAmount(changeAddress: changeAddress),
     );

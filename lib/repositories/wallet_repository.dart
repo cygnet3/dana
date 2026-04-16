@@ -40,8 +40,8 @@ class WalletRepository {
     });
   }
 
-  Future<SpWallet> setupWallet(WalletSetupResult walletSetup,
-      ApiNetwork network, DateTime? birthday, int? lastSync) async {
+  Future<SpWallet> setupWallet(WalletSetupResult walletSetup, Network network,
+      DateTime? birthday, int? lastSync) async {
     if ((await secureStorage.readAll()).isNotEmpty) {
       throw Exception('Previous wallet not properly deleted');
     }
@@ -106,9 +106,9 @@ class WalletRepository {
     return await secureStorage.read(key: _keySeedPhrase);
   }
 
-  Future<ApiNetwork> readNetwork() async {
+  Future<Network> readNetwork() async {
     final networkStr = await nonSecureStorage.getString(_keyNetwork);
-    return ApiNetwork.values.byName(networkStr!);
+    return Network.values.byName(networkStr!);
   }
 
   Future<void> saveBirthday(DateTime birthday) async {

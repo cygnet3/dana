@@ -1,20 +1,18 @@
-use spdk_wallet::{
-    bitcoin::{secp256k1::Scalar, ScriptBuf},
-    updater::DiscoveredOutput,
-};
+use spdk_wallet::bitcoin::secp256k1::Scalar;
+use spdk_wallet::bitcoin::ScriptBuf;
 
-use crate::api::structs::amount::ApiAmount;
+use crate::api::structs::amount::Amount;
 
 #[derive(Debug, Clone)]
-pub struct ApiDiscoveredOutput {
+pub struct DiscoveredOutput {
     pub tweak: [u8; 32],
-    pub value: ApiAmount,
+    pub value: Amount,
     pub script_pubkey: String,
     pub label: Option<String>,
 }
 
-impl From<DiscoveredOutput> for ApiDiscoveredOutput {
-    fn from(value: DiscoveredOutput) -> Self {
+impl From<spdk_wallet::updater::DiscoveredOutput> for DiscoveredOutput {
+    fn from(value: spdk_wallet::updater::DiscoveredOutput) -> Self {
         Self {
             tweak: value.tweak.to_be_bytes(),
             value: value.value.into(),
@@ -24,8 +22,8 @@ impl From<DiscoveredOutput> for ApiDiscoveredOutput {
     }
 }
 
-impl From<ApiDiscoveredOutput> for DiscoveredOutput {
-    fn from(value: ApiDiscoveredOutput) -> Self {
+impl From<DiscoveredOutput> for spdk_wallet::updater::DiscoveredOutput {
+    fn from(value: DiscoveredOutput) -> Self {
         Self {
             tweak: Scalar::from_be_bytes(value.tweak).unwrap(),
             value: value.value.into(),
@@ -34,3 +32,4 @@ impl From<ApiDiscoveredOutput> for DiscoveredOutput {
         }
     }
 }
+

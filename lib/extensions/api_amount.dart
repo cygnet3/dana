@@ -1,16 +1,16 @@
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 
-extension ApiAmountExtension on ApiAmount {
-  ApiAmount operator +(ApiAmount other) {
-    return ApiAmount(field0: field0 + other.field0);
+extension AmountExtension on Amount {
+  Amount operator +(Amount other) {
+    return Amount(field0: field0 + other.field0);
   }
 
-  ApiAmount operator -(ApiAmount other) {
-    return ApiAmount(field0: field0 - other.field0);
+  Amount operator -(Amount other) {
+    return Amount(field0: field0 - other.field0);
   }
 
-  bool operator >(ApiAmount other) {
+  bool operator >(Amount other) {
     return field0 > other.field0;
   }
 
@@ -35,14 +35,14 @@ extension ApiAmountExtension on ApiAmount {
     return field0.toInt();
   }
 
-  static ApiAmount fromDbValue(Object? value) {
+  static Amount fromDbValue(Object? value) {
     if (value == null) {
       throw StateError('Db value is null');
     }
     if (value is int) {
-      return ApiAmount(field0: BigInt.from(value.toInt()));
+      return Amount(field0: BigInt.from(value.toInt()));
     } else if (value is BigInt) {
-      return ApiAmount(field0: value);
+      return Amount(field0: value);
     } else {
       throw StateError('Invalid amount type: ${value.runtimeType}');
     }

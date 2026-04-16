@@ -30,14 +30,14 @@ class WalletState extends ChangeNotifier {
   final transactionsRepository = TransactionsRepository.instance;
 
   // variables that never change (unless wallet is reset)
-  late ApiNetwork network;
+  late Network network;
   late String receivePaymentCode;
   late String changePaymentCode;
   DateTime? birthday; // birthday may not be known
 
   // variables that change
-  late ApiAmount amount;
-  late ApiAmount unconfirmedChange;
+  late Amount amount;
+  late Amount unconfirmedChange;
   late int? lastSync;
 
   // Cached data from SQLite (updated via _updateWalletState)
@@ -154,7 +154,7 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<void> restoreWallet(
-      ApiNetwork network, String mnemonic, DateTime? birthday) async {
+      Network network, String mnemonic, DateTime? birthday) async {
     final args = WalletSetupArgs(
         setupType: WalletSetupType.mnemonic(mnemonic), network: network);
     final setupResult = SpWallet.setupWallet(setupArgs: args);
@@ -173,7 +173,7 @@ class WalletState extends ChangeNotifier {
     await _updateWalletState();
   }
 
-  Future<void> createNewWallet(ApiNetwork network, int? currentTip) async {
+  Future<void> createNewWallet(Network network, int? currentTip) async {
     final now = DateTime.now().toUtc();
 
     final args = WalletSetupArgs(
@@ -292,7 +292,7 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<ApiSilentPaymentUnsignedTransaction> createUnsignedTxToThisRecipient(
-      ApiRecipient recipient, int feerate) async {
+      Recipient recipient, int feerate) async {
     final wallet = await getWalletFromSecureStorage();
 
     if (recipient.amount.field0 < amount.field0 - BigInt.from(546)) {
@@ -333,17 +333,17 @@ class WalletState extends ChangeNotifier {
     String txid;
     try {
       switch (network) {
-        case ApiNetwork.mainnet:
+        case Network.mainnet:
           txid = await SpWallet.broadcastTx(tx: signedTx, network: network);
           break;
-        case ApiNetwork.signet:
+        case Network.signet:
           txid = await MempoolApiRepository(network: network)
               .postTransaction(signedTx);
           break;
-        case ApiNetwork.regtest:
+        case Network.regtest:
           final blindbitUrl =
               await SettingsRepository.instance.getBlindbitUrl() ??
-                  ApiNetwork.regtest.defaultBlindbitUrl;
+                  Network.regtest.defaultBlindbitUrl;
           txid = await SpWallet.broadcastUsingBlindbit(
               blindbitUrl: blindbitUrl, tx: signedTx);
           break;
@@ -400,7 +400,7 @@ class WalletState extends ChangeNotifier {
   // Return value indicates whether the caller should be directed to the dana registration screen
   Future<bool> checkDanaAddressRegistrationNeeded() async {
     // regtest networks have no dana address support
-    if (network == ApiNetwork.regtest) {
+    if (network == Network.regtest) {
       danaAddress = null;
       return false;
     }

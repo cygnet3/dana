@@ -120,7 +120,7 @@ class SynchronizationService {
 
   Future<void> _initializeLastSync() async {
     // if we're using regtest, we ignore the date and set last_sync to 0
-    if (chainState.network == ApiNetwork.regtest) {
+    if (chainState.network == Network.regtest) {
       walletState.lastSync = 0;
       return;
     }

@@ -1,6 +1,6 @@
-use crate::api::structs::network::ApiNetwork;
+use crate::api::structs::network::Network;
 use crate::api::structs::owned_output::OwnedOutput;
-use crate::api::structs::recipient::ApiRecipient;
+use crate::api::structs::recipient::Recipient;
 use crate::api::structs::unsigned_transaction::ApiSilentPaymentUnsignedTransaction;
 
 use anyhow::Result;
@@ -9,7 +9,7 @@ use spdk_wallet::backend_blindbit_v1::BlindbitClient;
 use spdk_wallet::bitcoin::secp256k1::Scalar;
 use spdk_wallet::bitcoin::ScriptBuf;
 use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex, OutPoint};
-use spdk_wallet::client::{FeeRate, Recipient, RecipientAddress, SpClient};
+use spdk_wallet::client::{FeeRate, RecipientAddress, SpClient};
 use spdk_wallet::updater::DiscoveredOutput;
 
 use super::SpWallet;
@@ -19,9 +19,9 @@ impl SpWallet {
     pub fn create_new_transaction(
         &self,
         owned_outputs: Vec<OwnedOutput>,
-        api_recipients: Vec<ApiRecipient>,
+        api_recipients: Vec<Recipient>,
         feerate: f32,
-        network: ApiNetwork,
+        network: Network,
     ) -> Result<ApiSilentPaymentUnsignedTransaction> {
         let client = &self.client;
         let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = owned_outputs
@@ -41,7 +41,7 @@ impl SpWallet {
                 Ok((outpoint, output))
             })
             .collect();
-        let recipients: Vec<Recipient> = api_recipients
+        let recipients: Vec<spdk_wallet::client::Recipient> = api_recipients
             .into_iter()
             .map(|r| r.try_into().unwrap())
             .collect();
@@ -61,7 +61,7 @@ impl SpWallet {
         owned_outputs: Vec<OwnedOutput>,
         wipe_address: String,
         feerate: f32,
-        network: ApiNetwork,
+        network: Network,
     ) -> Result<ApiSilentPaymentUnsignedTransaction> {
         let client = &self.client;
         let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = owned_outputs
@@ -125,17 +125,17 @@ impl SpWallet {
         Ok(res.to_string())
     }
 
-    pub async fn broadcast_tx(tx: String, network: ApiNetwork) -> Result<String> {
+    pub async fn broadcast_tx(tx: String, network: Network) -> Result<String> {
         let tx: pushtx::Transaction = tx.parse().unwrap();
 
         let txid = tx.txid();
 
         let network = match network {
-            ApiNetwork::Mainnet => pushtx::Network::Mainnet,
-            ApiNetwork::Testnet3 => pushtx::Network::Testnet,
-            ApiNetwork::Testnet4 => pushtx::Network::Testnet,
-            ApiNetwork::Signet => pushtx::Network::Signet,
-            ApiNetwork::Regtest => pushtx::Network::Regtest,
+            Network::Mainnet => pushtx::Network::Mainnet,
+            Network::Testnet3 => pushtx::Network::Testnet,
+            Network::Testnet4 => pushtx::Network::Testnet,
+            Network::Signet => pushtx::Network::Signet,
+            Network::Regtest => pushtx::Network::Regtest,
         };
 
         let opts = pushtx::Opts {

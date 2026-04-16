@@ -14,9 +14,9 @@ class MempoolApiRepository {
   final String baseUrl;
   final FeeConverter converter;
 
-  MempoolApiRepository({ApiNetwork network = ApiNetwork.mainnet})
+  MempoolApiRepository({Network network = Network.mainnet})
       : baseUrl =
-            'https://mempool.space/${network != ApiNetwork.mainnet ? '${network.name}/' : ''}api',
+            'https://mempool.space/${network != Network.mainnet ? '${network.name}/' : ''}api',
         converter = MempoolApiFeeConverter();
 
   Future<RecommendedFeeResponse> getCurrentFeeRate() async {

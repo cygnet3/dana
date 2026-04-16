@@ -21,7 +21,7 @@ sealed class RecordedTransaction {
 final class RecordedTransactionIncoming extends RecordedTransaction {
   @override
   final String txid;
-  final ApiAmount amount;
+  final Amount amount;
   @override
   final int? confirmationHeight;
   @override
@@ -42,13 +42,13 @@ final class RecordedTransactionOutgoing extends RecordedTransaction {
   @override
   final String txid;
   final List<OutPoint> spentOutpoints;
-  final List<ApiRecipient> recipients;
+  final List<Recipient> recipients;
   @override
   final int? confirmationHeight;
   @override
   final String? confirmationBlockhash;
-  final ApiAmount change;
-  final ApiAmount fee;
+  final Amount change;
+  final Amount fee;
 
   RecordedTransactionOutgoing({
     required super.id,
@@ -63,12 +63,12 @@ final class RecordedTransactionOutgoing extends RecordedTransaction {
     required this.fee,
   });
 
-  ApiAmount totalOutgoing() {
+  Amount totalOutgoing() {
     final sum = recipients.fold(
       BigInt.zero,
       (acc, r) => acc + r.amount.field0,
     );
-    return ApiAmount(field0: sum + fee.field0);
+    return Amount(field0: sum + fee.field0);
   }
 
   @override
@@ -87,7 +87,7 @@ final class RecordedTransactionOutgoing extends RecordedTransaction {
 }
 
 final class RecordedTransactionUnknownOutgoing extends RecordedTransaction {
-  final ApiAmount amount;
+  final Amount amount;
   @override
   final int confirmationHeight;
   @override

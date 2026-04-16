@@ -1,9 +1,9 @@
 mod info;
-mod sync;
 pub mod setup;
+mod sync;
 mod transaction;
 
-use crate::{api::structs::network::ApiNetwork, wallet::WalletFingerprint};
+use crate::{api::structs::network::Network, wallet::WalletFingerprint};
 use anyhow::Result;
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
@@ -20,7 +20,7 @@ pub struct SpWallet {
 
 impl SpWallet {
     #[frb(sync)]
-    pub fn new(scan_key: ApiScanKey, spend_key: ApiSpendKey, network: ApiNetwork) -> Result<Self> {
+    pub fn new(scan_key: ApiScanKey, spend_key: ApiSpendKey, network: Network) -> Result<Self> {
         let client = SpClient::new(scan_key.into(), spend_key.into(), network.into())?;
 
         let wallet_fingerprint = client.get_client_fingerprint()?;
