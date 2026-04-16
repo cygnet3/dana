@@ -1,18 +1,17 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:danawallet/constants.dart';
-import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/stream.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
-import 'package:danawallet/repositories/settings_repository.dart';
-import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 class SyncProgressNotifier extends ChangeNotifier {
   Completer? _completer;
   double? progress;
-  late int startHeight;
-  late int endHeight;
+  int? startHeight;
+  int? endHeight;
 
   late StreamSubscription syncProgressSubscription;
 
@@ -22,16 +21,22 @@ class SyncProgressNotifier extends ChangeNotifier {
   SyncProgressNotifier._();
 
   Future<void> _initialize() async {
-    syncProgressSubscription = createSyncProgressStream().listen(((current) {
-      double scanned = (current - startHeight).toDouble();
-      double total = (endHeight - startHeight).toDouble();
-      double progress = scanned / total;
-      if (current != endHeight) {
-        this.progress = progress;
+    syncProgressSubscription = createSyncProgressStream().listen((current) {
+      // Only update progress while the bar is active. Ignoring events outside
+      // of an active scan prevents a trailing Rust event from re-activating the
+      // bar after deactivate() has already been called.
+      if (!isScanning) return;
 
+      final start = startHeight;
+      final end = endHeight;
+      if (start == null || end == null || end <= start) return;
+
+      final progress = (current - start) / (end - start);
+      if (current != end) {
+        this.progress = progress;
         notifyListeners();
       }
-    }));
+    });
   }
 
   static Future<SyncProgressNotifier> create() async {
@@ -42,6 +47,9 @@ class SyncProgressNotifier extends ChangeNotifier {
 
   @override
   void dispose() {
+    if (Platform.isAndroid) {
+      FlutterForegroundTask.removeTaskDataCallback(onServiceData);
+    }
     syncProgressSubscription.cancel();
     super.dispose();
   }
@@ -58,48 +66,36 @@ class SyncProgressNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> scan(
-      WalletState walletState, int startHeight, int chainTip) async {
-    this.startHeight = startHeight;
-    endHeight = chainTip;
-
-    // start syncing from the first block after our last sync
-    // we ignore the startHeight here, because we may be continuing from another sync
-    final fromHeight = walletState.lastSync! + 1;
-    final toHeight = chainTip;
-
-    try {
-      final wallet = await walletState.getWalletFromSecureStorage();
-      final settings = SettingsRepository.instance;
-      final blindbitUrl = await settings.getBlindbitUrl() ??
-          walletState.network.defaultBlindbitUrl;
-      final dustLimit = await settings.getDustLimit() ?? defaultDustLimit;
-
-      if (walletState.lastSync == null) {
-        throw Exception("Last scan is null");
-      }
-
+  /// Called by the main isolate's service data callback with messages from
+  /// the background sync task.
+  void onServiceData(Object data) {
+    if (data is! Map) return;
+    if (data.containsKey(bgKeyStartHeight) &&
+        data.containsKey(bgKeyEndHeight)) {
+      startHeight = (data[bgKeyStartHeight] as num).toInt();
+      endHeight = (data[bgKeyEndHeight] as num).toInt();
       activate();
-      await wallet.syncToHeight(
-        fromHeight: fromHeight,
-        toHeight: toHeight,
-        blindbitUrl: blindbitUrl,
-        dustLimit: BigInt.from(dustLimit),
-        ownedOutpoints: walletState.outpointsToScan,
-      );
-    } catch (e) {
+    } else if (data.containsKey(bgKeyComplete)) {
       deactivate();
-      rethrow;
     }
-    deactivate();
   }
 
-  Future<void> interruptSync() async {
-    if (isScanning) {
-      SpWallet.interruptSync();
+  /// Waits for an active scan to complete or be interrupted, then returns.
+  /// Does not signal the interrupt itself — callers are responsible for doing
+  /// so through the appropriate channel (in-process or IPC).
+  Future<void> waitForCompletion() async {
+    if (!isScanning) return;
+    await _completer?.future.timeout(
+      const Duration(seconds: 10),
+      onTimeout: deactivate,
+    );
+  }
 
-      // this makes sure the scan function has been terminated
-      await _completer?.future;
-    }
+  /// Signals an in-process scan to stop and waits for it to finish.
+  /// Only correct to call when sync is running in the same Dart isolate.
+  Future<void> interruptSync() async {
+    if (!isScanning) return;
+    SpWallet.interruptSync();
+    await waitForCompletion();
   }
 }
