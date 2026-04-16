@@ -18,9 +18,7 @@ import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 
 class ChooseRecipientScreen extends StatefulWidget {
-  final String? initialAddress;
-
-  const ChooseRecipientScreen({super.key, this.initialAddress});
+  const ChooseRecipientScreen({super.key});
 
   @override
   ChooseRecipientScreenState createState() => ChooseRecipientScreenState();
@@ -33,9 +31,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
   @override
   void initState() {
     super.initState();
-    textFieldController = TextEditingController(
-      text: widget.initialAddress ?? '',
-    );
+    textFieldController = TextEditingController();
   }
 
   @override
