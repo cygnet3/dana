@@ -1,9 +1,10 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/constants.dart';
-import 'package:danawallet/data/models/recipient_form.dart';
+import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/extensions/payment_code.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/spend/fee_selection.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/chain_state.dart';
@@ -13,7 +14,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class AmountSelectionScreen extends StatefulWidget {
-  const AmountSelectionScreen({super.key});
+  final Contact recipient;
+  const AmountSelectionScreen({super.key, required this.recipient});
 
   @override
   AmountSelectionScreenState createState() => AmountSelectionScreenState();
@@ -60,16 +62,16 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
       return;
     }
 
-    RecipientForm().amount = ApiAmount(field0: amount);
+    final recipientAmount = ApiAmount(field0: amount);
 
-    Navigator.push(context,
-        MaterialPageRoute(builder: (context) => const FeeSelectionScreen()));
+    goToScreen(
+        context,
+        FeeSelectionScreen(
+            recipient: widget.recipient, amount: recipientAmount));
   }
 
   @override
   Widget build(BuildContext context) {
-    RecipientForm form = RecipientForm();
-
     final walletState = Provider.of<WalletState>(context, listen: false);
     final chainState = Provider.of<ChainState>(context, listen: false);
 
@@ -79,10 +81,10 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
       blocksToScan = chainState.tip - walletState.lastSync!;
     }
 
-    String recipientName = form.recipient!.displayName;
+    String recipientName = widget.recipient.displayName;
     TextStyle recipientTextStyle = BitcoinTextStyle.body4(Bitcoin.neutral7);
 
-    if (recipientName == form.recipient!.paymentCode) {
+    if (recipientName == widget.recipient.paymentCode) {
       // format static address nicely
       recipientName = recipientName.chunked(context, recipientTextStyle, 0.86);
     }

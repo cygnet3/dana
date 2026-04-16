@@ -1,9 +1,10 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
-import 'package:danawallet/data/models/recipient_form.dart';
+import 'package:danawallet/data/models/contact.dart';
+import 'package:danawallet/data/models/recommended_fee_model.dart';
 import 'package:danawallet/extensions/api_amount.dart';
-import 'package:danawallet/data/models/recipient_form_filled.dart';
 import 'package:danawallet/data/enums/selected_fee.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/spend/ready_to_send.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
@@ -16,7 +17,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class FeeSelectionScreen extends StatefulWidget {
-  const FeeSelectionScreen({super.key});
+  final Contact recipient;
+  final ApiAmount amount;
+
+  const FeeSelectionScreen(
+      {super.key, required this.recipient, required this.amount});
   @override
   State<FeeSelectionScreen> createState() {
     return FeeSelectionScreenState();
@@ -24,9 +29,9 @@ class FeeSelectionScreen extends StatefulWidget {
 }
 
 class FeeSelectionScreenState extends State<FeeSelectionScreen> {
+  RecommendedFeeResponse? _currentFeeRates;
   SelectedFee _selected = SelectedFee.normal;
   final Map<SelectedFee, ApiAmount> _feeAmounts = {};
-  bool _isLoadingFees = true;
 
   @override
   void initState() {
@@ -34,25 +39,23 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
     _computeFeeAmounts();
   }
 
-  void _computeFeeAmounts() async {
-    RecipientForm form = RecipientForm();
-
+  Future<void> _computeFeeAmounts() async {
     final walletState = Provider.of<WalletState>(context, listen: false);
     final chainState = Provider.of<ChainState>(context, listen: false);
 
     // fetch fee rates from mempool
     final currentFeeRates = await chainState.getCurrentFeeRates();
-    form.currentFeeRates = currentFeeRates;
 
     for (SelectedFee fee in [
       SelectedFee.fast,
       SelectedFee.normal,
       SelectedFee.slow
     ]) {
-      form.selectedFee = fee;
-      final filled = form.toFilled();
+      final recipient = ApiRecipient(
+          paymentCode: widget.recipient.paymentCode, amount: widget.amount);
+      final feerate = fee.getFeeRate(currentFeeRates);
       final feeEstimationTx =
-          await walletState.createUnsignedTxToThisRecipient(filled);
+          await walletState.createUnsignedTxToThisRecipient(recipient, feerate);
       BigInt inputSum = BigInt.from(0);
       for (var (_, utxo) in feeEstimationTx.selectedUtxos) {
         inputSum += utxo.value.field0;
@@ -64,43 +67,37 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
       _feeAmounts[fee] = ApiAmount(field0: inputSum - outputSum);
     }
 
-    if (mounted) {
-      setState(() {
-        _isLoadingFees = false;
-      });
-    }
-  }
-
-  // Get the fee amount for a specific fee type
-  ApiAmount? getFeeAmount(SelectedFee fee) {
-    return _feeAmounts[fee];
-  }
-
-  // Get the fee amount for the currently selected fee
-  ApiAmount? getCurrentSelectedFeeAmount() {
-    return _feeAmounts[_selected];
+    setState(() {
+      _currentFeeRates = currentFeeRates;
+    });
   }
 
   Future<void> onContinue() async {
-    RecipientForm().selectedFee = _selected;
-
     final walletState = Provider.of<WalletState>(context, listen: false);
     final changeAddress = walletState.changePaymentCode;
-    RecipientForm form = RecipientForm();
 
-    RecipientFormFilled filled = form.toFilled();
+    final fee = _selected;
+
+    final recipient = ApiRecipient(
+        paymentCode: widget.recipient.paymentCode, amount: widget.amount);
+    final feerate = fee.getFeeRate(_currentFeeRates!);
 
     final unsignedTx =
-        await walletState.createUnsignedTxToThisRecipient(filled);
-    form.unsignedTx = unsignedTx;
+        await walletState.createUnsignedTxToThisRecipient(recipient, feerate);
 
     // update the send amount to the actual sent amount (can be different e.g. dust)
     // this should probably be done already on the amount screen?
-    form.amount = form.unsignedTx!.getSendAmount(changeAddress: changeAddress);
+    final finalAmount = unsignedTx.getSendAmount(changeAddress: changeAddress);
 
     if (mounted) {
-      Navigator.push(context,
-          MaterialPageRoute(builder: (context) => const ReadyToSendScreen()));
+      goToScreen(
+          context,
+          ReadyToSendScreen(
+            recipient: widget.recipient,
+            fee: _selected,
+            amount: finalAmount,
+            unsignedTx: unsignedTx,
+          ));
     }
   }
 
@@ -111,7 +108,7 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
       case SelectedFee.slow:
         String subtitleBtc;
         String subtitleFiat;
-        if (_isLoadingFees) {
+        if (_currentFeeRates == null) {
           subtitleBtc = 'Loading...';
           subtitleFiat = 'Loading...';
         } else {
@@ -163,10 +160,10 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
             image: AssetImage("icons/caret_right.png", package: "bitcoin_ui"),
           ),
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const CustomFeeScreen()),
-            );
+            goToScreen(
+                context,
+                CustomFeeScreen(
+                    recipient: widget.recipient, amount: widget.amount));
           },
         );
     }
@@ -209,7 +206,7 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
           FooterButton(
             title: 'Continue',
             onPressed: onContinue,
-            enabled: !_isLoadingFees,
+            enabled: _currentFeeRates != null,
           )
         ],
       ),
