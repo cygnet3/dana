@@ -152,9 +152,12 @@ class ContactsState extends ChangeNotifier {
 
   List<Contact> filterContacts(String query) {
     return _contacts.where((contact) {
-      final displayName = contact.displayName.toLowerCase();
-      return displayName.contains(query) ||
-          contact.name!.toLowerCase().contains(query);
+      final displayName = contact.displayName?.toLowerCase();
+      if (displayName != null) {
+        return displayName.contains(query);
+      } else {
+        return false;
+      }
     }).toList();
   }
 
