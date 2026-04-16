@@ -3,10 +3,10 @@ use flutter_rust_bridge::frb;
 use spdk_wallet::client::RecipientAddress;
 use spdk_wallet::silentpayments::Network as SpNetwork;
 
-use crate::api::structs::network::ApiNetwork;
+use crate::api::structs::network::Network;
 
 #[frb(sync)]
-pub fn validate_address_with_network(address: String, network: ApiNetwork) -> Result<()> {
+pub fn validate_address_with_network(address: String, network: Network) -> Result<()> {
     log::debug!(
         "address_with_network: address: {}, network: {:?}",
         address,
@@ -20,11 +20,11 @@ pub fn validate_address_with_network(address: String, network: ApiNetwork) -> Re
             Ok(())
         }
         Ok(RecipientAddress::SpAddress(sp_address)) => match (sp_address.get_network(), &network) {
-            (SpNetwork::Mainnet, ApiNetwork::Mainnet)
-            | (SpNetwork::Testnet, ApiNetwork::Testnet3)
-            | (SpNetwork::Testnet, ApiNetwork::Testnet4)
-            | (SpNetwork::Testnet, ApiNetwork::Signet)
-            | (SpNetwork::Regtest, ApiNetwork::Regtest) => Ok(()),
+            (SpNetwork::Mainnet, Network::Mainnet)
+            | (SpNetwork::Testnet, Network::Testnet3)
+            | (SpNetwork::Testnet, Network::Testnet4)
+            | (SpNetwork::Testnet, Network::Signet)
+            | (SpNetwork::Regtest, Network::Regtest) => Ok(()),
             (sp_network, _) => Err(anyhow::anyhow!(
                 "Wrong network, expected: {:?}, got: {:?}",
                 network,

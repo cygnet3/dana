@@ -64,7 +64,7 @@ class ContactsState extends ChangeNotifier {
   /// Throws [Exception] if dana address cannot be resolved or contact already exists
   Future<void> addContact({
     required String paymentCode,
-    required ApiNetwork network,
+    required Network network,
     Bip353Address? danaAddress,
     String? name,
   }) async {

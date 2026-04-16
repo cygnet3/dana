@@ -31,7 +31,7 @@ class OverviewScreen extends StatefulWidget {
 
 class _OverviewScreenState extends State<OverviewScreen> {
   Future<void> onCreateNewWallet(BuildContext context) async {
-    ApiNetwork network;
+    Network network;
     // in dev environment, allow user to choose network
     if (isDevEnv) {
       network = await Navigator.push(context,
@@ -72,7 +72,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
     if (context.mounted) {
       // skip the dana address registration if we are currently offline, or using regtest
       Widget nextScreen;
-      if (!connected || network == ApiNetwork.regtest) {
+      if (!connected || network == Network.regtest) {
         nextScreen = const PinGuard();
       } else {
         nextScreen = const RegisterDanaAddressScreen();
@@ -87,7 +87,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
   }
 
   Future<void> onRestoreMnemonic(BuildContext context) async {
-    ApiNetwork network;
+    Network network;
     // in dev environment, allow user to choose network
     if (isDevEnv) {
       network = await Navigator.push(context,

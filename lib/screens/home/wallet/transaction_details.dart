@@ -157,7 +157,7 @@ class TransactionDetailsScreen extends StatelessWidget {
   }
 
   Widget _buildTransactionIdRow(
-      BuildContext context, String txid, ApiNetwork network) {
+      BuildContext context, String txid, Network network) {
     final truncatedTxid =
         txid.length > 16 ? '${txid.substring(0, 16)}...' : txid;
 
@@ -290,7 +290,7 @@ class TransactionDetailsScreen extends StatelessWidget {
   }
 
   Future<void> _openInBlockExplorer(
-      BuildContext context, String txid, ApiNetwork network) async {
+      BuildContext context, String txid, Network network) async {
     final defaultUrl = network.defaultBlockExplorerUrl;
     if (defaultUrl == null) return;
 
@@ -512,8 +512,8 @@ class _TransactionData {
   final int? confirmationHeight;
   final String date;
   final String? recipientAddress;
-  final ApiAmount? fee;
-  final ApiAmount? change;
+  final Amount? fee;
+  final Amount? change;
 
   _TransactionData({
     required this.txid,

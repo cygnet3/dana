@@ -39,7 +39,7 @@ class WalletScreenState extends State<WalletScreen> {
     // if we are on mainnet, show a warning message
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final walletState = Provider.of<WalletState>(context, listen: false);
-      if (walletState.network == ApiNetwork.mainnet) {
+      if (walletState.network == Network.mainnet) {
         showWarningDialog(mainnetWarning, WarningType.warn);
       }
     });
@@ -228,8 +228,7 @@ class WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget buildAmountDisplay(
-      ApiAmount amount, FiatExchangeRateState exchangeRate) {
+  Widget buildAmountDisplay(Amount amount, FiatExchangeRateState exchangeRate) {
     String btcAmount = hideAmount ? hideAmountFormat : amount.displayBtc();
 
     String fiatAmount =
@@ -673,7 +672,7 @@ class WalletScreenState extends State<WalletScreen> {
     final chainState = Provider.of<ChainState>(context);
     final danaAddress = walletState.danaAddress;
 
-    ApiAmount amount = walletState.amount + walletState.unconfirmedChange;
+    Amount amount = walletState.amount + walletState.unconfirmedChange;
 
     // Check if balance is zero
     bool isBalanceZero = amount.field0 == BigInt.zero;

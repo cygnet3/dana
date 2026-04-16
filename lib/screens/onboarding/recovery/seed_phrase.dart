@@ -26,7 +26,7 @@ const int _mnemonicCount = 12;
 
 class SeedPhraseScreen extends StatefulWidget {
   final List<String> bip39Words;
-  final ApiNetwork network;
+  final Network network;
   const SeedPhraseScreen({
     super.key,
     required this.bip39Words,

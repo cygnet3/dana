@@ -184,19 +184,19 @@ bool get isDevEnv {
   return appFlavor == 'dev' || appFlavor == 'local';
 }
 
-ApiNetwork get getNetworkForFlavor {
+Network get getNetworkForFlavor {
   switch (appFlavor) {
     // only live flavor uses mainnet
     case 'live':
-      return ApiNetwork.mainnet;
+      return Network.mainnet;
     // all other flavors use signet by default
     case 'signet':
     case 'dev':
     case 'local':
-      return ApiNetwork.signet;
+      return Network.signet;
     default:
       Logger().w("Unknown Flavor; defaulting to signet");
-      return ApiNetwork.signet;
+      return Network.signet;
   }
 }
 
