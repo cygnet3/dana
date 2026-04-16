@@ -127,22 +127,15 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
         }
       }
 
-      // Use existing contact so amount screen shows name; otherwise minimal Contact.
-      if (!mounted) return;
-      final contactsState = Provider.of<ContactsState>(context, listen: false);
-      final existingContact =
-          contactsState.getContactByPaymentCode(paymentCode);
-      final recipient = existingContact ??
-          Contact(bip353Address: bip353Address, paymentCode: paymentCode);
-
-      goToScreen(context, AmountSelectionScreen(recipient: recipient));
-      if (!mounted) return;
-      setState(() {
-        textFieldController.clear();
-        _addressErrorText = null;
-      });
+      if (mounted) {
+        goToScreen(
+            context,
+            AmountSelectionScreen(
+              paymentCode: paymentCode,
+              providedBip353: bip353Address,
+            ));
+      }
     } catch (e) {
-      if (!mounted) return;
       setState(() {
         _addressErrorText = exceptionToString(e);
       });

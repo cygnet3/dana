@@ -1,5 +1,5 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
-import 'package:danawallet/data/models/contact.dart';
+import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/recommended_fee_model.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/data/enums/selected_fee.dart';
@@ -17,11 +17,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class FeeSelectionScreen extends StatefulWidget {
-  final Contact recipient;
-  final ApiAmount amount;
+  final ApiRecipient recipient;
+  final Bip353Address? providedBip353;
 
   const FeeSelectionScreen(
-      {super.key, required this.recipient, required this.amount});
+      {super.key, required this.recipient, this.providedBip353});
   @override
   State<FeeSelectionScreen> createState() {
     return FeeSelectionScreenState();
@@ -51,11 +51,9 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
       SelectedFee.normal,
       SelectedFee.slow
     ]) {
-      final recipient = ApiRecipient(
-          paymentCode: widget.recipient.paymentCode, amount: widget.amount);
       final feerate = fee.getFeeRate(currentFeeRates);
-      final feeEstimationTx =
-          await walletState.createUnsignedTxToThisRecipient(recipient, feerate);
+      final feeEstimationTx = await walletState.createUnsignedTxToThisRecipient(
+          widget.recipient, feerate);
       BigInt inputSum = BigInt.from(0);
       for (var (_, utxo) in feeEstimationTx.selectedUtxos) {
         inputSum += utxo.value.field0;
@@ -76,26 +74,24 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
     final walletState = Provider.of<WalletState>(context, listen: false);
     final changeAddress = walletState.changePaymentCode;
 
-    final fee = _selected;
+    final feerate = _selected.getFeeRate(_currentFeeRates!);
 
-    final recipient = ApiRecipient(
-        paymentCode: widget.recipient.paymentCode, amount: widget.amount);
-    final feerate = fee.getFeeRate(_currentFeeRates!);
-
-    final unsignedTx =
-        await walletState.createUnsignedTxToThisRecipient(recipient, feerate);
+    final unsignedTx = await walletState.createUnsignedTxToThisRecipient(
+        widget.recipient, feerate);
 
     // update the send amount to the actual sent amount (can be different e.g. dust)
-    // this should probably be done already on the amount screen?
-    final finalAmount = unsignedTx.getSendAmount(changeAddress: changeAddress);
+    final updatedRecipient = ApiRecipient(
+      paymentCode: widget.recipient.paymentCode,
+      amount: unsignedTx.getSendAmount(changeAddress: changeAddress),
+    );
 
     if (mounted) {
       goToScreen(
           context,
           ReadyToSendScreen(
-            recipient: widget.recipient,
+            recipient: updatedRecipient,
+            providedBip353: widget.providedBip353,
             fee: _selected,
-            amount: finalAmount,
             unsignedTx: unsignedTx,
           ));
     }
@@ -163,7 +159,9 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
             goToScreen(
                 context,
                 CustomFeeScreen(
-                    recipient: widget.recipient, amount: widget.amount));
+                  recipient: widget.recipient,
+                  providedBip353: widget.providedBip353,
+                ));
           },
         );
     }

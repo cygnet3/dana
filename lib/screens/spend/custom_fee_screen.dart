@@ -1,5 +1,5 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
-import 'package:danawallet/data/models/contact.dart';
+import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/data/enums/selected_fee.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
@@ -14,10 +14,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class CustomFeeScreen extends StatefulWidget {
-  final Contact recipient;
-  final ApiAmount amount;
+  final ApiRecipient recipient;
+  final Bip353Address? providedBip353;
   const CustomFeeScreen(
-      {super.key, required this.recipient, required this.amount});
+      {super.key, required this.recipient, this.providedBip353});
 
   @override
   State<CustomFeeScreen> createState() => _CustomFeeScreenState();
@@ -49,11 +49,8 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
       }
 
       // Compute fee for the currently selected rate
-      final recipient = ApiRecipient(
-          paymentCode: widget.recipient.paymentCode, amount: widget.amount);
-
       final feeEstimationTx = await walletState.createUnsignedTxToThisRecipient(
-          recipient, _selectedFeeRate);
+          widget.recipient, _selectedFeeRate);
       BigInt inputSum = BigInt.from(0);
       for (var (_, utxo) in feeEstimationTx.selectedUtxos) {
         inputSum += utxo.value.field0;
@@ -89,22 +86,21 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
     final walletState = Provider.of<WalletState>(context, listen: false);
     final changeAddress = walletState.changePaymentCode;
 
-    final recipient = ApiRecipient(
-        paymentCode: widget.recipient.paymentCode, amount: widget.amount);
-
     final unsignedTx = await walletState.createUnsignedTxToThisRecipient(
-        recipient, _selectedFeeRate);
+        widget.recipient, _selectedFeeRate);
 
     // update the send amount to the actual sent amount (can be different e.g. dust)
-    final finalAmount = unsignedTx.getSendAmount(changeAddress: changeAddress);
+    final updatedRecipient = ApiRecipient(
+      paymentCode: widget.recipient.paymentCode,
+      amount: unsignedTx.getSendAmount(changeAddress: changeAddress),
+    );
 
     if (mounted) {
       goToScreen(
           context,
           ReadyToSendScreen(
-            recipient: widget.recipient,
+            recipient: updatedRecipient,
             fee: SelectedFee.custom,
-            amount: finalAmount,
             unsignedTx: unsignedTx,
           ));
     }

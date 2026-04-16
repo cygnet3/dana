@@ -220,7 +220,8 @@ class ContactDetailsScreen extends StatelessWidget {
     }
 
     if (context.mounted) {
-      goToScreen(context, AmountSelectionScreen(recipient: contact));
+      goToScreen(
+          context, AmountSelectionScreen(paymentCode: contact.paymentCode));
     }
   }
 
