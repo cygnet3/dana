@@ -28,12 +28,9 @@ class ConfirmWalletDeletionScreen extends StatelessWidget {
     final walletState = Provider.of<WalletState>(context, listen: false);
     final homeState = Provider.of<HomeState>(context, listen: false);
     final chainState = Provider.of<ChainState>(context, listen: false);
-    final scanProgress =
-        Provider.of<SyncProgressNotifier>(context, listen: false);
     final contacts = Provider.of<ContactsState>(context, listen: false);
 
-    await scanProgress.interruptSync();
-    chainState.reset();
+    await chainState.reset();
     await walletState.reset();
     await SettingsRepository.instance.resetAll();
     contacts.reset();

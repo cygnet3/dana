@@ -1,32 +1,25 @@
 import 'dart:async';
 
-import 'package:danawallet/constants.dart';
-import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/stream.dart';
-import 'package:danawallet/generated/rust/api/wallet.dart';
-import 'package:danawallet/repositories/settings_repository.dart';
-import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
 
 class SyncProgressNotifier extends ChangeNotifier {
-  Completer? _completer;
+  bool isSyncing = false;
   double? progress;
-  late int startHeight;
-  late int endHeight;
+  int? _fromHeight;
+  late int _toHeight;
 
   late StreamSubscription syncProgressSubscription;
-
-  bool get isScanning => _completer != null && !_completer!.isCompleted;
 
   // private constructor
   SyncProgressNotifier._();
 
   Future<void> _initialize() async {
     syncProgressSubscription = createSyncProgressStream().listen(((current) {
-      double scanned = (current - startHeight).toDouble();
-      double total = (endHeight - startHeight).toDouble();
+      double scanned = (current - _fromHeight!).toDouble();
+      double total = (_toHeight - _fromHeight!).toDouble();
       double progress = scanned / total;
-      if (current != endHeight) {
+      if (current != _toHeight) {
         this.progress = progress;
 
         notifyListeners();
@@ -46,60 +39,26 @@ class SyncProgressNotifier extends ChangeNotifier {
     super.dispose();
   }
 
-  void activate() {
-    _completer = Completer();
+  Future<void> activate(int fromHeight, int toHeight) async {
+    // if a start height has already been set, we ignore the start height variable
+    // this is because we might be continuing from a previous sync progress sync point,
+    // which got interrupted by an error
+    _fromHeight ??= fromHeight;
+    // we always set the end height
+    _toHeight = toHeight;
+
+    isSyncing = true;
     progress = null;
     notifyListeners();
   }
 
-  void deactivate() {
-    _completer?.complete();
+  void deactivate(bool clear) {
+    isSyncing = false;
     progress = null;
+    if (clear) {
+      _fromHeight = null;
+    }
+
     notifyListeners();
-  }
-
-  Future<void> scan(
-      WalletState walletState, int startHeight, int chainTip) async {
-    this.startHeight = startHeight;
-    endHeight = chainTip;
-
-    // start syncing from the first block after our last sync
-    // we ignore the startHeight here, because we may be continuing from another sync
-    final fromHeight = walletState.lastSync! + 1;
-    final toHeight = chainTip;
-
-    try {
-      final wallet = await walletState.getWalletFromSecureStorage();
-      final settings = SettingsRepository.instance;
-      final blindbitUrl = await settings.getBlindbitUrl() ??
-          walletState.network.defaultBlindbitUrl;
-      final dustLimit = await settings.getDustLimit() ?? defaultDustLimit;
-
-      if (walletState.lastSync == null) {
-        throw Exception("Last scan is null");
-      }
-
-      activate();
-      await wallet.syncToHeight(
-        fromHeight: fromHeight,
-        toHeight: toHeight,
-        blindbitUrl: blindbitUrl,
-        dustLimit: BigInt.from(dustLimit),
-        ownedOutpoints: walletState.outpointsToScan,
-      );
-    } catch (e) {
-      deactivate();
-      rethrow;
-    }
-    deactivate();
-  }
-
-  Future<void> interruptSync() async {
-    if (isScanning) {
-      SpWallet.interruptSync();
-
-      // this makes sure the scan function has been terminated
-      await _completer?.future;
-    }
   }
 }

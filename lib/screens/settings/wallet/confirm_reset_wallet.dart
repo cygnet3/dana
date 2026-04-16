@@ -23,14 +23,9 @@ class ConfirmWalletResetScreen extends StatelessWidget {
   Future<void> onConfirmResetWallet(BuildContext context) async {
     final walletState = Provider.of<WalletState>(context, listen: false);
     final chainState = Provider.of<ChainState>(context, listen: false);
-    final scanProgress =
-        Provider.of<SyncProgressNotifier>(context, listen: false);
 
-    // first interrupt the sync process if this is still running
-    await scanProgress.interruptSync();
-
-    // clear cached start height from sync history
-    chainState.clearSyncHistory();
+    // interrupt current sync
+    await chainState.interruptSync();
 
     // reset wallet data
     await walletState.resetToBirthday();

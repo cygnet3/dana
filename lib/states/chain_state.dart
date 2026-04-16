@@ -40,7 +40,7 @@ class ChainState extends ChangeNotifier {
       SyncProgressNotifier scanProgress, bool immediate) {
     // start sync service & timer
     _synchronizationService = SynchronizationService(
-        chainState: this, walletState: walletState, scanProgress: scanProgress);
+        chainState: this, walletState: walletState, syncProgress: scanProgress);
     _synchronizationService.startSyncTimer(immediate);
   }
 
@@ -83,12 +83,12 @@ class ChainState extends ChangeNotifier {
     }
   }
 
-  void clearSyncHistory() {
-    _synchronizationService.clearSyncHistory();
+  Future<void> interruptSync() async {
+    await _synchronizationService.interrupt();
   }
 
-  void reset() {
-    _synchronizationService.stopSyncTimer();
+  Future<void> reset() async {
+    await _synchronizationService.reset();
     _tip = null;
     _blindbitUrl = null;
     _network = null;

@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:danawallet/constants.dart';
+import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
+import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:danawallet/global_functions.dart';
+import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
@@ -12,21 +15,16 @@ import 'package:logger/logger.dart';
 class SynchronizationService {
   WalletState walletState;
   ChainState chainState;
-  SyncProgressNotifier scanProgress;
-
-  // first sync will set the start height, all other syncs will keep the same height
-  // this is useful if we receive an error while syncing, and restart the sync process.
-  // this way, we make it explicit that we're continuing from the last sync,
-  // instead of completely restarting.
-  int? _startHeight;
+  SyncProgressNotifier syncProgress;
 
   Timer? _timer;
+  Completer? _completer;
   final Duration _interval = const Duration(seconds: 10);
 
   SynchronizationService(
       {required this.chainState,
       required this.walletState,
-      required this.scanProgress});
+      required this.syncProgress});
 
   Future<void> startSyncTimer(bool immediate) async {
     Logger().i("Starting sync service");
@@ -57,6 +55,7 @@ class SynchronizationService {
   }
 
   Future<void> _performTask() async {
+    _completer = Completer();
     try {
       if (!chainState.available) {
         //attempt to reconnect to the chain state
@@ -74,6 +73,7 @@ class SynchronizationService {
       // e.g. a green or red circle based on whether we have connection issues
       displayError("Sync failed", e);
     }
+    _completer?.complete();
   }
 
   Future<void> _scheduleNextTask() async {
@@ -102,20 +102,44 @@ class SynchronizationService {
     }
 
     if (walletState.lastSync! < chainState.tip) {
-      if (!scanProgress.isScanning) {
-        Logger().i("Starting sync");
+      Logger().i("Starting sync");
 
-        // set start height if not yet set
-        _startHeight ??= walletState.lastSync!;
+      // set sync start height to next block after the last synced block
+      final fromHeight = walletState.lastSync! + 1;
+      final toHeight = chainState.tip;
 
-        await scanProgress.scan(walletState, _startHeight!, chainState.tip);
+      await syncProgress.activate(fromHeight, toHeight);
+
+      try {
+        await _syncToHeight(fromHeight, toHeight);
+        // if we finished syncing, clear and deactivate the sync progress.
+        syncProgress.deactivate(true);
+      } catch (e) {
+        // if we encountered an error, notify the sync progress to deactivate,
+        // but don't clear sync progress in case we want to continue.
+        syncProgress.deactivate(false);
       }
     }
+  }
 
-    if (chainState.tip < walletState.lastSync!) {
-      // not sure what we should do here, that's really bad
-      Logger().e('Current height is less than wallet last scan');
+  Future<void> _syncToHeight(int fromHeight, int toHeight) async {
+    final wallet = await walletState.getWalletFromSecureStorage();
+    final settings = SettingsRepository.instance;
+    final blindbitUrl = await settings.getBlindbitUrl() ??
+        chainState.network.defaultBlindbitUrl;
+    final dustLimit = await settings.getDustLimit() ?? defaultDustLimit;
+
+    if (walletState.lastSync == null) {
+      throw Exception("Last sync is null");
     }
+
+    await wallet.syncToHeight(
+      fromHeight: fromHeight,
+      toHeight: toHeight,
+      blindbitUrl: blindbitUrl,
+      dustLimit: BigInt.from(dustLimit),
+      ownedOutpoints: walletState.outpointsToScan,
+    );
   }
 
   Future<void> _initializeLastSync() async {
@@ -133,12 +157,19 @@ class SynchronizationService {
     walletState.lastSync = blockHeight;
   }
 
-  void stopSyncTimer() {
-    Logger().i("Stopping sync service");
-    _timer?.cancel();
+  Future<void> interrupt() async {
+    Logger().i("Interrupting sync task");
+    // interrupt currently running sync
+    SpWallet.interruptSync();
+
+    // wait until the task has completed
+    await _completer?.future;
   }
 
-  void clearSyncHistory() {
-    _startHeight = null;
+  Future<void> reset() async {
+    // interrupt the sync task
+    await interrupt();
+    // cancel the timer, don't run follow-up sync attempts
+    _timer?.cancel();
   }
 }

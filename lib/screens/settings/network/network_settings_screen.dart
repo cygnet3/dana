@@ -50,13 +50,13 @@ class NetworkSettingsScreen extends StatelessWidget {
         'Enter sync height',
         'Enter current sync height (numeric value)');
     if (syncHeight is int) {
+      await chainState.interruptSync();
       await walletState.resetToSyncHeight(syncHeight);
-      chainState.clearSyncHistory();
       homeState.showMainScreen();
     } else if (syncHeight is bool && syncHeight) {
       // if no height is provided, we reset to the birthday
+      await chainState.interruptSync();
       await walletState.resetToBirthday();
-      chainState.clearSyncHistory();
       homeState.showMainScreen();
     }
   }

@@ -558,7 +558,7 @@ class WalletScreenState extends State<WalletScreen> {
       children: [
         // Show sync progress when actively scanning
         Visibility(
-            visible: scanProgress.isScanning,
+            visible: scanProgress.isSyncing,
             maintainAnimation: true,
             maintainSize: true,
             maintainState: true,
@@ -685,7 +685,7 @@ class WalletScreenState extends State<WalletScreen> {
               children: [
                 // Show sync progress when actively scanning
                 Visibility(
-                    visible: scanProgress.isScanning,
+                    visible: scanProgress.isSyncing,
                     maintainAnimation: true,
                     maintainSize: true,
                     maintainState: true,
