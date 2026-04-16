@@ -40,12 +40,12 @@ class Contact {
     );
   }
 
-  String get displayName {
-    return name ?? bip353Address?.toString() ?? paymentCode;
+  String? get displayName {
+    return name ?? bip353Address?.toString();
   }
 
-  String get displayNameInitial {
-    return displayName[0].toUpperCase();
+  String? get displayNameInitial {
+    return displayName?[0].toUpperCase();
   }
 
   Color get avatarColor {

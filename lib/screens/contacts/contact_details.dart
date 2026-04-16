@@ -329,7 +329,7 @@ class ContactDetailsScreen extends StatelessWidget {
       throw Exception('Expected outgoing transaction');
     }
 
-    final recipient = contact.displayName;
+    final recipient = contact.displayName ?? '?';
     final date = tx.confirmationHeight?.toString() ?? 'Unconfirmed';
     final color =
         tx.confirmationHeight == null ? Bitcoin.neutral4 : Bitcoin.red;
@@ -478,7 +478,7 @@ class ContactDetailsScreen extends StatelessWidget {
               radius: 50,
               backgroundColor: contact.avatarColor,
               child: Text(
-                contact.displayNameInitial,
+                contact.displayNameInitial ?? '?',
                 style: BitcoinTextStyle.body1(Bitcoin.white)
                     .apply(fontWeightDelta: 2, fontSizeDelta: 3),
               ),

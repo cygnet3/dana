@@ -316,7 +316,7 @@ class WalletScreenState extends State<WalletScreen> {
             radius: 20,
             backgroundColor: contact.avatarColor,
             child: Text(
-              contact.displayNameInitial,
+              contact.displayNameInitial ?? '?',
               style: BitcoinTextStyle.body4(Bitcoin.white)
                   .apply(fontWeightDelta: 2),
             ),

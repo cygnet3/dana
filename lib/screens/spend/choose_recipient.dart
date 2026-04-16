@@ -47,13 +47,13 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
         radius: 16,
         backgroundColor: contact.avatarColor,
         child: Text(
-          contact.displayNameInitial,
+          contact.displayNameInitial ?? '?',
           style:
               BitcoinTextStyle.body5(Bitcoin.white).apply(fontWeightDelta: 2),
         ),
       ),
       title: Text(
-        contact.displayName,
+        contact.displayName ?? '?',
         style: BitcoinTextStyle.body5(Bitcoin.black),
       ),
       onTap: () {

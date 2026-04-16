@@ -44,8 +44,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   Widget _buildContactItem(Contact contact) {
-    final displayName = contact.displayName;
-    final initial = contact.displayNameInitial;
+    final displayName = contact.displayName ?? '?';
+    final initial = contact.displayNameInitial ?? '?';
     final avatarColor = contact.avatarColor;
 
     return ListTile(
