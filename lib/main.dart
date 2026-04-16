@@ -56,7 +56,7 @@ void main() async {
   DatabaseHelper.instance.enableForeignKeysPragma();
 
   final walletState = await WalletState.create();
-  final scanNotifier = await SyncProgressNotifier.create();
+  final scanNotifier = await SyncProgressState.create();
   final chainState = ChainState();
   final contactsState = ContactsState();
   final fiatExchangeRate = await FiatExchangeRateState.create();

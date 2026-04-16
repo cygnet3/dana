@@ -553,7 +553,7 @@ class WalletScreenState extends State<WalletScreen> {
   }
 
   Widget buildFundingScreen(String silentPaymentAddress, String? danaAddress,
-      SyncProgressNotifier scanProgress, ChainState chainState) {
+      SyncProgressState scanProgress, ChainState chainState) {
     return Column(
       children: [
         // Show sync progress when actively scanning
@@ -657,7 +657,7 @@ class WalletScreenState extends State<WalletScreen> {
   Widget build(BuildContext context) {
     final walletState = Provider.of<WalletState>(context);
     final exchangeRate = Provider.of<FiatExchangeRateState>(context);
-    final scanProgress = Provider.of<SyncProgressNotifier>(context);
+    final scanProgress = Provider.of<SyncProgressState>(context);
     final chainState = Provider.of<ChainState>(context);
     final danaAddress = walletState.danaAddress;
 

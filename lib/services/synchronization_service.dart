@@ -15,7 +15,7 @@ import 'package:logger/logger.dart';
 class SynchronizationService {
   WalletState walletState;
   ChainState chainState;
-  SyncProgressNotifier syncProgress;
+  SyncProgressState syncProgress;
 
   Timer? _timer;
   Completer? _completer;

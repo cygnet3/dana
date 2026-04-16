@@ -36,11 +36,11 @@ class ChainState extends ChangeNotifier {
     _network = network;
   }
 
-  void startSyncService(WalletState walletState,
-      SyncProgressNotifier scanProgress, bool immediate) {
+  void startSyncService(
+      WalletState walletState, SyncProgressState syncProgress, bool immediate) {
     // start sync service & timer
     _synchronizationService = SynchronizationService(
-        chainState: this, walletState: walletState, syncProgress: scanProgress);
+        chainState: this, walletState: walletState, syncProgress: syncProgress);
     _synchronizationService.startSyncTimer(immediate);
   }
 

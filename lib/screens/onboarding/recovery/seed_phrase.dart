@@ -51,7 +51,7 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
       final chainState = Provider.of<ChainState>(context, listen: false);
       final contactsState = Provider.of<ContactsState>(context, listen: false);
       final scanProgress =
-          Provider.of<SyncProgressNotifier>(context, listen: false);
+          Provider.of<SyncProgressState>(context, listen: false);
 
       // Get birthday: navigate to picker if user knows it, else null
       DateTime? birthday;

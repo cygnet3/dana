@@ -46,8 +46,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
     final walletState = Provider.of<WalletState>(context, listen: false);
     final chainState = Provider.of<ChainState>(context, listen: false);
     final contactsState = Provider.of<ContactsState>(context, listen: false);
-    final scanProgress =
-        Provider.of<SyncProgressNotifier>(context, listen: false);
+    final scanProgress = Provider.of<SyncProgressState>(context, listen: false);
 
     final blindbitUrl = network.defaultBlindbitUrl;
 

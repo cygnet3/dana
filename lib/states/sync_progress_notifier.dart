@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:danawallet/generated/rust/api/stream.dart';
 import 'package:flutter/material.dart';
 
-class SyncProgressNotifier extends ChangeNotifier {
+class SyncProgressState extends ChangeNotifier {
   bool isSyncing = false;
   double? progress;
   int? _fromHeight;
@@ -12,7 +12,7 @@ class SyncProgressNotifier extends ChangeNotifier {
   late StreamSubscription syncProgressSubscription;
 
   // private constructor
-  SyncProgressNotifier._();
+  SyncProgressState._();
 
   Future<void> _initialize() async {
     syncProgressSubscription = createSyncProgressStream().listen(((current) {
@@ -27,8 +27,8 @@ class SyncProgressNotifier extends ChangeNotifier {
     }));
   }
 
-  static Future<SyncProgressNotifier> create() async {
-    final instance = SyncProgressNotifier._();
+  static Future<SyncProgressState> create() async {
+    final instance = SyncProgressState._();
     await instance._initialize();
     return instance;
   }
