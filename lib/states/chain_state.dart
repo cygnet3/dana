@@ -4,14 +4,12 @@ import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/chain.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
-import 'package:danawallet/services/synchronization_service.dart';
-import 'package:danawallet/states/sync_progress_notifier.dart';
-import 'package:danawallet/states/wallet_state.dart';
+import 'package:danawallet/services/foreground_chain_poller.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 
 class ChainState extends ChangeNotifier {
-  late SynchronizationService _synchronizationService;
+  ForegroundChainPoller? _foregroundChainPoller;
 
   // Indicates whether the chainstate is initialized.
   // Once initialized we can check for the availability.
@@ -23,7 +21,7 @@ class ChainState extends ChangeNotifier {
   String? _blindbitUrl;
   int? _tip;
 
-  bool get initiated => _network != null;
+  bool get initiated => _network != null && _foregroundChainPoller != null;
 
   bool get available => initiated && _blindbitUrl != null && _tip != null;
 
@@ -34,14 +32,21 @@ class ChainState extends ChangeNotifier {
     Logger().i('Network: $network');
     // network is not yet verified in this state, it gets vetified in 'connect'
     _network = network;
+    _foregroundChainPoller = ForegroundChainPoller(chainState: this);
   }
 
-  void startSyncService(WalletState walletState,
-      SyncProgressNotifier scanProgress, bool immediate) {
-    // start sync service & timer
-    _synchronizationService = SynchronizationService(
-        chainState: this, walletState: walletState, scanProgress: scanProgress);
-    _synchronizationService.startSyncTimer(immediate);
+  void startChainPoller(bool immediate,
+      {Future<void> Function()? onTipUpdated}) {
+    if (_foregroundChainPoller != null) {
+      _foregroundChainPoller!.onTipUpdated = onTipUpdated;
+      _foregroundChainPoller!.start();
+      if (immediate) {
+        _foregroundChainPoller!.triggerImmediateUpdate();
+      }
+    } else {
+      throw Exception(
+          'Attempted to start chain poller, but chain state is not initialized');
+    }
   }
 
   /// Try connecting to blindbit service
@@ -83,12 +88,13 @@ class ChainState extends ChangeNotifier {
     }
   }
 
-  void clearSyncHistory() {
-    _synchronizationService.clearSyncHistory();
+  void stopChainPoller() {
+    _foregroundChainPoller?.stop();
   }
 
   void reset() {
-    _synchronizationService.stopSyncTimer();
+    _foregroundChainPoller?.stop();
+    _foregroundChainPoller = null;
     _tip = null;
     _blindbitUrl = null;
     _network = null;

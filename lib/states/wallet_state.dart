@@ -1,10 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
-import 'package:danawallet/extensions/outpoint.dart';
-import 'package:danawallet/generated/rust/api/stream.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/owned_output.dart';
@@ -22,6 +21,7 @@ import 'package:danawallet/repositories/wallet_repository.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/services/dana_address_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:logger/logger.dart';
 
 class WalletState extends ChangeNotifier {
@@ -48,72 +48,14 @@ class WalletState extends ChangeNotifier {
   // this variable may change in some exceptional cases
   Bip353Address? danaAddress;
 
-  // stream to receive updates while scanning
-  late StreamSubscription syncResultSubscription;
+  bool _initialized = false;
 
   // private constructor
   WalletState._();
 
   static Future<WalletState> create() async {
     final instance = WalletState._();
-    await instance._initStreams();
     return instance;
-  }
-
-  Future<void> _initStreams() async {
-    syncResultSubscription = createSyncResultStream().listen(((event) async {
-      // Process found outputs (new UTXOs we own)
-      for (final found in event.foundOutputs) {
-        // first, insert the transaction data in the known transactions table
-        await transactionsRepository.addIncomingTransaction(
-          txid: found.outpoint.txid,
-          confirmationHeight: event.blkheight,
-          confirmationBlockhash: event.blkhash,
-        );
-
-        // Insert output into database
-        await ownedOutputsRepository.insertOutput(output: found);
-      }
-
-      List<OutPoint> unknownSpends = [];
-
-      // Process found inputs (our UTXOs being spent)
-      for (final outpoint in event.foundInputs) {
-        // Try to confirm an outgoing transaction
-        final confirmed =
-            await transactionsRepository.confirmOutgoingTransaction(
-          confirmedOutpointTxid: outpoint.txid,
-          confirmedOutpointVout: outpoint.vout,
-          confirmationHeight: event.blkheight,
-          confirmationBlockhash: event.blkhash,
-        );
-
-        // this output does not have an associated transaction
-        // this can occur if a user imported their seed phrase in multiple wallets
-        // generally we should discourage this, but it's inevitable that it will happen
-        if (!confirmed) {
-          unknownSpends.add(outpoint);
-        }
-      }
-
-      if (unknownSpends.isNotEmpty) {
-        Logger().w(
-            "Unknown spends detected, marking the following outpoints as spent: ${unknownSpends.toDisplayString()}");
-        await transactionsRepository.addOutgoingTransaction(
-          spentOutpoints: unknownSpends,
-          recipients: [],
-          txid: null,
-          confirmationHeight: event.blkheight,
-          confirmationBlockhash: event.blkhash,
-        );
-      }
-
-      await walletRepository.saveLastSync(event.blkheight);
-
-      // update UI
-      await _updateWalletState();
-      notifyListeners();
-    }));
   }
 
   Future<bool> initialize() async {
@@ -136,12 +78,31 @@ class WalletState extends ChangeNotifier {
 
     await _updateWalletState();
 
+    // All late fields are now populated; stream events can be processed safely.
+    _initialized = true;
+
     return true;
+  }
+
+  Future<void> refreshAfterSync() async {
+    if (!_initialized) return;
+    await _updateWalletState();
+    notifyListeners();
+  }
+
+  void onServiceData(Object data) {
+    if (!_initialized) return;
+    if (data is! Map) return;
+    if (data.containsKey(bgKeyRefresh)) {
+      _updateWalletState().then((_) => notifyListeners());
+    }
   }
 
   @override
   void dispose() {
-    syncResultSubscription.cancel();
+    if (Platform.isAndroid) {
+      FlutterForegroundTask.removeTaskDataCallback(onServiceData);
+    }
     super.dispose();
   }
 
