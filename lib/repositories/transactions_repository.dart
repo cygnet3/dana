@@ -142,8 +142,9 @@ class TransactionsRepository {
       String receiveCode, String changeCode) async {
     final db = await _db;
 
-    final transactions =
-        await db.query('transactions', orderBy: 'created_at DESC');
+    final transactions = await db.query('transactions',
+        orderBy:
+            'CASE WHEN confirmation_height IS NULL THEN 0 ELSE 1 END, confirmation_height DESC');
 
     final result = <RecordedTransaction>[];
 
