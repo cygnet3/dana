@@ -1,5 +1,6 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/states/wallet_state.dart';
+import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -96,12 +97,8 @@ class _TransactionNoteScreenState extends State<TransactionNoteScreen> {
         ],
       ),
       footer: SizedBox(
-        width: double.infinity,
-        child: BitcoinButtonFilled(
-          body: Text('Save', style: BitcoinTextStyle.body4(Bitcoin.white)),
-          onPressed: _saveNote,
-        ),
-      ),
+          width: double.infinity,
+          child: FooterButton(title: 'Save', onPressed: _saveNote)),
     );
   }
 }
