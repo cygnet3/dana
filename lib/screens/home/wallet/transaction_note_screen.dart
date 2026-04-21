@@ -96,9 +96,6 @@ class _TransactionNoteScreenState extends State<TransactionNoteScreen> {
           ),
         ],
       ),
-      footer: SizedBox(
-          width: double.infinity,
-          child: FooterButton(title: 'Save', onPressed: _saveNote)),
-    );
+      footer: FooterButton(title: 'Save', onPressed: _saveNote));
   }
 }
