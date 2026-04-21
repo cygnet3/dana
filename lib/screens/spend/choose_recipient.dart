@@ -224,7 +224,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   FooterButtonOutlined(
-                      title: "Paste an address from clipboard",
+                      title: "Paste from clipboard",
                       onPressed: onPasteFromClipboard),
                   const SizedBox(
                     height: 10.0,
