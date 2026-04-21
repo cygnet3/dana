@@ -6,17 +6,20 @@ class MainScreenSkeleton extends StatelessWidget {
   final String title;
   final Widget body;
   final Widget? footer;
+  final AppBar? appBar;
 
   const MainScreenSkeleton({
     super.key,
     required this.title,
     required this.body,
     this.footer,
+    this.appBar,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: appBar,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
