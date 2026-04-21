@@ -4,7 +4,7 @@ import 'package:danawallet/screens/settings/about/about_screen.dart';
 import 'package:danawallet/screens/settings/network/network_settings_screen.dart';
 import 'package:danawallet/screens/settings/personalization/personalisation_settings_screen.dart';
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
-import 'package:danawallet/screens/settings/widgets/skeleton.dart';
+import 'package:danawallet/widgets/skeletons/main_screen_skeleton.dart';
 import 'package:danawallet/screens/settings/wallet/wallet_settings_screen.dart';
 import 'package:flutter/material.dart';
 
@@ -62,7 +62,7 @@ class SettingsScreen extends StatelessWidget {
       )
     ];
 
-    return SettingsSkeleton(
+    return MainScreenSkeleton(
       showBackButton: false,
       title: pageTitle,
       body: ListView.separated(

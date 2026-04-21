@@ -3,13 +3,13 @@ import 'package:danawallet/widgets/back_button.dart';
 import 'package:flutter/material.dart';
 
 /// Common layout structure for all settings screens
-class SettingsSkeleton extends StatelessWidget {
+class MainScreenSkeleton extends StatelessWidget {
   final bool showBackButton;
   final String title;
   final Widget body;
   final Widget? footer;
 
-  const SettingsSkeleton({
+  const MainScreenSkeleton({
     super.key,
     required this.showBackButton,
     required this.title,
