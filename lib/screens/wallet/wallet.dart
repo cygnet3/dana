@@ -15,6 +15,7 @@ import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
+import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -486,20 +487,10 @@ class WalletScreenState extends State<WalletScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           Expanded(
-            child: BitcoinButtonFilled(
-              tintColor: danaBlue,
-              body: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Text(
-                  'Pay  ',
-                  style: BitcoinTextStyle.body3(Bitcoin.white),
-                ),
-                Image(
-                  image:
-                      const AssetImage("icons/send.png", package: "bitcoin_ui"),
-                  color: Bitcoin.white,
-                )
-              ]),
-              cornerRadius: 6,
+            child: FooterButton(
+              prefixImage:
+                  const AssetImage("icons/send.png", package: "bitcoin_ui"),
+              title: 'Pay',
               onPressed: () =>
                   goToScreen(context, const ChooseRecipientScreen()),
             ),
