@@ -69,7 +69,7 @@ impl Updater for StateUpdater {
                     .collect(),
             };
 
-            send_sync_update(update);
+            send_sync_update(update)?;
 
             self.last_update = Instant::now();
         }
