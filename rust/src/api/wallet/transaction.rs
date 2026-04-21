@@ -1,7 +1,7 @@
 use crate::api::structs::network::Network;
 use crate::api::structs::owned_output::OwnedOutput;
 use crate::api::structs::recipient::Recipient;
-use crate::api::structs::unsigned_transaction::ApiSilentPaymentUnsignedTransaction;
+use crate::api::structs::unsigned_transaction::SilentPaymentUnsignedTransaction;
 
 use anyhow::Result;
 use bip39::rand::{thread_rng, RngCore};
@@ -22,7 +22,7 @@ impl SpWallet {
         api_recipients: Vec<Recipient>,
         feerate: f32,
         network: Network,
-    ) -> Result<ApiSilentPaymentUnsignedTransaction> {
+    ) -> Result<SilentPaymentUnsignedTransaction> {
         let client = &self.client;
         let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = owned_outputs
             .into_iter()
@@ -62,7 +62,7 @@ impl SpWallet {
         wipe_address: String,
         feerate: f32,
         network: Network,
-    ) -> Result<ApiSilentPaymentUnsignedTransaction> {
+    ) -> Result<SilentPaymentUnsignedTransaction> {
         let client = &self.client;
         let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = owned_outputs
             .into_iter()
@@ -96,7 +96,7 @@ impl SpWallet {
     #[flutter_rust_bridge::frb(sync)]
     pub fn sign_transaction(
         &self,
-        unsigned_transaction: ApiSilentPaymentUnsignedTransaction,
+        unsigned_transaction: SilentPaymentUnsignedTransaction,
     ) -> Result<String> {
         let mut aux_rand = [0u8; 32];
 
@@ -110,8 +110,8 @@ impl SpWallet {
 
     #[flutter_rust_bridge::frb(sync)]
     pub fn finalize_transaction(
-        unsigned_transaction: ApiSilentPaymentUnsignedTransaction,
-    ) -> Result<ApiSilentPaymentUnsignedTransaction> {
+        unsigned_transaction: SilentPaymentUnsignedTransaction,
+    ) -> Result<SilentPaymentUnsignedTransaction> {
         let res = SpClient::finalize_transaction(unsigned_transaction.into())?;
         Ok(res.into())
     }

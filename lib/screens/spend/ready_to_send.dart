@@ -19,7 +19,7 @@ class ReadyToSendScreen extends StatefulWidget {
   final Recipient recipient;
   final Bip353Address? providedBip353;
   final SelectedFee fee;
-  final ApiSilentPaymentUnsignedTransaction unsignedTx;
+  final SilentPaymentUnsignedTransaction unsignedTx;
   const ReadyToSendScreen(
       {super.key,
       required this.unsignedTx,
