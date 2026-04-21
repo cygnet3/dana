@@ -63,7 +63,6 @@ class SettingsScreen extends StatelessWidget {
     ];
 
     return MainScreenSkeleton(
-      showBackButton: false,
       title: pageTitle,
       body: ListView.separated(
         itemCount: settingsTiles.length,
