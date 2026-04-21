@@ -291,7 +291,7 @@ class WalletState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<ApiSilentPaymentUnsignedTransaction> createUnsignedTxToThisRecipient(
+  Future<SilentPaymentUnsignedTransaction> createUnsignedTxToThisRecipient(
       Recipient recipient, int feerate) async {
     final wallet = await getWalletFromSecureStorage();
 
@@ -313,7 +313,7 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<String> signAndBroadcastUnsignedTx(
-      ApiSilentPaymentUnsignedTransaction unsignedTx) async {
+      SilentPaymentUnsignedTransaction unsignedTx) async {
     final selectedOutputs = unsignedTx.selectedUtxos;
 
     List<OutPoint> selectedOutpoints =

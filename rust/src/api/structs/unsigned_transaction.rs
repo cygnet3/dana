@@ -5,13 +5,12 @@ use spdk_wallet::bitcoin::{
     secp256k1::SecretKey,
     Network,
 };
-use spdk_wallet::client::SilentPaymentUnsignedTransaction;
 
 use crate::api::structs::amount::Amount;
 use crate::api::structs::discovered_output::DiscoveredOutput;
 use crate::api::structs::recipient::Recipient;
 
-pub struct ApiSilentPaymentUnsignedTransaction {
+pub struct SilentPaymentUnsignedTransaction {
     pub selected_utxos: Vec<(super::outpoint::OutPoint, DiscoveredOutput)>,
     pub recipients: Vec<Recipient>,
     pub partial_secret: [u8; 32],
@@ -19,8 +18,10 @@ pub struct ApiSilentPaymentUnsignedTransaction {
     pub network: String,
 }
 
-impl From<SilentPaymentUnsignedTransaction> for ApiSilentPaymentUnsignedTransaction {
-    fn from(value: SilentPaymentUnsignedTransaction) -> Self {
+impl From<spdk_wallet::client::SilentPaymentUnsignedTransaction>
+    for SilentPaymentUnsignedTransaction
+{
+    fn from(value: spdk_wallet::client::SilentPaymentUnsignedTransaction) -> Self {
         Self {
             selected_utxos: value
                 .selected_utxos
@@ -37,8 +38,10 @@ impl From<SilentPaymentUnsignedTransaction> for ApiSilentPaymentUnsignedTransact
     }
 }
 
-impl From<ApiSilentPaymentUnsignedTransaction> for SilentPaymentUnsignedTransaction {
-    fn from(value: ApiSilentPaymentUnsignedTransaction) -> Self {
+impl From<SilentPaymentUnsignedTransaction>
+    for spdk_wallet::client::SilentPaymentUnsignedTransaction
+{
+    fn from(value: SilentPaymentUnsignedTransaction) -> Self {
         Self {
             selected_utxos: value
                 .selected_utxos
@@ -59,7 +62,7 @@ impl From<ApiSilentPaymentUnsignedTransaction> for SilentPaymentUnsignedTransact
     }
 }
 
-impl ApiSilentPaymentUnsignedTransaction {
+impl SilentPaymentUnsignedTransaction {
     #[frb(sync)]
     pub fn get_send_amount(&self, change_address: String) -> Amount {
         let amount = self
