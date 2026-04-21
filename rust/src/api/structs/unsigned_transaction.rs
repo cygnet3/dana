@@ -11,6 +11,7 @@ use crate::api::structs::amount::Amount;
 use crate::api::structs::discovered_output::DiscoveredOutput;
 use crate::api::structs::recipient::Recipient;
 
+#[derive(Clone, Debug)]
 pub struct ApiSilentPaymentUnsignedTransaction {
     pub selected_utxos: Vec<(super::outpoint::OutPoint, DiscoveredOutput)>,
     pub recipients: Vec<Recipient>,
@@ -109,5 +110,23 @@ impl ApiSilentPaymentUnsignedTransaction {
             .filter(|r| r.payment_code != change_address)
             .cloned()
             .collect()
+    }
+
+    #[frb(sync)]
+    pub fn replace_change_code(
+        &self,
+        change_code: String,
+        new_code: String,
+    ) -> anyhow::Result<Self> {
+        let mut cloned = self.clone();
+        if let Some(change_recipient) = cloned
+            .recipients
+            .iter_mut()
+            .find(|r| r.payment_code == change_code)
+        {
+            change_recipient.payment_code = new_code
+        };
+
+        Ok(cloned)
     }
 }
