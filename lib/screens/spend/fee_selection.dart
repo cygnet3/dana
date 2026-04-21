@@ -72,7 +72,7 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
 
   Future<void> onContinue() async {
     final walletState = Provider.of<WalletState>(context, listen: false);
-    final changeAddress = walletState.changePaymentCode;
+    final changeCode = walletState.changePaymentCode;
 
     final feerate = _selected.getFeeRate(_currentFeeRates!);
 
@@ -82,7 +82,7 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
     // update the send amount to the actual sent amount (can be different e.g. dust)
     final updatedRecipient = Recipient(
       paymentCode: widget.recipient.paymentCode,
-      amount: unsignedTx.getSendAmount(changeAddress: changeAddress),
+      amount: unsignedTx.getSendAmount(changeCode: changeCode),
     );
 
     if (mounted) {

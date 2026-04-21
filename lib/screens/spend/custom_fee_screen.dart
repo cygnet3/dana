@@ -84,7 +84,7 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
 
   Future<void> onContinue() async {
     final walletState = Provider.of<WalletState>(context, listen: false);
-    final changeAddress = walletState.changePaymentCode;
+    final changeCode = walletState.changePaymentCode;
 
     final unsignedTx = await walletState.createUnsignedTxToThisRecipient(
         widget.recipient, _selectedFeeRate);
@@ -92,7 +92,7 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
     // update the send amount to the actual sent amount (can be different e.g. dust)
     final updatedRecipient = Recipient(
       paymentCode: widget.recipient.paymentCode,
-      amount: unsignedTx.getSendAmount(changeAddress: changeAddress),
+      amount: unsignedTx.getSendAmount(changeCode: changeCode),
     );
 
     if (mounted) {
