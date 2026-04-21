@@ -64,12 +64,12 @@ impl From<SilentPaymentUnsignedTransaction>
 
 impl SilentPaymentUnsignedTransaction {
     #[frb(sync)]
-    pub fn get_send_amount(&self, change_address: String) -> Amount {
+    pub fn get_send_amount(&self, change_code: String) -> Amount {
         let amount = self
             .recipients
             .iter()
             .filter_map(|r| {
-                if r.payment_code != change_address {
+                if r.payment_code != change_code {
                     Some(r.amount.0)
                 } else {
                     None
@@ -81,12 +81,12 @@ impl SilentPaymentUnsignedTransaction {
     }
 
     #[frb(sync)]
-    pub fn get_change_amount(&self, change_address: String) -> Amount {
+    pub fn get_change_amount(&self, change_code: String) -> Amount {
         let amount = self
             .recipients
             .iter()
             .filter_map(|r| {
-                if r.payment_code == change_address {
+                if r.payment_code == change_code {
                     Some(r.amount.0)
                 } else {
                     None
@@ -106,10 +106,10 @@ impl SilentPaymentUnsignedTransaction {
     }
 
     #[frb(sync)]
-    pub fn get_recipients(&self, change_address: String) -> Vec<Recipient> {
+    pub fn get_recipients(&self, change_code: String) -> Vec<Recipient> {
         self.recipients
             .iter()
-            .filter(|r| r.payment_code != change_address)
+            .filter(|r| r.payment_code != change_code)
             .cloned()
             .collect()
     }
