@@ -14,6 +14,10 @@ extension AmountExtension on Amount {
     return field0 > other.field0;
   }
 
+  bool operator <(Amount other) {
+    return field0 < other.field0;
+  }
+
   String displayBtc() {
     final btcPart = field0 ~/ BigInt.from(bitcoinUnits);
     final satsPart = (field0 % BigInt.from(bitcoinUnits));

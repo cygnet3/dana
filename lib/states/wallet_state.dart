@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
+import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/extensions/outpoint.dart';
@@ -294,15 +295,30 @@ class WalletState extends ChangeNotifier {
   Future<ApiSilentPaymentUnsignedTransaction> createUnsignedTxToThisRecipient(
       Recipient recipient, int feerate) async {
     final wallet = await getWalletFromSecureStorage();
+    final changeCode = wallet.getChangeAddress();
 
     if (recipient.amount.field0 < amount.field0 - BigInt.from(546)) {
-      return wallet.createNewTransaction(
-          ownedOutputs: unspentOutputs,
-          apiRecipients: [
-            recipient,
-          ],
-          feerate: feerate.toDouble(),
-          network: network);
+      final unsignedTx = wallet.createNewTransaction(
+        ownedOutputs: unspentOutputs,
+        apiRecipients: [
+          recipient,
+        ],
+        feerate: feerate.toDouble(),
+        network: network,
+      );
+
+      final sendAmount = unsignedTx.getSendAmount(changeAddress: changeCode);
+      final changeAmount =
+          unsignedTx.getChangeAmount(changeAddress: changeCode);
+
+      if (changeAmount < sendAmount) {
+        if (changeAmount < donateBelow) {
+          // replace change payment code with donation payment code
+          return unsignedTx.replaceChangeCode(
+              changeCode: changeCode, newCode: donatePaymentCode);
+        }
+      }
+      return unsignedTx;
     } else {
       return wallet.createDrainTransaction(
           ownedOutputs: unspentOutputs,

@@ -1,4 +1,5 @@
 import 'package:danawallet/data/enums/fiat_currency.dart';
+import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:flutter/services.dart';
 
 // The default blindbit backend used
@@ -51,3 +52,9 @@ const String nameServerDevMainnet =
 // name server for other flavors that user testnet/signet
 const String nameServerDevTestnet =
     "https://test.dev.nameserver.danawallet.app/v1";
+
+// if the change is below this amount, suggest we donate
+final Amount donateBelow = Amount(field0: BigInt.from(5000));
+// signet faucet address
+const String donatePaymentCode =
+    "tsp1qqtp5ql6htn4jz4feslzspyel2n3dzmr5fxjrc69yge2w72hnh2jzzqh6g9zjzkwzzv3m79y84dwusw3sdw2akyzvxm8l2x4gagzxjlrvf5njz0j6";
