@@ -40,10 +40,14 @@ pub(crate) fn send_sync_progress(scan_progress: u32) {
     }
 }
 
-pub(crate) fn send_sync_update(update: StateUpdate) {
-    let stream_sink = STATE_UPDATE_STREAM_SINK.lock().unwrap();
-    if let Some(stream_sink) = stream_sink.as_ref() {
-        // Same rationale as send_sync_progress above.
-        let _ = stream_sink.add(update);
+pub(crate) fn send_sync_update(update: StateUpdate) -> anyhow::Result<()> {
+    let stream_sink = STATE_UPDATE_STREAM_SINK
+        .try_lock()
+        .map_err(|_| anyhow::Error::msg("Stream sink not available"))?;
+    match stream_sink.as_ref() {
+        Some(sink) => sink
+            .add(update)
+            .map_err(|_| anyhow::Error::msg("error while sending sync update".to_string())),
+        None => Err(anyhow::Error::msg("Stream sink not available".to_string())),
     }
 }
