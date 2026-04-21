@@ -7,6 +7,7 @@ class MainScreenSkeleton extends StatelessWidget {
   final Widget body;
   final Widget? footer;
   final AppBar? appBar;
+  final VoidCallback? floatingAction;
 
   const MainScreenSkeleton({
     super.key,
@@ -14,12 +15,20 @@ class MainScreenSkeleton extends StatelessWidget {
     required this.body,
     this.footer,
     this.appBar,
+    this.floatingAction,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: appBar,
+      floatingActionButton: (floatingAction != null)
+          ? FloatingActionButton(
+              onPressed: floatingAction,
+              backgroundColor: Bitcoin.blue,
+              child: const Icon(Icons.add, color: Colors.white),
+            )
+          : null,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
