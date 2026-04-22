@@ -44,6 +44,15 @@ class _ContactsScreenState extends State<ContactsScreen> {
     );
   }
 
+  void _openAddContactSheet() async {
+    await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const AddContactSheet(),
+    );
+  }
+
   Widget _buildContactItem(Contact contact) {
     final displayName = contact.displayName ?? '?';
     final initial = contact.displayNameInitial ?? '?';
@@ -67,12 +76,19 @@ class _ContactsScreenState extends State<ContactsScreen> {
         onTap: () => _onTapContact(context, contact));
   }
 
-  void _openAddContactSheet() async {
-    await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const AddContactSheet(),
+  Widget _buildSearchResults(ContactsState contactsState) {
+    final query = _searchController.text.toLowerCase().trim();
+
+    final displayContacts = query.length < 3
+        ? contactsState.getOtherContacts()
+        : contactsState.filterContacts(query);
+
+    return ListView.separated(
+      itemCount: displayContacts.length,
+      separatorBuilder: (context, index) => const Divider(),
+      itemBuilder: (context, index) {
+        return _buildContactItem(displayContacts[index]);
+      },
     );
   }
 
@@ -115,21 +131,5 @@ class _ContactsScreenState extends State<ContactsScreen> {
             ),
           ],
         ));
-  }
-
-  Widget _buildSearchResults(ContactsState contactsState) {
-    final query = _searchController.text.toLowerCase().trim();
-
-    final displayContacts = query.length < 3
-        ? contactsState.getOtherContacts()
-        : contactsState.filterContacts(query);
-
-    return ListView.separated(
-      itemCount: displayContacts.length,
-      separatorBuilder: (context, index) => const Divider(),
-      itemBuilder: (context, index) {
-        return _buildContactItem(displayContacts[index]);
-      },
-    );
   }
 }
