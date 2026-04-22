@@ -45,7 +45,9 @@ class MainScreenSkeleton extends StatelessWidget {
             ),
           ),
           // Main content
-          Expanded(child: body),
+          Expanded(
+              child: Padding(
+                  padding: const EdgeInsetsGeometry.all(10), child: body)),
           // Optional footer
           if (footer != null) footer!,
         ],
