@@ -16,6 +16,7 @@ import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
+import 'package:danawallet/widgets/skeletons/main_screen_skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -553,85 +554,82 @@ class WalletScreenState extends State<WalletScreen> {
 
   Widget buildFundingScreen(String silentPaymentAddress, String? danaAddress,
       SyncProgressNotifier scanProgress, ChainState chainState) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0),
-      child: Column(
-        children: [
-          // Show sync progress when actively scanning
-          Visibility(
-              visible: scanProgress.isScanning,
-              maintainAnimation: true,
-              maintainSize: true,
-              maintainState: true,
-              child: buildScanProgress(scanProgress.progress)),
-          // Show offline status when chain sync has connection issues
-          Visibility(
-              visible: !chainState.available,
-              maintainAnimation: true,
-              maintainSize: true,
-              maintainState: true,
-              child: buildOfflineStatus(chainState)),
-          const SizedBox(height: 20.0),
-          Expanded(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Icon: arrow down in a box, blue
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: Bitcoin.blue.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Center(
-                        child: Image(
-                          width: 40,
-                          height: 40,
-                          image: const AssetImage("icons/receive.png",
-                              package: "bitcoin_ui"),
-                          color: Bitcoin.blue,
-                        ),
+    return Column(
+      children: [
+        // Show sync progress when actively scanning
+        Visibility(
+            visible: scanProgress.isScanning,
+            maintainAnimation: true,
+            maintainSize: true,
+            maintainState: true,
+            child: buildScanProgress(scanProgress.progress)),
+        // Show offline status when chain sync has connection issues
+        Visibility(
+            visible: !chainState.available,
+            maintainAnimation: true,
+            maintainSize: true,
+            maintainState: true,
+            child: buildOfflineStatus(chainState)),
+        const SizedBox(height: 20.0),
+        Expanded(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Icon: arrow down in a box, blue
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Bitcoin.blue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Center(
+                      child: Image(
+                        width: 40,
+                        height: 40,
+                        image: const AssetImage("icons/receive.png",
+                            package: "bitcoin_ui"),
+                        color: Bitcoin.blue,
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    // Title
-                    Text(
-                      'Fund your wallet',
-                      style: BitcoinTextStyle.body1(Bitcoin.neutral8).apply(
-                        fontSizeDelta: 2,
-                        fontWeightDelta: 2,
-                      ),
-                      textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  // Title
+                  Text(
+                    'Fund your wallet',
+                    style: BitcoinTextStyle.body1(Bitcoin.neutral8).apply(
+                      fontSizeDelta: 2,
+                      fontWeightDelta: 2,
                     ),
-                    const SizedBox(height: 16),
-                    // Subtitle
-                    Text(
-                      'Your balance is 0 at the moment. Share your Dana address and get donations or fund your wallet to donate to others',
-                      style: BitcoinTextStyle.body3(Bitcoin.neutral7),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-                    // Dana address box (if available)
-                    if (danaAddress != null) ...[
-                      buildAddressBox('Your Dana Address', danaAddress, true),
-                      const SizedBox(height: 20),
-                    ],
-                    // Silent payment address box, only show this if dana address is not present
-                    if (danaAddress == null)
-                      buildAddressBox('Your Silent Payment Address',
-                          silentPaymentAddress, false),
-                    const SizedBox(height: 24),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  // Subtitle
+                  Text(
+                    'Your balance is 0 at the moment. Share your Dana address and get donations or fund your wallet to donate to others',
+                    style: BitcoinTextStyle.body3(Bitcoin.neutral7),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  // Dana address box (if available)
+                  if (danaAddress != null) ...[
+                    buildAddressBox('Your Dana Address', danaAddress, true),
+                    const SizedBox(height: 20),
                   ],
-                ),
+                  // Silent payment address box, only show this if dana address is not present
+                  if (danaAddress == null)
+                    buildAddressBox('Your Silent Payment Address',
+                        silentPaymentAddress, false),
+                  const SizedBox(height: 24),
+                ],
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -673,60 +671,51 @@ class WalletScreenState extends State<WalletScreen> {
     // Show funding screen only if balance is zero AND there's no transaction history
     bool showFundingScreen = isBalanceZero && !hasTransactionHistory;
 
-    return Scaffold(
-        appBar: buildAppBar(walletState.network.toColor),
-        body: showFundingScreen
-            ? buildFundingScreen(
-                walletState.receivePaymentCode,
-                danaAddress?.toString(),
-                scanProgress,
-                chainState,
-              )
-            : Column(
-                children: [
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Show sync progress when actively scanning
-                          Visibility(
-                              visible: scanProgress.isScanning,
-                              maintainAnimation: true,
-                              maintainSize: true,
-                              maintainState: true,
-                              child: buildScanProgress(scanProgress.progress)),
-                          // Show offline status when chain sync has connection issues
-                          Visibility(
-                              visible: !chainState.available,
-                              maintainAnimation: true,
-                              maintainSize: true,
-                              maintainState: true,
-                              child: buildOfflineStatus(chainState)),
-                          const SizedBox(height: 20.0),
-                          buildAmountDisplay(
-                            amount,
-                            exchangeRate,
-                          ),
-                          const SizedBox(height: 20.0),
-                          // Show Dana address banner if available
-                          if (danaAddress != null)
-                            buildDanaAddressBanner(danaAddress),
-                          const Spacer(),
-                          buildTransactionHistory(
-                            walletState.transactions,
-                            exchangeRate,
-                          ),
-                          buildBottomButtons(walletState.receivePaymentCode),
-                          const SizedBox(
-                            height: 20.0,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ));
+    return MainScreenSkeleton(
+      appBar: buildAppBar(walletState.network.toColor),
+      body: showFundingScreen
+          ? buildFundingScreen(
+              walletState.receivePaymentCode,
+              danaAddress?.toString(),
+              scanProgress,
+              chainState,
+            )
+          : Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Show sync progress when actively scanning
+                Visibility(
+                    visible: scanProgress.isScanning,
+                    maintainAnimation: true,
+                    maintainSize: true,
+                    maintainState: true,
+                    child: buildScanProgress(scanProgress.progress)),
+                // Show offline status when chain sync has connection issues
+                Visibility(
+                    visible: !chainState.available,
+                    maintainAnimation: true,
+                    maintainSize: true,
+                    maintainState: true,
+                    child: buildOfflineStatus(chainState)),
+                const SizedBox(height: 20.0),
+                buildAmountDisplay(
+                  amount,
+                  exchangeRate,
+                ),
+                const SizedBox(height: 20.0),
+                // Show Dana address banner if available
+                if (danaAddress != null) buildDanaAddressBanner(danaAddress),
+                const Spacer(),
+                buildTransactionHistory(
+                  walletState.transactions,
+                  exchangeRate,
+                ),
+                buildBottomButtons(walletState.receivePaymentCode),
+                const SizedBox(
+                  height: 20.0,
+                ),
+              ],
+            ),
+    );
   }
 }
