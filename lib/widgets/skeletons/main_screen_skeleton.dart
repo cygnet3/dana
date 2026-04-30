@@ -29,7 +29,8 @@ class MainScreenSkeleton extends StatelessWidget {
               child: const Icon(Icons.add, color: Colors.white),
             )
           : null,
-      body: Column(
+      body: SafeArea(
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Title
@@ -54,7 +55,7 @@ class MainScreenSkeleton extends StatelessWidget {
           // Optional footer
           if (footer != null) footer!,
         ],
-      ),
+      )),
     );
   }
 }
