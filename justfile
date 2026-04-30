@@ -32,10 +32,8 @@ clean-bin:
     cd rust && just clean-bin
 gen:
     cd rust && just gen
-build-emulator:
-    cd rust && just build-emulator
-build-android:
-    cd rust && just build-android
+build:
+    cd rust && just build
 
 inspect-db:
     #!/bin/sh
