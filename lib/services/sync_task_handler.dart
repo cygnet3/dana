@@ -34,7 +34,8 @@ class SynchronizationTaskHandler extends TaskHandler {
     }
 
     Logger().i('[BG] service started (starter: ${starter.name})');
-    await _ensureInit();
+    if (!await _ensureNotificationPermissionOrStop('onStart')) return;
+
     _engine = SyncEngine(
       logTag: 'BG',
       onSyncStarted: (start, end) {
@@ -59,6 +60,12 @@ class SynchronizationTaskHandler extends TaskHandler {
   @override
   void onRepeatEvent(DateTime timestamp) {
     Logger().i('[BG] heartbeat $timestamp');
+    unawaited(_onRepeatEventAsync());
+  }
+
+  Future<void> _onRepeatEventAsync() async {
+    if (!await _ensureNotificationPermissionOrStop('onRepeatEvent')) return;
+    await _ensureInit();
     unawaited(_engine?.trySync());
   }
 
@@ -118,5 +125,19 @@ class SynchronizationTaskHandler extends TaskHandler {
     if (_initialized) return;
     await RustLib.init();
     _initialized = true;
+  }
+
+  /// Returns false if [NotificationPermission] is not granted and this task
+  /// has shut down the foreground service — caller must not sync afterward.
+  Future<bool> _ensureNotificationPermissionOrStop(String context) async {
+    final perm = await FlutterForegroundTask.checkNotificationPermission();
+    if (perm == NotificationPermission.granted) return true;
+
+    Logger().w(
+      '[BG] notification permission not granted ($context) — stopping '
+      'foreground service',
+    );
+    await FlutterForegroundTask.stopService();
+    return false;
   }
 }
