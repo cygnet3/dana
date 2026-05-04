@@ -72,6 +72,7 @@ void main() async {
   final chainState = ChainState();
   final contactsState = ContactsState();
   final fiatExchangeRate = await FiatExchangeRateState.create();
+  SyncOrchestrator? syncOrchestratorRef;
   final SyncBackend syncBackend;
   if (Platform.isLinux) {
     syncBackend = LinuxSyncBackend(
@@ -85,12 +86,18 @@ void main() async {
       permissionState: permissionState,
       syncProgress: scanNotifier,
       walletState: walletState,
+      onFatalError: () =>
+          syncOrchestratorRef?.restart(fallbackMode: true) ?? Future.value(),
     );
   } else {
     Logger().e('Dana wallet is not supported on this platform');
     exit(1);
   }
-  final syncOrchestrator = SyncOrchestrator(backend: syncBackend);
+  final syncOrchestrator = SyncOrchestrator(
+    backend: syncBackend,
+    permissionState: permissionState,
+  );
+  syncOrchestratorRef = syncOrchestrator;
 
   // Try to update exchange rate, but don't crash if it fails
   try {
