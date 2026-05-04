@@ -1,52 +1,125 @@
+import 'dart:async';
+
 import 'package:danawallet/data/enums/sync_enums.dart';
 import 'package:danawallet/services/sync_backend.dart';
+import 'package:danawallet/states/permission_state.dart';
 import 'package:flutter/material.dart';
 
-export 'package:danawallet/data/enums/sync_enums.dart'
-    show SyncAppAction;
 export 'package:danawallet/services/sync_backend.dart'
     show SyncBackend, LinuxSyncBackend, AndroidSyncBackend;
 
-/// Owns the sync lifecycle and exposes [inProcessFallback] so that
-/// [HomeScreen] can show an informational banner without knowing platform
-/// details.
+/// Coordinates sync backend lifecycle and runtime reconfiguration.
 ///
-/// All platform I/O is delegated to the injected [SyncBackend], keeping this
-/// class free of [Platform] checks, plugin calls, and [exit] invocations.
+/// This class serializes [start], [stop], and [restart] to avoid overlapping
+/// backend transitions, and reacts to [PermissionState] changes by restarting
+/// sync when running (for example after Android notification permission
+/// changes). It also exposes [inProcessFallback] so UI layers can surface
+/// degraded background-sync state without depending on platform details.
+///
+/// All platform-specific I/O remains inside the injected [SyncBackend].
 class SyncOrchestrator extends ChangeNotifier {
   final SyncBackend _backend;
+  final PermissionState _permissionState;
 
   bool _inProcessFallback = false;
   bool _running = false;
+  bool _permissionRestartInFlight = false;
+  bool _disposed = false;
+  Future<void> _lifecycleQueue = Future.value();
 
   bool get inProcessFallback => _inProcessFallback;
   bool get isRunning => _running;
 
-  SyncOrchestrator({required SyncBackend backend}) : _backend = backend;
+  SyncOrchestrator({
+    required SyncBackend backend,
+    required PermissionState permissionState,
+  })  : _backend = backend,
+        _permissionState = permissionState {
+    _permissionState.addListener(_onPermissionStateChanged);
+  }
 
-  /// Idempotent. On Android, [AndroidSyncBackend] may show a dialog via its
-  /// [onUiEvent] callback before this returns — call only after the navigator
-  /// is live.
-  Future<void> start() async {
-    if (_running) return;
-    _running = true;
-    final result = await _backend.start();
-    _inProcessFallback = result == SyncStartResult.fallback;
-    if (_inProcessFallback) notifyListeners();
+  /// Idempotent. Call only after the navigator is live.
+  Future<void> start({bool fallbackMode = false}) async {
+    await _enqueueLifecycleAction(() async {
+      if (_running) return;
+      _running = true;
+      try {
+        if (fallbackMode) {
+          await _backend.startFallback();
+          _setInProcessFallback(true);
+        } else {
+          final result = await _backend.start();
+          _setInProcessFallback(result == SyncStartResult.fallback);
+        }
+      } catch (_) {
+        _running = false;
+        rethrow;
+      }
+    });
   }
 
   Future<void> stop() async {
-    if (!_running) return;
-    _running = false;
-    await _backend.stop();
-    if (_inProcessFallback) {
-      _inProcessFallback = false;
-      notifyListeners();
-    }
+    await _enqueueLifecycleAction(() async {
+      if (!_running) return;
+      _running = false;
+      await _backend.stop();
+      _setInProcessFallback(false);
+    });
   }
 
-  Future<void> restart() async {
-    await stop();
-    await start();
+  Future<void> restart({bool fallbackMode = false}) async {
+    await _enqueueLifecycleAction(() async {
+      if (_running) {
+        _running = false;
+        await _backend.stop();
+      }
+      _setInProcessFallback(false);
+
+      _running = true;
+      try {
+        if (fallbackMode) {
+          await _backend.startFallback();
+          _setInProcessFallback(true);
+        } else {
+          final result = await _backend.start();
+          _setInProcessFallback(result == SyncStartResult.fallback);
+        }
+      } catch (_) {
+        _running = false;
+        rethrow;
+      }
+    });
+  }
+
+  Future<void> _enqueueLifecycleAction(Future<void> Function() action) {
+    final queued = _lifecycleQueue.then((_) => action());
+    _lifecycleQueue = queued.catchError((_) {});
+    return queued;
+  }
+
+  void _setInProcessFallback(bool value) {
+    if (_inProcessFallback == value) return;
+    _inProcessFallback = value;
+    notifyListeners();
+  }
+
+  void _onPermissionStateChanged() {
+    if (!_running || _permissionRestartInFlight) return;
+    _permissionRestartInFlight = true;
+    unawaited(() async {
+      try {
+        await restart();
+      } finally {
+        _permissionRestartInFlight = false;
+      }
+    }());
+  }
+
+  @override
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _permissionState.removeListener(_onPermissionStateChanged);
+    super.dispose();
   }
 }
