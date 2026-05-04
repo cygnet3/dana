@@ -58,6 +58,7 @@ const String bgKeyEndHeight = 'endHeight';
 const String bgKeyComplete = 'complete';
 const String bgKeyRefresh = 'refresh';
 const String bgKeyInterrupt = 'interrupt';
+const String bgKeyFatalError = 'fatalError';
 
 // Message keys sent to the background sync service from the main isolate.
 const String bgKeySync = 'sync';

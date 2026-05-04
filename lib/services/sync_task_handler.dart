@@ -39,7 +39,9 @@ class SynchronizationTaskHandler extends TaskHandler {
     try {
       await _ensureInit();
     } catch (e) {
-      Logger().e('[BG] Rust library failed to initialize — stopping service: $e');
+      Logger()
+          .e('[BG] Rust library failed to initialize — stopping service: $e');
+      FlutterForegroundTask.sendDataToMain({bgKeyFatalError: true});
       await FlutterForegroundTask.stopService();
       return;
     }

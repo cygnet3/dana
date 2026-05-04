@@ -3,7 +3,6 @@ import 'package:danawallet/data/enums/sync_enums.dart';
 import 'package:danawallet/services/foreground_sync_service.dart';
 import 'package:danawallet/services/in_process_sync_service.dart';
 import 'package:danawallet/states/chain_state.dart';
-import 'package:danawallet/states/permission_state.dart';
 import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -58,20 +57,23 @@ class LinuxSyncBackend implements SyncBackend {
 /// (e.g. notification permission permanently denied).
 class AndroidSyncBackend implements SyncBackend {
   final ChainState _chainState;
-  final PermissionState _permissionState;
   final SyncProgressNotifier _syncProgress;
   final WalletState _walletState;
+
+  /// Called when the background isolate sends [bgKeyFatalError]. The backend
+  /// has already committed to the foreground-service path by the time this
+  /// fires, so the caller must trigger a restart to recover into fallback mode.
+  final Future<void> Function() onFatalError;
 
   bool _callbacksRegistered = false;
   InProcessSyncService? _fallbackService;
 
   AndroidSyncBackend({
     required ChainState chainState,
-    required PermissionState permissionState,
     required SyncProgressNotifier syncProgress,
     required WalletState walletState,
+    required this.onFatalError,
   })  : _chainState = chainState,
-        _permissionState = permissionState,
         _syncProgress = syncProgress,
         _walletState = walletState;
 
@@ -80,17 +82,13 @@ class AndroidSyncBackend implements SyncBackend {
     if (!_callbacksRegistered) {
       FlutterForegroundTask.addTaskDataCallback(_syncProgress.onServiceData);
       FlutterForegroundTask.addTaskDataCallback(_walletState.onServiceData);
+      FlutterForegroundTask.addTaskDataCallback(_onServiceData);
       _callbacksRegistered = true;
     }
 
-    await _permissionState.refresh();
-    if (!_permissionState.notificationGranted) {
-      if (await FlutterForegroundTask.isRunningService) {
-        await ForegroundSyncService.instance.stop();
-      }
-      Logger().w('[AndroidSyncBackend] notification permission missing — '
-          'falling back to in-process sync');
-      return _startFallback();
+    final perm = await FlutterForegroundTask.checkNotificationPermission();
+    if (perm != NotificationPermission.granted) {
+      await onUiEvent?.call(SyncAppAction.notificationPermissionWarning);
     }
 
     await ForegroundSyncService.instance.start();
@@ -106,7 +104,12 @@ class AndroidSyncBackend implements SyncBackend {
 
     Logger().w('[AndroidSyncBackend] foreground service unavailable — '
         'falling back to in-process sync');
-    return _startFallback();
+    _fallbackService = InProcessSyncService(
+      syncProgress: _syncProgress,
+      walletState: _walletState,
+    );
+    _chainState.startChainPoller(true, onTipUpdated: _fallbackService!.trySync);
+    return SyncStartResult.fallback;
   }
 
   @override
@@ -128,12 +131,12 @@ class AndroidSyncBackend implements SyncBackend {
     }
   }
 
-  SyncStartResult _startFallback() {
-    _fallbackService = InProcessSyncService(
-      syncProgress: _syncProgress,
-      walletState: _walletState,
-    );
-    _chainState.startChainPoller(true, onTipUpdated: _fallbackService!.trySync);
-    return SyncStartResult.fallback;
+  void _onServiceData(Object data) {
+    if (data is Map && data[bgKeyFatalError] == true) {
+      Logger().e('[AndroidSyncBackend] background isolate reported fatal error '
+          '— restarting to recover into fallback mode');
+      unawaited(onFatalError());
+    }
   }
+
 }
