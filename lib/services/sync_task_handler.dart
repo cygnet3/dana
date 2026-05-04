@@ -27,6 +27,12 @@ class SynchronizationTaskHandler extends TaskHandler {
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
+    // First guard against accidental double calls
+    if (_engine != null) {
+      Logger().e('[BG] service already started, skipping');
+      return;
+    }
+
     Logger().i('[BG] service started (starter: ${starter.name})');
     await _ensureInit();
     _engine = SyncEngine(
