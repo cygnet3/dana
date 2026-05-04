@@ -60,9 +60,21 @@ class SynchronizationTaskHandler extends TaskHandler {
   Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
     Logger().i('[BG] service destroyed (isTimeout: $isTimeout)');
     if (_engine?.isSyncing == true) {
-      FlutterForegroundTask.sendDataToMain({bgKeyComplete: false});
+      SpWallet.interruptSync();
+      if (!isTimeout) {
+        // Wait for trySync to drain so its onSyncComplete callback sends
+        // bgKeyComplete to the main isolate before we cancel the subscription
+        // in dispose(). This also prevents a double bgKeyComplete send.
+        // Skipped on timeout: the OS is reclaiming the service immediately and
+        // IPC delivery is not guaranteed; the main isolate's waitForCompletion
+        // timeout will deactivate the progress bar on its own.
+        await _engine!.waitForIdle();
+      }
     }
     _engine?.dispose();
+    _engine = null;
+    _startHeight = null;
+    _endHeight = null;
   }
 
   @override

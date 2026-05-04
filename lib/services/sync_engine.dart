@@ -38,6 +38,7 @@ class SyncEngine {
 
   bool _isSyncing = false;
   bool get isSyncing => _isSyncing;
+  Completer<void>? _idleCompleter;
 
   late final StreamSubscription _syncResultSubscription;
 
@@ -177,7 +178,21 @@ class SyncEngine {
       onSyncComplete(false);
     } finally {
       _isSyncing = false;
+      _idleCompleter?.complete();
+      _idleCompleter = null;
     }
+  }
+
+  /// Waits until any active [trySync] call has fully unwound, including its
+  /// [onSyncComplete] callback. Returns immediately if idle.
+  ///
+  /// [timeout] guards against Rust taking too long to honour [interruptSync].
+  Future<void> waitForIdle({
+    Duration timeout = const Duration(seconds: 5),
+  }) {
+    if (!_isSyncing) return Future.value();
+    _idleCompleter ??= Completer<void>();
+    return _idleCompleter!.future.timeout(timeout, onTimeout: () {});
   }
 
   Future<int> _heightFromBirthday(network) async {
