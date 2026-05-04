@@ -5,7 +5,6 @@ import 'package:danawallet/constants.dart';
 import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/frb_generated.dart';
 
-import 'package:danawallet/data/enums/warning_type.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/services/foreground_sync_service.dart';
 import 'package:danawallet/repositories/database_helper.dart';
@@ -80,25 +79,16 @@ void main() async {
       syncProgress: scanNotifier,
       walletState: walletState,
     );
-  } else {
+  } else if (Platform.isAndroid) {
     syncBackend = AndroidSyncBackend(
       chainState: chainState,
+      permissionState: permissionState,
       syncProgress: scanNotifier,
       walletState: walletState,
-      onUiEvent: (event) async {
-        switch (event) {
-          case SyncAppAction.notificationPermissionWarning:
-            await showWarningDialog(
-              'Dana syncs your wallet in the background using an Android '
-              'foreground service, which requires showing a notification while '
-              'it runs.\n\nWithout this permission your wallet will only sync '
-              'while the app is open, which may result in long sync times when '
-              'you reopen the app.',
-              WarningType.warn,
-            );
-        }
-      },
     );
+  } else {
+    Logger().e('Dana wallet is not supported on this platform');
+    exit(1);
   }
   final syncOrchestrator = SyncOrchestrator(backend: syncBackend);
 
