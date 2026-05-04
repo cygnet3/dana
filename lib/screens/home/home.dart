@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:bitcoin_ui/bitcoin_ui.dart';
+import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/states/home_state.dart';
 import 'package:danawallet/screens/contacts/contacts.dart';
 import 'package:danawallet/screens/wallet/wallet.dart';
 import 'package:danawallet/screens/settings/settings_screen.dart';
+import 'package:danawallet/states/permission_state.dart';
 import 'package:danawallet/states/sync_orchestrator.dart';
 import 'package:danawallet/widgets/alerts/status_banner.dart';
 import 'package:flutter/material.dart';
@@ -20,6 +24,31 @@ class HomeScreen extends StatelessWidget {
 
   const HomeScreen({super.key});
 
+  Future<void> _onEnableBackgroundSync(BuildContext context) async {
+    final permissionState =
+        Provider.of<PermissionState>(context, listen: false);
+    final syncOrchestrator =
+        Provider.of<SyncOrchestrator>(context, listen: false);
+
+    // Capture state before the call: if permission was already granted,
+    // _onPermissionStateChanged won't fire and we must restart explicitly.
+    final wasGranted = permissionState.notificationGranted;
+
+    if (!await permissionState.requestPermissionsAndWaitForSettingsReturn()) {
+      displayWarning(
+          'Notification permission is required for background sync.');
+      return;
+    }
+
+    if (wasGranted && syncOrchestrator.inProcessFallback) {
+      await syncOrchestrator.restart();
+      if (syncOrchestrator.inProcessFallback) {
+        displayWarning(
+            'Background sync could not be started. Try restarting the app.');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final homeState = Provider.of<HomeState>(context, listen: true);
@@ -32,10 +61,14 @@ class HomeScreen extends StatelessWidget {
           body: Column(
             children: [
               if (syncOrchestrator.inProcessFallback)
-                const StatusBanner(
+                StatusBanner(
                   icon: Icons.sync,
                   message: bgSyncUnavailableMsg,
                   backgroundColor: bgSyncUnavailableColor,
+                  actionLabel: 'Enable',
+                  onActionPressed: () {
+                    unawaited(_onEnableBackgroundSync(context));
+                  },
                 ),
               Expanded(
                 child: IndexedStack(
