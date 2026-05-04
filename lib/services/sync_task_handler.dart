@@ -53,13 +53,13 @@ class SynchronizationTaskHandler extends TaskHandler {
       onStateUpdated: () async =>
           FlutterForegroundTask.sendDataToMain({bgKeyRefresh: true}),
     );
-    _engine!.trySync();
+    unawaited(_engine!.trySync());
   }
 
   @override
   void onRepeatEvent(DateTime timestamp) {
     Logger().i('[BG] heartbeat $timestamp');
-    _engine?.trySync();
+    unawaited(_engine?.trySync());
   }
 
   @override
