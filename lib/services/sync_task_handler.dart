@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/generated/rust/frb_generated.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
@@ -20,7 +22,7 @@ void startCallback() {
 }
 
 class SynchronizationTaskHandler extends TaskHandler {
-  bool _initialized = false;
+  Future<void>? _initFuture;
   SyncEngine? _engine;
   int? _startHeight;
   int? _endHeight;
@@ -34,6 +36,13 @@ class SynchronizationTaskHandler extends TaskHandler {
     }
 
     Logger().i('[BG] service started (starter: ${starter.name})');
+    try {
+      await _ensureInit();
+    } catch (e) {
+      Logger().e('[BG] Rust library failed to initialize — stopping service: $e');
+      await FlutterForegroundTask.stopService();
+      return;
+    }
     if (!await _ensureNotificationPermissionOrStop('onStart')) return;
 
     _engine = SyncEngine(
@@ -94,20 +103,7 @@ class SynchronizationTaskHandler extends TaskHandler {
   void onReceiveData(Object data) {
     if (data is Map) {
       if (data[bgKeySync] == true) {
-        Logger().i('[BG] sync triggered by main isolate');
-        if (_engine?.isSyncing == true &&
-            _startHeight != null &&
-            _endHeight != null) {
-          // Re-send current sync state so a freshly started main isolate can
-          // pick up the progress bar.
-          Logger().i('[BG] sync already running, re-sending progress state');
-          FlutterForegroundTask.sendDataToMain({
-            bgKeyStartHeight: _startHeight,
-            bgKeyEndHeight: _endHeight,
-          });
-        } else {
-          _engine?.trySync();
-        }
+        unawaited(_onReceiveSyncRequest());
       } else if (data[bgKeyInterrupt] == true) {
         Logger().i('[BG] interrupt requested');
         SpWallet.interruptSync();
@@ -121,10 +117,9 @@ class SynchronizationTaskHandler extends TaskHandler {
     }
   }
 
-  Future<void> _ensureInit() async {
-    if (_initialized) return;
-    await RustLib.init();
-    _initialized = true;
+  Future<void> _ensureInit() {
+    _initFuture ??= RustLib.init();
+    return _initFuture!;
   }
 
   /// Returns false if [NotificationPermission] is not granted and this task
@@ -139,5 +134,23 @@ class SynchronizationTaskHandler extends TaskHandler {
     );
     await FlutterForegroundTask.stopService();
     return false;
+  }
+
+  Future<void> _onReceiveSyncRequest() async {
+    if (!await _ensureNotificationPermissionOrStop('onReceiveData')) return;
+
+    if (_engine?.isSyncing == true &&
+        _startHeight != null &&
+        _endHeight != null) {
+      Logger().i('[BG] sync already running, re-sending progress state');
+      FlutterForegroundTask.sendDataToMain({
+        bgKeyStartHeight: _startHeight,
+        bgKeyEndHeight: _endHeight,
+      });
+    } else {
+      Logger().i('[BG] sync triggered by main isolate');
+      await _ensureInit();
+      unawaited(_engine?.trySync());
+    }
   }
 }
