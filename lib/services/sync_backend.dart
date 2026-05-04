@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/enums/sync_enums.dart';
 import 'package:danawallet/services/foreground_sync_service.dart';
@@ -14,6 +16,7 @@ import 'package:logger/logger.dart';
 /// keeping itself free of [Platform], plugin, and process-lifecycle imports.
 abstract class SyncBackend {
   Future<SyncStartResult> start();
+  Future<void> startFallback();
   Future<void> stop();
 }
 
@@ -41,6 +44,12 @@ class LinuxSyncBackend implements SyncBackend {
     );
     _chainState.startChainPoller(true, onTipUpdated: _service!.trySync);
     return SyncStartResult.started;
+  }
+
+  // Fallback mode is the same as regular start for linux
+  @override
+  Future<void> startFallback() async {
+    await start();
   }
 
   @override
@@ -104,12 +113,12 @@ class AndroidSyncBackend implements SyncBackend {
 
     Logger().w('[AndroidSyncBackend] foreground service unavailable — '
         'falling back to in-process sync');
-    _fallbackService = InProcessSyncService(
-      syncProgress: _syncProgress,
-      walletState: _walletState,
-    );
-    _chainState.startChainPoller(true, onTipUpdated: _fallbackService!.trySync);
-    return SyncStartResult.fallback;
+    return _startFallback();
+  }
+
+  @override
+  Future<void> startFallback() async {
+    _startFallback();
   }
 
   @override
@@ -139,4 +148,12 @@ class AndroidSyncBackend implements SyncBackend {
     }
   }
 
+  SyncStartResult _startFallback() {
+    _fallbackService = InProcessSyncService(
+      syncProgress: _syncProgress,
+      walletState: _walletState,
+    );
+    _chainState.startChainPoller(true, onTipUpdated: _fallbackService!.trySync);
+    return SyncStartResult.fallback;
+  }
 }
