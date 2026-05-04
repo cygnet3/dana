@@ -22,6 +22,7 @@ import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/home_state.dart';
+import 'package:danawallet/states/permission_state.dart';
 import 'package:danawallet/states/sync_orchestrator.dart';
 import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
@@ -67,6 +68,7 @@ void main() async {
   DatabaseHelper.instance.enableForeignKeysPragma();
 
   final walletState = await WalletState.create();
+  final permissionState = await PermissionState.create();
   final scanNotifier = await SyncProgressNotifier.create();
   final chainState = ChainState();
   final contactsState = ContactsState();
@@ -160,6 +162,7 @@ void main() async {
         ChangeNotifierProvider.value(value: scanNotifier),
         ChangeNotifierProvider.value(value: chainState),
         ChangeNotifierProvider.value(value: HomeState()),
+        ChangeNotifierProvider.value(value: permissionState),
         ChangeNotifierProvider.value(value: fiatExchangeRate),
         ChangeNotifierProvider.value(value: contactsState),
         ChangeNotifierProvider.value(value: syncOrchestrator),
