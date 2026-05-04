@@ -31,24 +31,6 @@ class ForegroundSyncService {
   /// Start the foreground service. Safe to call even if already running.
   /// Does not block startup — await this fire-and-forget with unawaited().
   Future<void> start() async {
-    // Android 13+ requires POST_NOTIFICATIONS at runtime.
-    final perm = await FlutterForegroundTask.checkNotificationPermission();
-    if (perm != NotificationPermission.granted) {
-      await FlutterForegroundTask.requestNotificationPermission();
-      final recheckPerm =
-          await FlutterForegroundTask.checkNotificationPermission();
-      if (recheckPerm != NotificationPermission.granted) {
-        Logger().w(
-          'Notification permission denied, cannot start Android foreground service',
-        );
-        return;
-      }
-    }
-
-    if (!await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
-      await FlutterForegroundTask.requestIgnoreBatteryOptimization();
-    }
-
     if (await FlutterForegroundTask.isRunningService) {
       Logger().i('Android foreground service already running');
       return;
