@@ -3,6 +3,7 @@ import 'package:danawallet/data/enums/sync_enums.dart';
 import 'package:danawallet/services/foreground_sync_service.dart';
 import 'package:danawallet/services/in_process_sync_service.dart';
 import 'package:danawallet/states/chain_state.dart';
+import 'package:danawallet/states/permission_state.dart';
 import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -57,22 +58,20 @@ class LinuxSyncBackend implements SyncBackend {
 /// (e.g. notification permission permanently denied).
 class AndroidSyncBackend implements SyncBackend {
   final ChainState _chainState;
+  final PermissionState _permissionState;
   final SyncProgressNotifier _syncProgress;
   final WalletState _walletState;
-
-  /// Called when the backend needs the UI layer to act (e.g. show a dialog).
-  /// Awaited so [start] only continues after the caller has handled the event.
-  final Future<void> Function(SyncAppAction)? onUiEvent;
 
   bool _callbacksRegistered = false;
   InProcessSyncService? _fallbackService;
 
   AndroidSyncBackend({
     required ChainState chainState,
+    required PermissionState permissionState,
     required SyncProgressNotifier syncProgress,
     required WalletState walletState,
-    this.onUiEvent,
   })  : _chainState = chainState,
+        _permissionState = permissionState,
         _syncProgress = syncProgress,
         _walletState = walletState;
 
@@ -84,9 +83,14 @@ class AndroidSyncBackend implements SyncBackend {
       _callbacksRegistered = true;
     }
 
-    final perm = await FlutterForegroundTask.checkNotificationPermission();
-    if (perm != NotificationPermission.granted) {
-      await onUiEvent?.call(SyncAppAction.notificationPermissionWarning);
+    await _permissionState.refresh();
+    if (!_permissionState.notificationGranted) {
+      if (await FlutterForegroundTask.isRunningService) {
+        await ForegroundSyncService.instance.stop();
+      }
+      Logger().w('[AndroidSyncBackend] notification permission missing — '
+          'falling back to in-process sync');
+      return _startFallback();
     }
 
     await ForegroundSyncService.instance.start();
@@ -102,12 +106,7 @@ class AndroidSyncBackend implements SyncBackend {
 
     Logger().w('[AndroidSyncBackend] foreground service unavailable — '
         'falling back to in-process sync');
-    _fallbackService = InProcessSyncService(
-      syncProgress: _syncProgress,
-      walletState: _walletState,
-    );
-    _chainState.startChainPoller(true, onTipUpdated: _fallbackService!.trySync);
-    return SyncStartResult.fallback;
+    return _startFallback();
   }
 
   @override
@@ -127,5 +126,14 @@ class AndroidSyncBackend implements SyncBackend {
       await _syncProgress.waitForCompletion();
       await ForegroundSyncService.instance.stop();
     }
+  }
+
+  SyncStartResult _startFallback() {
+    _fallbackService = InProcessSyncService(
+      syncProgress: _syncProgress,
+      walletState: _walletState,
+    );
+    _chainState.startChainPoller(true, onTipUpdated: _fallbackService!.trySync);
+    return SyncStartResult.fallback;
   }
 }
