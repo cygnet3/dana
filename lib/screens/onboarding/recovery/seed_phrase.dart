@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/enums/warning_type.dart';
@@ -5,6 +7,7 @@ import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/home/home.dart';
+import 'package:danawallet/screens/onboarding/notification_permission_screen.dart';
 import 'package:danawallet/screens/onboarding/recovery/birthday_picker_screen.dart';
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/states/chain_state.dart';
@@ -105,16 +108,28 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
       contactsState.initialize(
           walletState.receivePaymentCode, walletState.danaAddress);
 
-      await orchestrator.start();
-
       if (context.mounted) {
-        Widget nextScreen = goToDanaAddressSetup
+        final Widget nextScreen = goToDanaAddressSetup
             ? const RegisterDanaAddressScreen()
             : const HomeScreen();
-        Navigator.pushAndRemoveUntil(
+        if (Platform.isAndroid) {
+          Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => nextScreen),
-            (Route<dynamic> route) => false);
+            MaterialPageRoute(
+              builder: (context) => NotificationPermissionScreen(
+                goToDanaAddressSetup: goToDanaAddressSetup,
+              ),
+            ),
+            (Route<dynamic> route) => false,
+          );
+        } else {
+          await orchestrator.start();
+          if (!context.mounted) return;
+          Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => nextScreen),
+              (Route<dynamic> route) => false);
+        }
       }
     } catch (e) {
       if (context.mounted) {

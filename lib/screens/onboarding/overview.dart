@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/extensions/network.dart';
@@ -6,6 +8,7 @@ import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/home/home.dart';
 import 'package:danawallet/screens/onboarding/choose_network.dart';
+import 'package:danawallet/screens/onboarding/notification_permission_screen.dart';
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/screens/onboarding/onboarding_skeleton.dart';
 import 'package:danawallet/screens/onboarding/recovery/seed_phrase.dart';
@@ -60,22 +63,30 @@ class _OverviewScreenState extends State<OverviewScreen> {
       currentTip = chainState.tip;
     }
 
+    final goToDanaAddressSetup = connected && network != Network.regtest;
+
     await walletState.createNewWallet(network, currentTip);
 
     // initialize contacts state with the user's payment code
     contactsState.initialize(walletState.receivePaymentCode, null);
 
-    await orchestrator.start();
-
-    if (context.mounted) {
-      // skip the dana address registration if we are currently offline, or using regtest
-      Widget nextScreen;
-      if (!connected || network == Network.regtest) {
-        nextScreen = const HomeScreen();
-      } else {
-        nextScreen = const RegisterDanaAddressScreen();
-      }
-
+    if (Platform.isAndroid) {
+      if (!context.mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => NotificationPermissionScreen(
+            goToDanaAddressSetup: goToDanaAddressSetup,
+          ),
+        ),
+        (Route<dynamic> route) => false,
+      );
+    } else {
+      final nextScreen = goToDanaAddressSetup
+          ? const RegisterDanaAddressScreen()
+          : const HomeScreen();
+      await orchestrator.start();
+      if (!context.mounted) return;
       // clear path (don't allow users to go back to registration screen by pressing 'back')
       Navigator.pushAndRemoveUntil(
           context,
