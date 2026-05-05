@@ -10,8 +10,8 @@ import 'package:logger/logger.dart';
 final ForegroundTaskOptions synchronizationTaskOptions = ForegroundTaskOptions(
   eventAction:
       ForegroundTaskEventAction.repeat(const Duration(hours: 1).inMilliseconds),
-  autoRunOnBoot: true,
-  autoRunOnMyPackageReplaced: true,
+  autoRunOnBoot: false,
+  autoRunOnMyPackageReplaced: false,
   allowWakeLock: false,
   allowWifiLock: false,
 );
@@ -45,8 +45,6 @@ class SynchronizationTaskHandler extends TaskHandler {
       await FlutterForegroundTask.stopService();
       return;
     }
-    if (!await _ensureNotificationPermissionOrStop('onStart')) return;
-
     _engine = SyncEngine(
       logTag: 'BG',
       onSyncStarted: (start, end) {
@@ -75,7 +73,6 @@ class SynchronizationTaskHandler extends TaskHandler {
   }
 
   Future<void> _onRepeatEventAsync() async {
-    if (!await _ensureNotificationPermissionOrStop('onRepeatEvent')) return;
     await _ensureInit();
     unawaited(_engine?.trySync());
   }
@@ -124,23 +121,7 @@ class SynchronizationTaskHandler extends TaskHandler {
     return _initFuture!;
   }
 
-  /// Returns false if [NotificationPermission] is not granted and this task
-  /// has shut down the foreground service — caller must not sync afterward.
-  Future<bool> _ensureNotificationPermissionOrStop(String context) async {
-    final perm = await FlutterForegroundTask.checkNotificationPermission();
-    if (perm == NotificationPermission.granted) return true;
-
-    Logger().w(
-      '[BG] notification permission not granted ($context) — stopping '
-      'foreground service',
-    );
-    await FlutterForegroundTask.stopService();
-    return false;
-  }
-
   Future<void> _onReceiveSyncRequest() async {
-    if (!await _ensureNotificationPermissionOrStop('onReceiveData')) return;
-
     if (_engine?.isSyncing == true &&
         _startHeight != null &&
         _endHeight != null) {
