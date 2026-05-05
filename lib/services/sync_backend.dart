@@ -5,6 +5,7 @@ import 'package:danawallet/data/enums/sync_enums.dart';
 import 'package:danawallet/services/foreground_sync_service.dart';
 import 'package:danawallet/services/in_process_sync_service.dart';
 import 'package:danawallet/states/chain_state.dart';
+import 'package:danawallet/states/permission_state.dart';
 import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -66,6 +67,7 @@ class LinuxSyncBackend implements SyncBackend {
 /// (e.g. notification permission permanently denied).
 class AndroidSyncBackend implements SyncBackend {
   final ChainState _chainState;
+  final PermissionState _permissionState;
   final SyncProgressNotifier _syncProgress;
   final WalletState _walletState;
 
@@ -79,10 +81,12 @@ class AndroidSyncBackend implements SyncBackend {
 
   AndroidSyncBackend({
     required ChainState chainState,
+    required PermissionState permissionState,
     required SyncProgressNotifier syncProgress,
     required WalletState walletState,
     required this.onFatalError,
   })  : _chainState = chainState,
+        _permissionState = permissionState,
         _syncProgress = syncProgress,
         _walletState = walletState;
 
@@ -95,9 +99,14 @@ class AndroidSyncBackend implements SyncBackend {
       _callbacksRegistered = true;
     }
 
-    final perm = await FlutterForegroundTask.checkNotificationPermission();
-    if (perm != NotificationPermission.granted) {
-      await onUiEvent?.call(SyncAppAction.notificationPermissionWarning);
+    await _permissionState.refresh();
+    if (!_permissionState.notificationGranted) {
+      if (await FlutterForegroundTask.isRunningService) {
+        await ForegroundSyncService.instance.stop();
+      }
+      Logger().w('[AndroidSyncBackend] notification permission missing — '
+          'falling back to in-process sync');
+      return _startFallback();
     }
 
     await ForegroundSyncService.instance.start();
