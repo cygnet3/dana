@@ -43,7 +43,11 @@ class LinuxSyncBackend implements SyncBackend {
       syncProgress: _syncProgress,
       walletState: _walletState,
     );
-    _chainState.startChainPoller(true, onTipUpdated: _service!.trySync);
+    _chainState.startChainPoller(
+      true,
+      onTipUpdated: _service!.trySync,
+      shouldSkipTick: () => _syncProgress.isScanning,
+    );
     return SyncStartResult.started;
   }
 
@@ -116,6 +120,7 @@ class AndroidSyncBackend implements SyncBackend {
         true,
         onTipUpdated: () async =>
             FlutterForegroundTask.sendDataToTask({bgKeySync: true}),
+        shouldSkipTick: () => _syncProgress.isScanning,
       );
       return SyncStartResult.started;
     }
@@ -162,7 +167,11 @@ class AndroidSyncBackend implements SyncBackend {
       syncProgress: _syncProgress,
       walletState: _walletState,
     );
-    _chainState.startChainPoller(true, onTipUpdated: _fallbackService!.trySync);
+    _chainState.startChainPoller(
+      true,
+      onTipUpdated: _fallbackService!.trySync,
+      shouldSkipTick: () => _syncProgress.isScanning,
+    );
     return SyncStartResult.fallback;
   }
 }

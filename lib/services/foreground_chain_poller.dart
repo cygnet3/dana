@@ -13,6 +13,7 @@ class ForegroundChainPoller {
   /// Called after a successful chain-tip update. Set via [startChainPoller]
   /// to decouple platform knowledge from this class.
   Future<void> Function()? onTipUpdated;
+  bool Function()? shouldSkipTick;
 
   Timer? _timer;
   bool _running = false;
@@ -49,6 +50,11 @@ class ForegroundChainPoller {
   }
 
   Future<void> _performChainUpdate() async {
+    if (shouldSkipTick?.call() == true) {
+      // Skip polling while sync is active.
+      return;
+    }
+
     try {
       var updated = false;
       if (!chainState.available) {
@@ -59,7 +65,7 @@ class ForegroundChainPoller {
         updated = await chainState.updateChainTip();
       }
 
-      if (updated) {
+      if (updated && shouldSkipTick?.call() != true) {
         await onTipUpdated?.call();
       }
     } catch (e) {

@@ -36,9 +36,11 @@ class ChainState extends ChangeNotifier {
   }
 
   void startChainPoller(bool immediate,
-      {Future<void> Function()? onTipUpdated}) {
+      {Future<void> Function()? onTipUpdated,
+      bool Function()? shouldSkipTick}) {
     if (_foregroundChainPoller != null) {
       _foregroundChainPoller!.onTipUpdated = onTipUpdated;
+      _foregroundChainPoller!.shouldSkipTick = shouldSkipTick;
       _foregroundChainPoller!.start();
       if (immediate) {
         _foregroundChainPoller!.triggerImmediateUpdate();
