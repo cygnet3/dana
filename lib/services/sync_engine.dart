@@ -30,9 +30,8 @@ class SyncEngine {
   /// on error so callers can deactivate progress indicators in both cases.
   final void Function(bool success) onSyncComplete;
 
-  /// Called after each [StateUpdate] that contains at least one found output
-  /// or spent input. Allows callers to refresh UI state from the DB.
-  final Future<void> Function() onStateUpdated;
+  /// Called after each [StateUpdate] to refresh UI state from the DB.
+  final Future<void> Function(bool lastSyncOnly) onStateUpdated;
 
   final String _logTag;
 
@@ -105,7 +104,9 @@ class SyncEngine {
     await _walletRepository.saveLastSync(event.blkheight);
 
     if (event.foundOutputs.isNotEmpty || event.foundInputs.isNotEmpty) {
-      await onStateUpdated();
+      await onStateUpdated(false);
+    } else {
+      await onStateUpdated(true);
     }
   }
 
