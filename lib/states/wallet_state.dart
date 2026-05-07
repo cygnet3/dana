@@ -86,9 +86,9 @@ class WalletState extends ChangeNotifier {
     return true;
   }
 
-  Future<void> refreshAfterSync() async {
+  Future<void> refreshAfterSync({bool lastSyncOnly = false}) async {
     if (!_initialized) return;
-    await _updateWalletState();
+    await _updateWalletState(lastSyncOnly: lastSyncOnly);
     notifyListeners();
   }
 
@@ -96,7 +96,8 @@ class WalletState extends ChangeNotifier {
     if (!_initialized) return;
     if (data is! Map) return;
     if (data.containsKey(bgKeyRefresh)) {
-      _updateWalletState().then((_) => notifyListeners());
+      _updateWalletState(lastSyncOnly: data[bgKeyRefresh] as bool)
+          .then((_) => notifyListeners());
     }
   }
 
@@ -229,8 +230,12 @@ class WalletState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _updateWalletState() async {
+  Future<void> _updateWalletState({bool lastSyncOnly = false}) async {
     lastSync = await walletRepository.readLastSync();
+
+    if (lastSyncOnly) {
+      return;
+    }
 
     // Get cached data from SQLite
     amount = await ownedOutputsRepository.getUnspentBalance();

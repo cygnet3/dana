@@ -21,7 +21,8 @@ class InProcessSyncService {
             syncProgress.activate();
           },
           onSyncComplete: (_) => syncProgress.deactivate(),
-          onStateUpdated: walletState.refreshAfterSync,
+          onStateUpdated: (lastSyncOnly) =>
+              walletState.refreshAfterSync(lastSyncOnly: lastSyncOnly),
         );
 
   Future<void> trySync() => _engine.trySync();

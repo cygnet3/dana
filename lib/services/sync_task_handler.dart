@@ -60,8 +60,8 @@ class SynchronizationTaskHandler extends TaskHandler {
         _endHeight = null;
         FlutterForegroundTask.sendDataToMain({bgKeyComplete: ok});
       },
-      onStateUpdated: () async =>
-          FlutterForegroundTask.sendDataToMain({bgKeyRefresh: true}),
+      onStateUpdated: (lastSyncOnly) async =>
+          FlutterForegroundTask.sendDataToMain({bgKeyRefresh: lastSyncOnly}),
     );
     unawaited(_engine!.trySync());
   }
