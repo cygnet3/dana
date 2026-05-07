@@ -12,9 +12,6 @@ run flags="":
     #!/bin/sh
     just gen
 
-    # always build rust binaries if building for android
-    [[ {{platform}} == "android-arm64" ]] && just build-android
-
     flags={{flags}}
     flags="$flags --flavor local"
     flags="$flags --target lib/main_local.dart"
@@ -28,14 +25,8 @@ run-release:
 format:
     fvm dart format ./lib
 
-clean-bin:
-    cd rust && just clean-bin
 gen:
     cd rust && just gen
-build-emulator:
-    cd rust && just build-emulator
-build-android:
-    cd rust && just build-android
 
 inspect-db:
     #!/bin/sh
