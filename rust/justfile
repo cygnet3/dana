@@ -1,13 +1,4 @@
-default: clean-bin build-emulator build-android
-
-clean-bin:
-    rm -fRd ../android/app/src/main/jniLibs/*
+default: gen
 
 gen:
     flutter_rust_bridge_codegen generate --config-file ../flutter_rust_bridge.yaml --enable-lifetime
-
-build-emulator:
-    cargo ndk -t x86_64 -o ../android/app/src/main/jniLibs build
-
-build-android:
-    cargo ndk -o ../android/app/src/main/jniLibs build --release
