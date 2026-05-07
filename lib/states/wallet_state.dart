@@ -59,6 +59,8 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<bool> initialize() async {
+    _initialized = false;
+
     // we check if wallet data is present in database
     final wallet = await walletRepository.readWallet();
 
@@ -107,6 +109,7 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<void> reset() async {
+    _initialized = false;
     danaAddress = null;
     await transactionsRepository.reset();
     // this is redudant, but we do it to be sure
@@ -116,6 +119,7 @@ class WalletState extends ChangeNotifier {
 
   Future<void> restoreWallet(
       Network network, String mnemonic, DateTime? birthday) async {
+    _initialized = false;
     final args = WalletSetupArgs(
         setupType: WalletSetupType.mnemonic(mnemonic), network: network);
     final setupResult = SpWallet.setupWallet(setupArgs: args);
@@ -132,9 +136,11 @@ class WalletState extends ChangeNotifier {
     lastSync = null;
 
     await _updateWalletState();
+    _initialized = true;
   }
 
   Future<void> createNewWallet(Network network, int? currentTip) async {
+    _initialized = false;
     final now = DateTime.now().toUtc();
 
     final args = WalletSetupArgs(
@@ -149,7 +155,9 @@ class WalletState extends ChangeNotifier {
     birthday = now;
     this.network = network;
     lastSync = currentTip;
+
     await _updateWalletState();
+    _initialized = true;
   }
 
   Future<SpWallet> getWalletFromSecureStorage() async {
