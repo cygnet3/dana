@@ -1079,7 +1079,7 @@ packages:
     source: hosted
     version: "6.3.2"
   url_launcher_android:
-    dependency: "direct overridden"
+    dependency: transitive
     description:
       name: url_launcher_android
       sha256: "81777b08c498a292d93ff2feead633174c386291e35612f8da438d6e92c4447e"
