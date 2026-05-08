@@ -5,6 +5,7 @@ import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
+import 'package:danawallet/screens/home/home.dart';
 import 'package:danawallet/screens/onboarding/onboarding_skeleton.dart';
 import 'package:danawallet/services/dana_address_service.dart';
 import 'package:danawallet/states/contacts_state.dart';
@@ -12,7 +13,6 @@ import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button_outlined.dart';
 import 'package:danawallet/widgets/loading_widget.dart';
-import 'package:danawallet/widgets/pin_guard.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
@@ -328,7 +328,7 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
         if (mounted) {
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => const PinGuard()),
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
             (Route<dynamic> route) => false,
           );
         }
@@ -346,7 +346,7 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
   void _onSkip() {
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => const PinGuard()),
+      MaterialPageRoute(builder: (context) => const HomeScreen()),
       (Route<dynamic> route) => false,
     );
   }
