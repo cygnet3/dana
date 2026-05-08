@@ -9,6 +9,7 @@ import 'package:danawallet/repositories/owned_outputs_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/repositories/transactions_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
+import 'package:danawallet/screens/home/home.dart' show HomeScreen;
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/screens/onboarding/introduction.dart';
 import 'package:danawallet/services/app_info_service.dart';
@@ -19,7 +20,6 @@ import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/home_state.dart';
 import 'package:danawallet/states/sync_progress_notifier.dart';
 import 'package:danawallet/states/wallet_state.dart';
-import 'package:danawallet/widgets/pin_guard.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -108,7 +108,7 @@ void main() async {
     if (addressRegistrationNeeded) {
       landingPage = const RegisterDanaAddressScreen();
     } else {
-      landingPage = const PinGuard();
+      landingPage = const HomeScreen();
     }
   } else {
     // no wallet is loaded, so we go to the introduction screen

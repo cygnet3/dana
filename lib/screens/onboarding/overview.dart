@@ -4,6 +4,7 @@ import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/bip39.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
+import 'package:danawallet/screens/home/home.dart';
 import 'package:danawallet/screens/onboarding/choose_network.dart';
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/screens/onboarding/onboarding_skeleton.dart';
@@ -15,7 +16,6 @@ import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button_outlined.dart';
 import 'package:danawallet/widgets/info_widget.dart';
-import 'package:danawallet/widgets/pin_guard.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sizer/sizer.dart';
@@ -71,7 +71,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
       // skip the dana address registration if we are currently offline, or using regtest
       Widget nextScreen;
       if (!connected || network == Network.regtest) {
-        nextScreen = const PinGuard();
+        nextScreen = const HomeScreen();
       } else {
         nextScreen = const RegisterDanaAddressScreen();
       }
