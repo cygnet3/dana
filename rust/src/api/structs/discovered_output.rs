@@ -32,4 +32,3 @@ impl From<DiscoveredOutput> for spdk_wallet::updater::DiscoveredOutput {
         }
     }
 }
-
