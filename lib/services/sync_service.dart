@@ -26,7 +26,7 @@ class SyncService {
   bool _callbacksRegistered = false;
 
   // in case we are doing in-process syncing
-  InProcessSyncService? _service;
+  InProcessSyncService? _inProcessSyncService;
 
   SyncService({
     required ChainState chainState,
@@ -67,13 +67,12 @@ class SyncService {
     await _permissionState.refresh();
     if (!_permissionState.notificationGranted) {
       if (await FlutterForegroundTask.isRunningService) {
-        await ForegroundSyncService.instance.stop();
+        await ForegroundSyncService.stop();
       }
       Logger().w('Notification permission missing');
       return false;
     }
-
-    await ForegroundSyncService.instance.start();
+    await ForegroundSyncService.start();
 
     if (await FlutterForegroundTask.isRunningService) {
       _chainState.startChainPoller(
@@ -90,13 +89,13 @@ class SyncService {
   }
 
   void startInProcess() {
-    _service = InProcessSyncService(
+    _inProcessSyncService = InProcessSyncService(
       syncProgress: _syncProgress,
       walletState: _walletState,
     );
     _chainState.startChainPoller(
       true,
-      onTipUpdated: _service!.trySync,
+      onTipUpdated: _inProcessSyncService!.trySync,
       shouldSkipTick: () => _syncProgress.isSyncing,
     );
     return;
@@ -111,11 +110,11 @@ class SyncService {
 
   Future<void> stop() async {
     _chainState.stopChainPoller();
-    if (_service != null) {
+    if (_inProcessSyncService != null) {
       // In-process path: SpWallet.interruptSync() targets the correct (main) isolate.
       await _syncProgress.interruptSync();
-      _service!.dispose();
-      _service = null;
+      _inProcessSyncService!.dispose();
+      _inProcessSyncService = null;
     } else {
       // Foreground-service path: the sync runs in the BG isolate, so we must
       // send the interrupt via IPC and let it call SpWallet.interruptSync() there.
@@ -123,7 +122,7 @@ class SyncService {
       // BG isolate can finish cleanly rather than being killed mid-sync.
       FlutterForegroundTask.sendDataToTask({bgKeyInterrupt: true});
       await _syncProgress.waitForCompletion();
-      await ForegroundSyncService.instance.stop();
+      await ForegroundSyncService.stop();
     }
   }
 }

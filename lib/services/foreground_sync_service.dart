@@ -3,9 +3,6 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:logger/logger.dart';
 
 class ForegroundSyncService {
-  ForegroundSyncService._();
-  static final instance = ForegroundSyncService._();
-
   static const String _notificationChannelId = 'dana_sync';
   static const String _notificationChannelName = 'Dana background sync';
   static const String _notificationChannelDescription =
@@ -15,7 +12,7 @@ class ForegroundSyncService {
       'Keeping your wallet up to date';
 
   /// Call once at app startup, before runApp().
-  void initialize() {
+  static void initialize() {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: _notificationChannelId,
@@ -30,7 +27,7 @@ class ForegroundSyncService {
 
   /// Start the foreground service. Safe to call even if already running.
   /// Does not block startup — await this fire-and-forget with unawaited().
-  Future<void> start() async {
+  static Future<void> start() async {
     if (await FlutterForegroundTask.isRunningService) {
       Logger().i('Android foreground service already running');
       return;
@@ -52,7 +49,7 @@ class ForegroundSyncService {
     }
   }
 
-  Future<void> stop() async {
+  static Future<void> stop() async {
     if (!await FlutterForegroundTask.isRunningService) return;
     await FlutterForegroundTask.stopService();
     Logger().i('Android foreground service stopped');
