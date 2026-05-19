@@ -12,7 +12,7 @@ import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:logger/logger.dart';
 
-class SyncBackend {
+class SyncService {
   final ChainState _chainState;
   final SyncProgressState _syncProgress;
   final WalletState _walletState;
@@ -28,7 +28,7 @@ class SyncBackend {
   // in case we are doing in-process syncing
   InProcessSyncService? _service;
 
-  SyncBackend({
+  SyncService({
     required ChainState chainState,
     required PermissionState permissionState,
     required SyncProgressState syncProgress,
