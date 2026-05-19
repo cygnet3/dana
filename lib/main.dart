@@ -44,7 +44,7 @@ void main() async {
     databaseFactory = databaseFactoryFfi;
   } else if (Platform.isAndroid) {
     FlutterForegroundTask.initCommunicationPort();
-    ForegroundSyncService.instance.initialize();
+    ForegroundSyncService.initialize();
   } else {
     Logger().e('Dana wallet is not supported on this platform');
     exit(1);
