@@ -73,26 +73,15 @@ void main() async {
   final contactsState = ContactsState();
   final fiatExchangeRate = await FiatExchangeRateState.create();
   SyncOrchestrator? syncOrchestratorRef;
-  final SyncBackend syncBackend;
-  if (Platform.isLinux) {
-    syncBackend = LinuxSyncBackend(
-      chainState: chainState,
-      syncProgress: syncProgress,
-      walletState: walletState,
-    );
-  } else if (Platform.isAndroid) {
-    syncBackend = AndroidSyncBackend(
-      chainState: chainState,
-      permissionState: permissionState,
-      syncProgress: syncProgress,
-      walletState: walletState,
-      onFatalError: () =>
-          syncOrchestratorRef?.restart(fallbackMode: true) ?? Future.value(),
-    );
-  } else {
-    Logger().e('Dana wallet is not supported on this platform');
-    exit(1);
-  }
+  final syncBackend = SyncBackend(
+    chainState: chainState,
+    syncProgress: syncProgress,
+    walletState: walletState,
+    permissionState: permissionState,
+    onFatalError: () =>
+        syncOrchestratorRef?.restart(fallbackMode: true) ?? Future.value(),
+  );
+
   final syncOrchestrator = SyncOrchestrator(
     backend: syncBackend,
     permissionState: permissionState,
