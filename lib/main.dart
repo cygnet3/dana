@@ -68,7 +68,7 @@ void main() async {
 
   final walletState = await WalletState.create();
   final permissionState = await PermissionState.create();
-  final scanNotifier = await SyncProgressNotifier.create();
+  final syncProgress = await SyncProgressState.create();
   final chainState = ChainState();
   final contactsState = ContactsState();
   final fiatExchangeRate = await FiatExchangeRateState.create();
@@ -77,14 +77,14 @@ void main() async {
   if (Platform.isLinux) {
     syncBackend = LinuxSyncBackend(
       chainState: chainState,
-      syncProgress: scanNotifier,
+      syncProgress: syncProgress,
       walletState: walletState,
     );
   } else if (Platform.isAndroid) {
     syncBackend = AndroidSyncBackend(
       chainState: chainState,
       permissionState: permissionState,
-      syncProgress: scanNotifier,
+      syncProgress: syncProgress,
       walletState: walletState,
       onFatalError: () =>
           syncOrchestratorRef?.restart(fallbackMode: true) ?? Future.value(),
@@ -156,7 +156,7 @@ void main() async {
         Provider.value(value: appInfo),
         // providers for mutable data
         ChangeNotifierProvider.value(value: walletState),
-        ChangeNotifierProvider.value(value: scanNotifier),
+        ChangeNotifierProvider.value(value: syncProgress),
         ChangeNotifierProvider.value(value: chainState),
         ChangeNotifierProvider.value(value: HomeState()),
         ChangeNotifierProvider.value(value: permissionState),

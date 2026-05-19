@@ -7,7 +7,7 @@ import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
-class SyncProgressNotifier extends ChangeNotifier {
+class SyncProgressState extends ChangeNotifier {
   Completer? _completer;
   double? progress;
   int? startHeight;
@@ -15,17 +15,17 @@ class SyncProgressNotifier extends ChangeNotifier {
 
   late StreamSubscription syncProgressSubscription;
 
-  bool get isScanning => _completer != null && !_completer!.isCompleted;
+  bool get isSyncing => _completer != null && !_completer!.isCompleted;
 
   // private constructor
-  SyncProgressNotifier._();
+  SyncProgressState._();
 
   Future<void> _initialize() async {
     syncProgressSubscription = createSyncProgressStream().listen((current) {
       // Only update progress while the bar is active. Ignoring events outside
       // of an active scan prevents a trailing Rust event from re-activating the
       // bar after deactivate() has already been called.
-      if (!isScanning) return;
+      if (!isSyncing) return;
 
       final start = startHeight;
       final end = endHeight;
@@ -39,8 +39,8 @@ class SyncProgressNotifier extends ChangeNotifier {
     });
   }
 
-  static Future<SyncProgressNotifier> create() async {
-    final instance = SyncProgressNotifier._();
+  static Future<SyncProgressState> create() async {
+    final instance = SyncProgressState._();
     await instance._initialize();
     return instance;
   }
@@ -84,7 +84,7 @@ class SyncProgressNotifier extends ChangeNotifier {
   /// Does not signal the interrupt itself — callers are responsible for doing
   /// so through the appropriate channel (in-process or IPC).
   Future<void> waitForCompletion() async {
-    if (!isScanning) return;
+    if (!isSyncing) return;
     await _completer?.future.timeout(
       const Duration(seconds: 10),
       onTimeout: deactivate,
@@ -94,7 +94,7 @@ class SyncProgressNotifier extends ChangeNotifier {
   /// Signals an in-process scan to stop and waits for it to finish.
   /// Only correct to call when sync is running in the same Dart isolate.
   Future<void> interruptSync() async {
-    if (!isScanning) return;
+    if (!isSyncing) return;
     SpWallet.interruptSync();
     await waitForCompletion();
   }

@@ -11,7 +11,7 @@ class InProcessSyncService {
   final SyncEngine _engine;
 
   InProcessSyncService({
-    required SyncProgressNotifier syncProgress,
+    required SyncProgressState syncProgress,
     required WalletState walletState,
   }) : _engine = SyncEngine(
           logTag: 'in-process',
