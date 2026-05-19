@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/enums/sync_enums.dart';
@@ -11,69 +12,11 @@ import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:logger/logger.dart';
 
-/// Platform-specific sync lifecycle strategy.
-///
-/// [SyncOrchestrator] holds one of these and delegates all platform I/O to it,
-/// keeping itself free of [Platform], plugin, and process-lifecycle imports.
-abstract class SyncBackend {
-  Future<SyncStartResult> start();
-  Future<void> startFallback();
-  Future<void> stop();
-}
-
-/// Linux backend: runs sync in the main isolate via [InProcessSyncService].
-class LinuxSyncBackend implements SyncBackend {
+class SyncBackend {
   final ChainState _chainState;
   final SyncProgressState _syncProgress;
   final WalletState _walletState;
-
-  InProcessSyncService? _service;
-
-  LinuxSyncBackend({
-    required ChainState chainState,
-    required SyncProgressState syncProgress,
-    required WalletState walletState,
-  })  : _chainState = chainState,
-        _syncProgress = syncProgress,
-        _walletState = walletState;
-
-  @override
-  Future<SyncStartResult> start() async {
-    _service = InProcessSyncService(
-      syncProgress: _syncProgress,
-      walletState: _walletState,
-    );
-    _chainState.startChainPoller(
-      true,
-      onTipUpdated: _service!.trySync,
-      shouldSkipTick: () => _syncProgress.isSyncing,
-    );
-    return SyncStartResult.started;
-  }
-
-  // Fallback mode is the same as regular start for linux
-  @override
-  Future<void> startFallback() async {
-    await start();
-  }
-
-  @override
-  Future<void> stop() async {
-    _chainState.stopChainPoller();
-    await _syncProgress.interruptSync();
-    _service?.dispose();
-    _service = null;
-  }
-}
-
-/// Android backend: starts an Android foreground service and wires IPC
-/// callbacks. Falls back to in-process sync if the service cannot start
-/// (e.g. notification permission permanently denied).
-class AndroidSyncBackend implements SyncBackend {
-  final ChainState _chainState;
   final PermissionState _permissionState;
-  final SyncProgressState _syncProgress;
-  final WalletState _walletState;
 
   /// Called when the background isolate sends [bgKeyFatalError]. The backend
   /// has already committed to the foreground-service path by the time this
@@ -81,9 +24,11 @@ class AndroidSyncBackend implements SyncBackend {
   final Future<void> Function() onFatalError;
 
   bool _callbacksRegistered = false;
-  InProcessSyncService? _fallbackService;
 
-  AndroidSyncBackend({
+  // in case we are doing in-process syncing
+  InProcessSyncService? _service;
+
+  SyncBackend({
     required ChainState chainState,
     required PermissionState permissionState,
     required SyncProgressState syncProgress,
@@ -94,8 +39,24 @@ class AndroidSyncBackend implements SyncBackend {
         _syncProgress = syncProgress,
         _walletState = walletState;
 
-  @override
   Future<SyncStartResult> start() async {
+    if (Platform.isAndroid) {
+      // on android, we use a foreground task to sync
+      if (await startForeground()) {
+        return SyncStartResult.foreground;
+      } else {
+        // if starting the foreground stask failed, fall back to in-process
+        startInProcess();
+        return SyncStartResult.fallback;
+      }
+    } else {
+      // on all other platforms, we use in-process by default
+      startInProcess();
+      return SyncStartResult.inProcess;
+    }
+  }
+
+  Future<bool> startForeground() async {
     if (!_callbacksRegistered) {
       FlutterForegroundTask.addTaskDataCallback(_syncProgress.onServiceData);
       FlutterForegroundTask.addTaskDataCallback(_walletState.onServiceData);
@@ -108,9 +69,8 @@ class AndroidSyncBackend implements SyncBackend {
       if (await FlutterForegroundTask.isRunningService) {
         await ForegroundSyncService.instance.stop();
       }
-      Logger().w('[AndroidSyncBackend] notification permission missing — '
-          'falling back to in-process sync');
-      return _startFallback();
+      Logger().w('Notification permission missing');
+      return false;
     }
 
     await ForegroundSyncService.instance.start();
@@ -122,27 +82,40 @@ class AndroidSyncBackend implements SyncBackend {
             FlutterForegroundTask.sendDataToTask({bgKeySync: true}),
         shouldSkipTick: () => _syncProgress.isSyncing,
       );
-      return SyncStartResult.started;
+      return true;
     }
 
-    Logger().w('[AndroidSyncBackend] foreground service unavailable — '
-        'falling back to in-process sync');
-    return _startFallback();
+    Logger().w('Foreground service unavailable');
+    return false;
   }
 
-  @override
-  Future<void> startFallback() async {
-    _startFallback();
+  void startInProcess() {
+    _service = InProcessSyncService(
+      syncProgress: _syncProgress,
+      walletState: _walletState,
+    );
+    _chainState.startChainPoller(
+      true,
+      onTipUpdated: _service!.trySync,
+      shouldSkipTick: () => _syncProgress.isSyncing,
+    );
+    return;
   }
 
-  @override
+  void _onServiceData(Object data) {
+    if (data is Map && data[bgKeyFatalError] == true) {
+      Logger().e('Background isolate reported a fatal error');
+      unawaited(onFatalError());
+    }
+  }
+
   Future<void> stop() async {
     _chainState.stopChainPoller();
-    if (_fallbackService != null) {
+    if (_service != null) {
       // In-process path: SpWallet.interruptSync() targets the correct (main) isolate.
       await _syncProgress.interruptSync();
-      _fallbackService!.dispose();
-      _fallbackService = null;
+      _service!.dispose();
+      _service = null;
     } else {
       // Foreground-service path: the sync runs in the BG isolate, so we must
       // send the interrupt via IPC and let it call SpWallet.interruptSync() there.
@@ -152,26 +125,5 @@ class AndroidSyncBackend implements SyncBackend {
       await _syncProgress.waitForCompletion();
       await ForegroundSyncService.instance.stop();
     }
-  }
-
-  void _onServiceData(Object data) {
-    if (data is Map && data[bgKeyFatalError] == true) {
-      Logger().e('[AndroidSyncBackend] background isolate reported fatal error '
-          '— restarting to recover into fallback mode');
-      unawaited(onFatalError());
-    }
-  }
-
-  SyncStartResult _startFallback() {
-    _fallbackService = InProcessSyncService(
-      syncProgress: _syncProgress,
-      walletState: _walletState,
-    );
-    _chainState.startChainPoller(
-      true,
-      onTipUpdated: _fallbackService!.trySync,
-      shouldSkipTick: () => _syncProgress.isSyncing,
-    );
-    return SyncStartResult.fallback;
   }
 }

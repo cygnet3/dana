@@ -5,8 +5,7 @@ import 'package:danawallet/services/sync_backend.dart';
 import 'package:danawallet/states/permission_state.dart';
 import 'package:flutter/material.dart';
 
-export 'package:danawallet/services/sync_backend.dart'
-    show SyncBackend, LinuxSyncBackend, AndroidSyncBackend;
+export 'package:danawallet/services/sync_backend.dart' show SyncBackend;
 
 /// Coordinates sync backend lifecycle and runtime reconfiguration.
 ///
@@ -45,7 +44,7 @@ class SyncOrchestrator extends ChangeNotifier {
       _running = true;
       try {
         if (fallbackMode) {
-          await _backend.startFallback();
+          _backend.startInProcess();
           _setInProcessFallback(true);
         } else {
           final result = await _backend.start();
@@ -78,7 +77,7 @@ class SyncOrchestrator extends ChangeNotifier {
       _running = true;
       try {
         if (fallbackMode) {
-          await _backend.startFallback();
+          _backend.startInProcess();
           _setInProcessFallback(true);
         } else {
           final result = await _backend.start();
