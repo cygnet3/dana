@@ -24,14 +24,14 @@ abstract class SyncBackend {
 /// Linux backend: runs sync in the main isolate via [InProcessSyncService].
 class LinuxSyncBackend implements SyncBackend {
   final ChainState _chainState;
-  final SyncProgressNotifier _syncProgress;
+  final SyncProgressState _syncProgress;
   final WalletState _walletState;
 
   InProcessSyncService? _service;
 
   LinuxSyncBackend({
     required ChainState chainState,
-    required SyncProgressNotifier syncProgress,
+    required SyncProgressState syncProgress,
     required WalletState walletState,
   })  : _chainState = chainState,
         _syncProgress = syncProgress,
@@ -46,7 +46,7 @@ class LinuxSyncBackend implements SyncBackend {
     _chainState.startChainPoller(
       true,
       onTipUpdated: _service!.trySync,
-      shouldSkipTick: () => _syncProgress.isScanning,
+      shouldSkipTick: () => _syncProgress.isSyncing,
     );
     return SyncStartResult.started;
   }
@@ -72,7 +72,7 @@ class LinuxSyncBackend implements SyncBackend {
 class AndroidSyncBackend implements SyncBackend {
   final ChainState _chainState;
   final PermissionState _permissionState;
-  final SyncProgressNotifier _syncProgress;
+  final SyncProgressState _syncProgress;
   final WalletState _walletState;
 
   /// Called when the background isolate sends [bgKeyFatalError]. The backend
@@ -86,7 +86,7 @@ class AndroidSyncBackend implements SyncBackend {
   AndroidSyncBackend({
     required ChainState chainState,
     required PermissionState permissionState,
-    required SyncProgressNotifier syncProgress,
+    required SyncProgressState syncProgress,
     required WalletState walletState,
     required this.onFatalError,
   })  : _chainState = chainState,
@@ -120,7 +120,7 @@ class AndroidSyncBackend implements SyncBackend {
         true,
         onTipUpdated: () async =>
             FlutterForegroundTask.sendDataToTask({bgKeySync: true}),
-        shouldSkipTick: () => _syncProgress.isScanning,
+        shouldSkipTick: () => _syncProgress.isSyncing,
       );
       return SyncStartResult.started;
     }
@@ -170,7 +170,7 @@ class AndroidSyncBackend implements SyncBackend {
     _chainState.startChainPoller(
       true,
       onTipUpdated: _fallbackService!.trySync,
-      shouldSkipTick: () => _syncProgress.isScanning,
+      shouldSkipTick: () => _syncProgress.isSyncing,
     );
     return SyncStartResult.fallback;
   }
