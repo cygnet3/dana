@@ -7,7 +7,7 @@ const Duration pollingInterval = Duration(seconds: 10);
 
 /// Periodically refreshes the chain tip so the UI shows the current height.
 /// Scanning is handled by the foreground service on Android.
-class ForegroundChainPoller {
+class ChainPoller {
   final ChainState chainState;
 
   /// Called after a successful chain-tip update. Set via [startChainPoller]
@@ -18,7 +18,7 @@ class ForegroundChainPoller {
   Timer? _timer;
   bool _running = false;
 
-  ForegroundChainPoller({required this.chainState, this.onTipUpdated});
+  ChainPoller({required this.chainState, this.onTipUpdated});
 
   void start() {
     Logger().i('Starting chain tip refresh timer');
