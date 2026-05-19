@@ -4,12 +4,12 @@ import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/chain.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
-import 'package:danawallet/services/foreground_chain_poller.dart';
+import 'package:danawallet/services/chain_poller.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 
 class ChainState extends ChangeNotifier {
-  ForegroundChainPoller? _foregroundChainPoller;
+  ChainPoller? _foregroundChainPoller;
 
   // Indicates whether the chainstate is initialized.
   // Once initialized we can check for the availability.
@@ -32,7 +32,7 @@ class ChainState extends ChangeNotifier {
     Logger().i('Network: $network');
     // network is not yet verified in this state, it gets vetified in 'connect'
     _network = network;
-    _foregroundChainPoller = ForegroundChainPoller(chainState: this);
+    _foregroundChainPoller = ChainPoller(chainState: this);
   }
 
   void startChainPoller(bool immediate,
