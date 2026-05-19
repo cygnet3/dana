@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:danawallet/data/enums/sync_enums.dart';
-import 'package:danawallet/services/sync_backend.dart';
+import 'package:danawallet/services/sync_service.dart';
 import 'package:danawallet/states/permission_state.dart';
 import 'package:flutter/material.dart';
 
-export 'package:danawallet/services/sync_backend.dart' show SyncBackend;
+export 'package:danawallet/services/sync_service.dart' show SyncService;
 
 /// Coordinates sync backend lifecycle and runtime reconfiguration.
 ///
@@ -15,9 +15,9 @@ export 'package:danawallet/services/sync_backend.dart' show SyncBackend;
 /// changes). It also exposes [inProcessFallback] so UI layers can surface
 /// degraded background-sync state without depending on platform details.
 ///
-/// All platform-specific I/O remains inside the injected [SyncBackend].
+/// All platform-specific I/O remains inside the injected [SyncService].
 class SyncOrchestrator extends ChangeNotifier {
-  final SyncBackend _backend;
+  final SyncService _service;
   final PermissionState _permissionState;
 
   bool _inProcessFallback = false;
@@ -30,9 +30,9 @@ class SyncOrchestrator extends ChangeNotifier {
   bool get isRunning => _running;
 
   SyncOrchestrator({
-    required SyncBackend backend,
+    required SyncService service,
     required PermissionState permissionState,
-  })  : _backend = backend,
+  })  : _service = service,
         _permissionState = permissionState {
     _permissionState.addListener(_onPermissionStateChanged);
   }
@@ -44,10 +44,10 @@ class SyncOrchestrator extends ChangeNotifier {
       _running = true;
       try {
         if (fallbackMode) {
-          _backend.startInProcess();
+          _service.startInProcess();
           _setInProcessFallback(true);
         } else {
-          final result = await _backend.start();
+          final result = await _service.start();
           _setInProcessFallback(result == SyncStartResult.fallback);
         }
       } catch (_) {
@@ -61,7 +61,7 @@ class SyncOrchestrator extends ChangeNotifier {
     await _enqueueLifecycleAction(() async {
       if (!_running) return;
       _running = false;
-      await _backend.stop();
+      await _service.stop();
       _setInProcessFallback(false);
     });
   }
@@ -70,17 +70,17 @@ class SyncOrchestrator extends ChangeNotifier {
     await _enqueueLifecycleAction(() async {
       if (_running) {
         _running = false;
-        await _backend.stop();
+        await _service.stop();
       }
       _setInProcessFallback(false);
 
       _running = true;
       try {
         if (fallbackMode) {
-          _backend.startInProcess();
+          _service.startInProcess();
           _setInProcessFallback(true);
         } else {
-          final result = await _backend.start();
+          final result = await _service.start();
           _setInProcessFallback(result == SyncStartResult.fallback);
         }
       } catch (_) {

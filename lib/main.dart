@@ -73,7 +73,7 @@ void main() async {
   final contactsState = ContactsState();
   final fiatExchangeRate = await FiatExchangeRateState.create();
   SyncOrchestrator? syncOrchestratorRef;
-  final syncBackend = SyncBackend(
+  final syncService = SyncService(
     chainState: chainState,
     syncProgress: syncProgress,
     walletState: walletState,
@@ -83,7 +83,7 @@ void main() async {
   );
 
   final syncOrchestrator = SyncOrchestrator(
-    backend: syncBackend,
+    service: syncService,
     permissionState: permissionState,
   );
   syncOrchestratorRef = syncOrchestrator;
