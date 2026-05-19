@@ -6,7 +6,7 @@ import 'package:danawallet/services/foreground_sync_service.dart';
 import 'package:danawallet/services/in_process_sync_service.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/permission_state.dart';
-import 'package:danawallet/states/sync_progress_notifier.dart';
+import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:logger/logger.dart';

@@ -1,5 +1,5 @@
 import 'package:danawallet/services/sync_engine.dart';
-import 'package:danawallet/states/sync_progress_notifier.dart';
+import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 
 /// In-process equivalent of [SynchronizationTaskHandler].
