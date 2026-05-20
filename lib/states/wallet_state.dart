@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/date_time.dart';
@@ -21,7 +20,6 @@ import 'package:danawallet/repositories/wallet_repository.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/services/dana_address_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:logger/logger.dart';
 
 class WalletState extends ChangeNotifier {
@@ -90,23 +88,6 @@ class WalletState extends ChangeNotifier {
     if (!_initialized) return;
     await _updateWalletState(lastSyncOnly: lastSyncOnly);
     notifyListeners();
-  }
-
-  void onServiceData(Object data) {
-    if (!_initialized) return;
-    if (data is! Map) return;
-    if (data.containsKey(bgKeyRefresh)) {
-      _updateWalletState(lastSyncOnly: data[bgKeyRefresh] as bool)
-          .then((_) => notifyListeners());
-    }
-  }
-
-  @override
-  void dispose() {
-    if (Platform.isAndroid) {
-      FlutterForegroundTask.removeTaskDataCallback(onServiceData);
-    }
-    super.dispose();
   }
 
   Future<void> reset() async {

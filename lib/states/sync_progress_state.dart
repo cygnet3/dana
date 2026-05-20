@@ -1,21 +1,17 @@
 import 'dart:async';
-import 'dart:io';
 
-import 'package:danawallet/constants.dart';
 import 'package:danawallet/generated/rust/api/stream.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 class SyncProgressState extends ChangeNotifier {
+  bool isSyncing = false;
   Completer? _completer;
   double? progress;
-  int? startHeight;
-  int? endHeight;
+  int? _startHeight;
+  int? _endHeight;
 
   late StreamSubscription syncProgressSubscription;
-
-  bool get isSyncing => _completer != null && !_completer!.isCompleted;
 
   // private constructor
   SyncProgressState._();
@@ -27,8 +23,8 @@ class SyncProgressState extends ChangeNotifier {
       // bar after deactivate() has already been called.
       if (!isSyncing) return;
 
-      final start = startHeight;
-      final end = endHeight;
+      final start = _startHeight;
+      final end = _endHeight;
       if (start == null || end == null || end <= start) return;
 
       final progress = (current - start) / (end - start);
@@ -47,37 +43,33 @@ class SyncProgressState extends ChangeNotifier {
 
   @override
   void dispose() {
-    if (Platform.isAndroid) {
-      FlutterForegroundTask.removeTaskDataCallback(onServiceData);
-    }
     syncProgressSubscription.cancel();
     super.dispose();
   }
 
-  void activate() {
+  void activate(int startHeight, int endHeight) {
+    // if a start height has already been set, we ignore the start height variable
+    // this is because we might be continuing from a previous sync progress sync point,
+    // which got interrupted by an error
+    _startHeight ??= startHeight;
+    _endHeight = endHeight;
+
+    isSyncing = true;
+
     _completer = Completer();
     progress = null;
     notifyListeners();
   }
 
-  void deactivate() {
-    _completer?.complete();
+  void deactivate(bool clear) {
+    isSyncing = false;
     progress = null;
-    notifyListeners();
-  }
+    _completer?.complete();
 
-  /// Called by the main isolate's service data callback with messages from
-  /// the background sync task.
-  void onServiceData(Object data) {
-    if (data is! Map) return;
-    if (data.containsKey(bgKeyStartHeight) &&
-        data.containsKey(bgKeyEndHeight)) {
-      startHeight = (data[bgKeyStartHeight] as num).toInt();
-      endHeight = (data[bgKeyEndHeight] as num).toInt();
-      activate();
-    } else if (data.containsKey(bgKeyComplete)) {
-      deactivate();
+    if (clear) {
+      _startHeight = null;
     }
+    notifyListeners();
   }
 
   /// Waits for an active scan to complete or be interrupted, then returns.
@@ -87,7 +79,7 @@ class SyncProgressState extends ChangeNotifier {
     if (!isSyncing) return;
     await _completer?.future.timeout(
       const Duration(seconds: 10),
-      onTimeout: deactivate,
+      onTimeout: () => deactivate(true),
     );
   }
 
