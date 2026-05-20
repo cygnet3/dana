@@ -58,8 +58,6 @@ class SyncService {
 
   Future<bool> startForeground() async {
     if (!_callbacksRegistered) {
-      FlutterForegroundTask.addTaskDataCallback(_syncProgress.onServiceData);
-      FlutterForegroundTask.addTaskDataCallback(_walletState.onServiceData);
       FlutterForegroundTask.addTaskDataCallback(_onServiceData);
       _callbacksRegistered = true;
     }
@@ -102,9 +100,28 @@ class SyncService {
   }
 
   void _onServiceData(Object data) {
-    if (data is Map && data[bgKeyFatalError] == true) {
+    if (data is! Map) return;
+
+    if (data[bgKeyFatalError] == true) {
       Logger().e('Background isolate reported a fatal error');
       unawaited(onFatalError());
+    }
+
+    // sync progress update
+    if (data.containsKey(bgKeyStartHeight) &&
+        data.containsKey(bgKeyEndHeight)) {
+      int startHeight = (data[bgKeyStartHeight] as num).toInt();
+      int endHeight = (data[bgKeyEndHeight] as num).toInt();
+      _syncProgress.activate(startHeight, endHeight);
+    } else if (data.containsKey(bgKeyComplete)) {
+      bool success = data[bgKeyComplete] as bool;
+      _syncProgress.deactivate(success);
+    }
+
+    // walletState update
+    if (data.containsKey(bgKeyRefresh)) {
+      final lastSyncOnly = data[bgKeyRefresh] as bool;
+      unawaited(_walletState.refreshAfterSync(lastSyncOnly: lastSyncOnly));
     }
   }
 

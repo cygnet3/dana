@@ -16,11 +16,9 @@ class InProcessSyncService {
   }) : _engine = SyncEngine(
           logTag: 'in-process',
           onSyncStarted: (start, end) {
-            syncProgress.startHeight = start;
-            syncProgress.endHeight = end;
-            syncProgress.activate();
+            syncProgress.activate(start, end);
           },
-          onSyncComplete: (_) => syncProgress.deactivate(),
+          onSyncComplete: (success) => syncProgress.deactivate(success),
           onStateUpdated: (lastSyncOnly) =>
               walletState.refreshAfterSync(lastSyncOnly: lastSyncOnly),
         );
