@@ -1,4 +1,4 @@
-default: run
+default: prepare run
 
 # use fvm if available, else use flutter directly
 flutter := if `which fvm 2> /dev/null || true` != "" { "fvm flutter" }  else { "flutter" }
@@ -8,15 +8,16 @@ platform := `fvm flutter devices --machine | jq .[0].targetPlatform`
 
 git_hash := `git rev-parse HEAD`
 
+prepare:
+    just gen
+    {{flutter}} pub get
+
 run flags="":
     #!/bin/sh
-    just gen
-
     flags={{flags}}
     flags="$flags --flavor local"
     flags="$flags --target lib/main_local.dart"
     flags="$flags --dart-define=GIT_HASH={{git_hash}}"
-
     {{flutter}} run $flags
 
 run-release:
