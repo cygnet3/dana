@@ -1,4 +1,16 @@
-# Dana wallet
+<div align="center">
+<h1>Dana wallet</h1>
+
+<img src="assets/images/logo_circle.png">
+<br>
+
+[<img width="30%" src=".github/badges/fdroid.png">](https://fdroid.danawallet.app/fdroid/repo/)
+[<img width="30%" src=".github/badges/zapstore.png">](https://zapstore.dev/apps/dev.silentpayments.danawallet)
+[<img width="30%" src=".github/badges/github.png">](https://github.com/cygnet3/dana/releases/latest)
+
+</div>
+
+## About
 
 Dana is a flutter app used for accepting bitcoin donations. It uses silent payments, a new static payments protocol, to receive donations while preserving on-chain privacy.
 
