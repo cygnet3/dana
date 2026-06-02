@@ -1,9 +1,11 @@
 use flutter_rust_bridge::frb;
-use spdk_wallet::bitcoin::{
-    consensus::{deserialize, serialize},
-    hex::{DisplayHex, FromHex},
-    secp256k1::SecretKey,
-    Network,
+use spdk_wallet::{
+    bitcoin::{
+        consensus::{deserialize, serialize},
+        hex::{DisplayHex, FromHex},
+        Network,
+    },
+    silentpayments::utils::sending::PartialSecret,
 };
 
 use crate::api::structs::amount::Amount;
@@ -53,7 +55,7 @@ impl From<SilentPaymentUnsignedTransaction>
                 .into_iter()
                 .map(|r| r.try_into().unwrap())
                 .collect(),
-            partial_secret: SecretKey::from_slice(&value.partial_secret).unwrap(),
+            partial_secret: PartialSecret::from_slice(&value.partial_secret).unwrap(),
             unsigned_tx: value
                 .unsigned_tx
                 .map(|tx| deserialize(&Vec::from_hex(&tx).unwrap()).unwrap()),
