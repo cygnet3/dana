@@ -1,7 +1,7 @@
 name: danawallet
 description: A silent payments wallet built in flutter.
 publish_to: 'none'
-version: 0.8.0-beta.4+37
+version: 0.8.0+38
 
 environment:
   sdk: ^3.5.2
