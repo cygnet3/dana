@@ -1,7 +1,6 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/global_functions.dart';
-import 'package:danawallet/states/chain_state.dart';
-import 'package:danawallet/states/sync_progress_notifier.dart';
+import 'package:danawallet/states/sync_orchestrator.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/icons/circular_icon.dart';
@@ -22,20 +21,12 @@ class ConfirmWalletResetScreen extends StatelessWidget {
 
   Future<void> onConfirmResetWallet(BuildContext context) async {
     final walletState = Provider.of<WalletState>(context, listen: false);
-    final chainState = Provider.of<ChainState>(context, listen: false);
-    final scanProgress =
-        Provider.of<SyncProgressNotifier>(context, listen: false);
+    final orchestrator = Provider.of<SyncOrchestrator>(context, listen: false);
 
-    // first interrupt the sync process if this is still running
-    await scanProgress.interruptSync();
-
-    // clear cached start height from sync history
-    chainState.clearSyncHistory();
-
-    // reset wallet data
+    await orchestrator.stop();
     await walletState.resetToBirthday();
+    await orchestrator.start();
 
-    // go to home screen after resetting
     if (context.mounted) goToHomeScreen(context);
   }
 

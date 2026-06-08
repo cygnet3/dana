@@ -3,8 +3,6 @@ import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
-import 'package:danawallet/extensions/outpoint.dart';
-import 'package:danawallet/generated/rust/api/stream.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/owned_output.dart';
@@ -48,75 +46,19 @@ class WalletState extends ChangeNotifier {
   // this variable may change in some exceptional cases
   Bip353Address? danaAddress;
 
-  // stream to receive updates while scanning
-  late StreamSubscription syncResultSubscription;
+  bool _initialized = false;
 
   // private constructor
   WalletState._();
 
   static Future<WalletState> create() async {
     final instance = WalletState._();
-    await instance._initStreams();
     return instance;
   }
 
-  Future<void> _initStreams() async {
-    syncResultSubscription = createSyncResultStream().listen(((event) async {
-      // Process found outputs (new UTXOs we own)
-      for (final found in event.foundOutputs) {
-        // first, insert the transaction data in the known transactions table
-        await transactionsRepository.addIncomingTransaction(
-          txid: found.outpoint.txid,
-          confirmationHeight: event.blkheight,
-          confirmationBlockhash: event.blkhash,
-        );
-
-        // Insert output into database
-        await ownedOutputsRepository.insertOutput(output: found);
-      }
-
-      List<OutPoint> unknownSpends = [];
-
-      // Process found inputs (our UTXOs being spent)
-      for (final outpoint in event.foundInputs) {
-        // Try to confirm an outgoing transaction
-        final confirmed =
-            await transactionsRepository.confirmOutgoingTransaction(
-          confirmedOutpointTxid: outpoint.txid,
-          confirmedOutpointVout: outpoint.vout,
-          confirmationHeight: event.blkheight,
-          confirmationBlockhash: event.blkhash,
-        );
-
-        // this output does not have an associated transaction
-        // this can occur if a user imported their seed phrase in multiple wallets
-        // generally we should discourage this, but it's inevitable that it will happen
-        if (!confirmed) {
-          unknownSpends.add(outpoint);
-        }
-      }
-
-      if (unknownSpends.isNotEmpty) {
-        Logger().w(
-            "Unknown spends detected, marking the following outpoints as spent: ${unknownSpends.toDisplayString()}");
-        await transactionsRepository.addOutgoingTransaction(
-          spentOutpoints: unknownSpends,
-          recipients: [],
-          txid: null,
-          confirmationHeight: event.blkheight,
-          confirmationBlockhash: event.blkhash,
-        );
-      }
-
-      await walletRepository.saveLastSync(event.blkheight);
-
-      // update UI
-      await _updateWalletState();
-      notifyListeners();
-    }));
-  }
-
   Future<bool> initialize() async {
+    _initialized = false;
+
     // we check if wallet data is present in database
     final wallet = await walletRepository.readWallet();
 
@@ -136,16 +78,20 @@ class WalletState extends ChangeNotifier {
 
     await _updateWalletState();
 
+    // All late fields are now populated; stream events can be processed safely.
+    _initialized = true;
+
     return true;
   }
 
-  @override
-  void dispose() {
-    syncResultSubscription.cancel();
-    super.dispose();
+  Future<void> refreshAfterSync({bool lastSyncOnly = false}) async {
+    if (!_initialized) return;
+    await _updateWalletState(lastSyncOnly: lastSyncOnly);
+    notifyListeners();
   }
 
   Future<void> reset() async {
+    _initialized = false;
     danaAddress = null;
     await transactionsRepository.reset();
     // this is redudant, but we do it to be sure
@@ -155,6 +101,7 @@ class WalletState extends ChangeNotifier {
 
   Future<void> restoreWallet(
       Network network, String mnemonic, DateTime? birthday) async {
+    _initialized = false;
     final args = WalletSetupArgs(
         setupType: WalletSetupType.mnemonic(mnemonic), network: network);
     final setupResult = SpWallet.setupWallet(setupArgs: args);
@@ -171,9 +118,11 @@ class WalletState extends ChangeNotifier {
     lastSync = null;
 
     await _updateWalletState();
+    _initialized = true;
   }
 
   Future<void> createNewWallet(Network network, int? currentTip) async {
+    _initialized = false;
     final now = DateTime.now().toUtc();
 
     final args = WalletSetupArgs(
@@ -188,7 +137,9 @@ class WalletState extends ChangeNotifier {
     birthday = now;
     this.network = network;
     lastSync = currentTip;
+
     await _updateWalletState();
+    _initialized = true;
   }
 
   Future<SpWallet> getWalletFromSecureStorage() async {
@@ -260,8 +211,12 @@ class WalletState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _updateWalletState() async {
+  Future<void> _updateWalletState({bool lastSyncOnly = false}) async {
     lastSync = await walletRepository.readLastSync();
+
+    if (lastSyncOnly) {
+      return;
+    }
 
     // Get cached data from SQLite
     amount = await ownedOutputsRepository.getUnspentBalance();

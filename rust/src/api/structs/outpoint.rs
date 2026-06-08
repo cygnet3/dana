@@ -3,7 +3,6 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use spdk_wallet::bitcoin::Txid;
 
-
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct OutPoint {
     pub txid: String,

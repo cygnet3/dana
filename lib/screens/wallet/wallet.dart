@@ -13,7 +13,7 @@ import 'package:danawallet/screens/home/wallet/transaction_details.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
-import 'package:danawallet/states/sync_progress_notifier.dart';
+import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/skeletons/main_screen_skeleton.dart';
@@ -47,13 +47,13 @@ class WalletScreenState extends State<WalletScreen> {
     });
   }
 
-  Widget buildScanProgress(double? scanProgress) {
+  Widget buildSyncProgress(double? syncProgress) {
     return Row(
       children: [
-        if (scanProgress != null)
+        if (syncProgress != null)
           SizedBox(
               width: 40,
-              child: Text('${(scanProgress * 100.0).toStringAsFixed(0)} %',
+              child: Text('${(syncProgress * 100.0).toStringAsFixed(0)} %',
                   textAlign: TextAlign.right,
                   style: BitcoinTextStyle.body5(Bitcoin.neutral7))),
         const SizedBox(
@@ -65,7 +65,7 @@ class WalletScreenState extends State<WalletScreen> {
               child: LinearProgressIndicator(
                 valueColor: AlwaysStoppedAnimation(Bitcoin.blue),
                 backgroundColor: Bitcoin.neutral4,
-                value: scanProgress,
+                value: syncProgress,
                 minHeight: 6.0,
               )),
         ),
@@ -553,16 +553,16 @@ class WalletScreenState extends State<WalletScreen> {
   }
 
   Widget buildFundingScreen(String silentPaymentAddress, String? danaAddress,
-      SyncProgressNotifier scanProgress, ChainState chainState) {
+      SyncProgressState syncProgress, ChainState chainState) {
     return Column(
       children: [
         // Show sync progress when actively scanning
         Visibility(
-            visible: scanProgress.isScanning,
+            visible: syncProgress.isSyncing,
             maintainAnimation: true,
             maintainSize: true,
             maintainState: true,
-            child: buildScanProgress(scanProgress.progress)),
+            child: buildSyncProgress(syncProgress.progress)),
         // Show offline status when chain sync has connection issues
         Visibility(
             visible: !chainState.available,
@@ -657,7 +657,7 @@ class WalletScreenState extends State<WalletScreen> {
   Widget build(BuildContext context) {
     final walletState = Provider.of<WalletState>(context);
     final exchangeRate = Provider.of<FiatExchangeRateState>(context);
-    final scanProgress = Provider.of<SyncProgressNotifier>(context);
+    final syncProgress = Provider.of<SyncProgressState>(context);
     final chainState = Provider.of<ChainState>(context);
     final danaAddress = walletState.danaAddress;
 
@@ -677,7 +677,7 @@ class WalletScreenState extends State<WalletScreen> {
           ? buildFundingScreen(
               walletState.receivePaymentCode,
               danaAddress?.toString(),
-              scanProgress,
+              syncProgress,
               chainState,
             )
           : Column(
@@ -685,11 +685,11 @@ class WalletScreenState extends State<WalletScreen> {
               children: [
                 // Show sync progress when actively scanning
                 Visibility(
-                    visible: scanProgress.isScanning,
+                    visible: syncProgress.isSyncing,
                     maintainAnimation: true,
                     maintainSize: true,
                     maintainState: true,
-                    child: buildScanProgress(scanProgress.progress)),
+                    child: buildSyncProgress(syncProgress.progress)),
                 // Show offline status when chain sync has connection issues
                 Visibility(
                     visible: !chainState.available,

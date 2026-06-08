@@ -9,18 +9,22 @@ import 'package:danawallet/repositories/owned_outputs_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/repositories/transactions_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
+import 'package:danawallet/screens/home/home.dart' show HomeScreen;
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/screens/onboarding/introduction.dart';
 import 'package:danawallet/services/app_info_service.dart';
+import 'package:danawallet/services/foreground_sync_service.dart';
 import 'package:danawallet/services/logging_service.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/home_state.dart';
-import 'package:danawallet/states/sync_progress_notifier.dart';
+import 'package:danawallet/states/permission_state.dart';
+import 'package:danawallet/states/sync_orchestrator.dart';
+import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
-import 'package:danawallet/widgets/pin_guard.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:logger/logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -34,6 +38,12 @@ void main() async {
   if (Platform.isLinux) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+  } else if (Platform.isAndroid) {
+    FlutterForegroundTask.initCommunicationPort();
+    ForegroundSyncService.initialize();
+  } else {
+    Logger().e('Dana wallet is not supported on this platform');
+    exit(1);
   }
 
   final appInfo = AppInfoService(packageInfo: await PackageInfo.fromPlatform());
@@ -53,10 +63,25 @@ void main() async {
   DatabaseHelper.instance.enableForeignKeysPragma();
 
   final walletState = await WalletState.create();
-  final scanNotifier = await SyncProgressNotifier.create();
+  final permissionState = await PermissionState.create();
+  final syncProgress = await SyncProgressState.create();
   final chainState = ChainState();
   final contactsState = ContactsState();
   final fiatExchangeRate = await FiatExchangeRateState.create();
+  SyncOrchestrator? syncOrchestratorRef;
+  final SyncService syncService = SyncService(
+    chainState: chainState,
+    permissionState: permissionState,
+    syncProgress: syncProgress,
+    walletState: walletState,
+    onFatalError: () =>
+        syncOrchestratorRef?.restart(fallbackMode: true) ?? Future.value(),
+  );
+  final syncOrchestrator = SyncOrchestrator(
+    service: syncService,
+    permissionState: permissionState,
+  );
+  syncOrchestratorRef = syncOrchestrator;
 
   // Try to update exchange rate, but don't crash if it fails
   try {
@@ -96,8 +121,6 @@ void main() async {
       Logger().w("Failed to connect");
     }
 
-    chainState.startSyncService(walletState, scanNotifier, true);
-
     final addressRegistrationNeeded =
         await walletState.checkDanaAddressRegistrationNeeded();
 
@@ -108,7 +131,7 @@ void main() async {
     if (addressRegistrationNeeded) {
       landingPage = const RegisterDanaAddressScreen();
     } else {
-      landingPage = const PinGuard();
+      landingPage = const HomeScreen();
     }
   } else {
     // no wallet is loaded, so we go to the introduction screen
@@ -122,13 +145,21 @@ void main() async {
         Provider.value(value: appInfo),
         // providers for mutable data
         ChangeNotifierProvider.value(value: walletState),
-        ChangeNotifierProvider.value(value: scanNotifier),
+        ChangeNotifierProvider.value(value: syncProgress),
         ChangeNotifierProvider.value(value: chainState),
         ChangeNotifierProvider.value(value: HomeState()),
+        ChangeNotifierProvider.value(value: permissionState),
         ChangeNotifierProvider.value(value: fiatExchangeRate),
         ChangeNotifierProvider.value(value: contactsState),
+        ChangeNotifierProvider.value(value: syncOrchestrator),
       ],
       child: SilentPaymentApp(landingPage: landingPage),
     ),
   );
+
+  if (walletLoaded) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      syncOrchestrator.start();
+    });
+  }
 }

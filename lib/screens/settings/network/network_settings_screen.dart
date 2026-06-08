@@ -4,7 +4,7 @@ import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/chain_state.dart';
-import 'package:danawallet/states/home_state.dart';
+import 'package:danawallet/states/sync_orchestrator.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
@@ -40,8 +40,7 @@ class NetworkSettingsScreen extends StatelessWidget {
 
   Future<void> _onSetLastSync(BuildContext context) async {
     final walletState = Provider.of<WalletState>(context, listen: false);
-    final homeState = Provider.of<HomeState>(context, listen: false);
-    final chainState = Provider.of<ChainState>(context, listen: false);
+    final orchestrator = Provider.of<SyncOrchestrator>(context, listen: false);
 
     TextEditingController controller = TextEditingController();
     final syncHeight = await showInputAlertDialog(
@@ -49,16 +48,20 @@ class NetworkSettingsScreen extends StatelessWidget {
         TextInputType.number,
         'Enter sync height',
         'Enter current sync height (numeric value)');
+
+    if (syncHeight is! int && syncHeight != true) return;
+
+    await orchestrator.stop();
+
     if (syncHeight is int) {
       await walletState.resetToSyncHeight(syncHeight);
-      chainState.clearSyncHistory();
-      homeState.showMainScreen();
-    } else if (syncHeight is bool && syncHeight) {
-      // if no height is provided, we reset to the birthday
+    } else {
       await walletState.resetToBirthday();
-      chainState.clearSyncHistory();
-      homeState.showMainScreen();
     }
+
+    await orchestrator.start();
+
+    if (context.mounted) goToHomeScreen(context);
   }
 
   Future<void> _onSetBlindbitUrl(BuildContext context) async {

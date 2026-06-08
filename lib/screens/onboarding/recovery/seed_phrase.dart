@@ -1,19 +1,22 @@
+import 'dart:io';
+
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/enums/warning_type.dart';
 import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
+import 'package:danawallet/screens/home/home.dart';
+import 'package:danawallet/screens/onboarding/notification_permission_screen.dart';
 import 'package:danawallet/screens/onboarding/recovery/birthday_picker_screen.dart';
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
-import 'package:danawallet/states/sync_progress_notifier.dart';
+import 'package:danawallet/states/sync_orchestrator.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/loading_widget.dart';
 import 'package:danawallet/widgets/pills/mnemonic_input_pill_box.dart';
-import 'package:danawallet/widgets/pin_guard.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -50,8 +53,8 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
       final walletState = Provider.of<WalletState>(context, listen: false);
       final chainState = Provider.of<ChainState>(context, listen: false);
       final contactsState = Provider.of<ContactsState>(context, listen: false);
-      final scanProgress =
-          Provider.of<SyncProgressNotifier>(context, listen: false);
+      final orchestrator =
+          Provider.of<SyncOrchestrator>(context, listen: false);
 
       // Get birthday: navigate to picker if user knows it, else null
       DateTime? birthday;
@@ -98,8 +101,6 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
         }
       }
 
-      chainState.startSyncService(walletState, scanProgress, true);
-
       final goToDanaAddressSetup =
           await walletState.checkDanaAddressRegistrationNeeded();
 
@@ -108,13 +109,27 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
           walletState.receivePaymentCode, walletState.danaAddress);
 
       if (context.mounted) {
-        Widget nextScreen = goToDanaAddressSetup
+        final Widget nextScreen = goToDanaAddressSetup
             ? const RegisterDanaAddressScreen()
-            : const PinGuard();
-        Navigator.pushAndRemoveUntil(
+            : const HomeScreen();
+        if (Platform.isAndroid) {
+          Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => nextScreen),
-            (Route<dynamic> route) => false);
+            MaterialPageRoute(
+              builder: (context) => NotificationPermissionScreen(
+                goToDanaAddressSetup: goToDanaAddressSetup,
+              ),
+            ),
+            (Route<dynamic> route) => false,
+          );
+        } else {
+          await orchestrator.start();
+          if (!context.mounted) return;
+          Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => nextScreen),
+              (Route<dynamic> route) => false);
+        }
       }
     } catch (e) {
       if (context.mounted) {

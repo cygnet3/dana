@@ -1,21 +1,24 @@
+import 'dart:io';
+
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/bip39.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
+import 'package:danawallet/screens/home/home.dart';
 import 'package:danawallet/screens/onboarding/choose_network.dart';
+import 'package:danawallet/screens/onboarding/notification_permission_screen.dart';
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/screens/onboarding/onboarding_skeleton.dart';
 import 'package:danawallet/screens/onboarding/recovery/seed_phrase.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
-import 'package:danawallet/states/sync_progress_notifier.dart';
+import 'package:danawallet/states/sync_orchestrator.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button_outlined.dart';
 import 'package:danawallet/widgets/info_widget.dart';
-import 'package:danawallet/widgets/pin_guard.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sizer/sizer.dart';
@@ -46,8 +49,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
     final walletState = Provider.of<WalletState>(context, listen: false);
     final chainState = Provider.of<ChainState>(context, listen: false);
     final contactsState = Provider.of<ContactsState>(context, listen: false);
-    final scanProgress =
-        Provider.of<SyncProgressNotifier>(context, listen: false);
+    final orchestrator = Provider.of<SyncOrchestrator>(context, listen: false);
 
     final blindbitUrl = network.defaultBlindbitUrl;
 
@@ -61,21 +63,30 @@ class _OverviewScreenState extends State<OverviewScreen> {
       currentTip = chainState.tip;
     }
 
+    final goToDanaAddressSetup = connected && network != Network.regtest;
+
     await walletState.createNewWallet(network, currentTip);
 
-    // start chain sync service only *after* we created the wallet
-    chainState.startSyncService(walletState, scanProgress, false);
     // initialize contacts state with the user's payment code
     contactsState.initialize(walletState.receivePaymentCode, null);
-    if (context.mounted) {
-      // skip the dana address registration if we are currently offline, or using regtest
-      Widget nextScreen;
-      if (!connected || network == Network.regtest) {
-        nextScreen = const PinGuard();
-      } else {
-        nextScreen = const RegisterDanaAddressScreen();
-      }
 
+    if (Platform.isAndroid) {
+      if (!context.mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => NotificationPermissionScreen(
+            goToDanaAddressSetup: goToDanaAddressSetup,
+          ),
+        ),
+        (Route<dynamic> route) => false,
+      );
+    } else {
+      final nextScreen = goToDanaAddressSetup
+          ? const RegisterDanaAddressScreen()
+          : const HomeScreen();
+      await orchestrator.start();
+      if (!context.mounted) return;
       // clear path (don't allow users to go back to registration screen by pressing 'back')
       Navigator.pushAndRemoveUntil(
           context,
