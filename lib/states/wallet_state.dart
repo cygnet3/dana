@@ -48,14 +48,6 @@ class WalletState extends ChangeNotifier {
 
   bool _initialized = false;
 
-  // private constructor
-  WalletState._();
-
-  static Future<WalletState> create() async {
-    final instance = WalletState._();
-    return instance;
-  }
-
   Future<bool> initialize() async {
     _initialized = false;
 
