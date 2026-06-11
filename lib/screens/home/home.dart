@@ -55,63 +55,61 @@ class HomeScreen extends StatelessWidget {
     final syncOrchestrator =
         Provider.of<SyncOrchestrator>(context, listen: true);
 
-    return PopScope(
-        canPop: false,
-        child: Scaffold(
-          body: Column(
-            children: [
-              if (syncOrchestrator.inProcessFallback)
-                StatusBanner(
-                  icon: Icons.sync,
-                  message: bgSyncUnavailableMsg,
-                  backgroundColor: bgSyncUnavailableColor,
-                  actionLabel: 'Enable',
-                  onActionPressed: () {
-                    unawaited(_onEnableBackgroundSync(context));
-                  },
-                ),
-              Expanded(
-                child: IndexedStack(
-                  index: homeState.selectedIndex,
-                  children: _widgetOptions,
-                ),
-              ),
-            ],
+    return Scaffold(
+      body: Column(
+        children: [
+          if (syncOrchestrator.inProcessFallback)
+            StatusBanner(
+              icon: Icons.sync,
+              message: bgSyncUnavailableMsg,
+              backgroundColor: bgSyncUnavailableColor,
+              actionLabel: 'Enable',
+              onActionPressed: () {
+                unawaited(_onEnableBackgroundSync(context));
+              },
+            ),
+          Expanded(
+            child: IndexedStack(
+              index: homeState.selectedIndex,
+              children: _widgetOptions,
+            ),
           ),
-          bottomNavigationBar: BottomNavigationBar(
-            items: <BottomNavigationBarItem>[
-              BottomNavigationBarItem(
-                icon: Image(
-                    image: const AssetImage("icons/flip_vertical.png",
-                        package: "bitcoin_ui"),
-                    color: Bitcoin.neutral7),
-                activeIcon: Image(
-                    image: const AssetImage("icons/flip_vertical.png",
-                        package: "bitcoin_ui"),
-                    color: Bitcoin.blue),
-                label: 'Transact',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.contacts, color: Bitcoin.neutral7),
-                activeIcon: Icon(Icons.contacts, color: Bitcoin.blue),
-                label: 'Contacts',
-              ),
-              BottomNavigationBarItem(
-                icon: Image(
-                    image: const AssetImage("icons/gear.png",
-                        package: "bitcoin_ui"),
-                    color: Bitcoin.neutral7),
-                activeIcon: Image(
-                    image: const AssetImage("icons/gear.png",
-                        package: "bitcoin_ui"),
-                    color: Bitcoin.blue),
-                label: 'Settings',
-              ),
-            ],
-            currentIndex: homeState.selectedIndex,
-            selectedItemColor: Bitcoin.blue,
-            onTap: homeState.setIndex,
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        items: <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Image(
+                image: const AssetImage("icons/flip_vertical.png",
+                    package: "bitcoin_ui"),
+                color: Bitcoin.neutral7),
+            activeIcon: Image(
+                image: const AssetImage("icons/flip_vertical.png",
+                    package: "bitcoin_ui"),
+                color: Bitcoin.blue),
+            label: 'Transact',
           ),
-        ));
+          BottomNavigationBarItem(
+            icon: Icon(Icons.contacts, color: Bitcoin.neutral7),
+            activeIcon: Icon(Icons.contacts, color: Bitcoin.blue),
+            label: 'Contacts',
+          ),
+          BottomNavigationBarItem(
+            icon: Image(
+                image:
+                    const AssetImage("icons/gear.png", package: "bitcoin_ui"),
+                color: Bitcoin.neutral7),
+            activeIcon: Image(
+                image:
+                    const AssetImage("icons/gear.png", package: "bitcoin_ui"),
+                color: Bitcoin.blue),
+            label: 'Settings',
+          ),
+        ],
+        currentIndex: homeState.selectedIndex,
+        selectedItemColor: Bitcoin.blue,
+        onTap: homeState.setIndex,
+      ),
+    );
   }
 }
