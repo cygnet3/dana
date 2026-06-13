@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:logger/logger.dart';
 import 'package:path/path.dart';
@@ -20,7 +22,8 @@ class DatabaseHelper {
 
 // Usage
   Future<Database> _initDB(String filePath) async {
-    final dbPath = await getDatabasesPath();
+    final String dbPath = await _getDbPath();
+
     final path = join(dbPath, filePath);
 
     // read migration files from asset manifest
@@ -42,6 +45,19 @@ class DatabaseHelper {
       onUpgrade: (db, oldVersion, newVersion) =>
           _performMigrations(db, oldVersion, migrations),
     );
+  }
+
+  Future<String> _getDbPath() async {
+    if (Platform.isLinux) {
+      String? home = Platform.environment['HOME'];
+      if (home == null) {
+        throw Exception("Home variable required on linux");
+      }
+      return "$home/.dana";
+    } else {
+      // on non-linux platforms, we use the default path provided by the sqflite package
+      return await getDatabasesPath();
+    }
   }
 
   Future<void> enableForeignKeysPragma() async {
