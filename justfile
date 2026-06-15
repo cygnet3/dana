@@ -1,4 +1,4 @@
-default: prepare run
+default: run
 
 # use fvm if available, else use flutter directly
 flutter := if `which fvm 2> /dev/null || true` != "" { "fvm flutter" }  else { "flutter" }
