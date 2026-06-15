@@ -331,6 +331,13 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
             MaterialPageRoute(builder: (context) => const HomeScreen()),
             (Route<dynamic> route) => false,
           );
+
+          // if we're using the live environment, show a warning message after redirecting
+          if (isLiveEnv) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              showMainnetWarning();
+            });
+          }
         }
       } else {
         throw Exception('Registration succeeded but dana address is null');
