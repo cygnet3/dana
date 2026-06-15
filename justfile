@@ -37,7 +37,7 @@ inspect-db:
           sqlite3 /tmp/dana.db
         ;;
         "linux-x64")
-          sqlite3 .dart_tool/sqflite_common_ffi/databases/dana.db
+          sqlite3 ~/.dana/dana.db
         ;;
         *) echo "unknown platform: {{platform}}"
     esac
