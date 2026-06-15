@@ -88,13 +88,8 @@ void main() async {
   );
   syncOrchestratorRef = syncOrchestrator;
 
-  // Try to update exchange rate, but don't crash if it fails
-  try {
-    await fiatExchangeRate.updateExchangeRate();
-  } catch (e) {
-    Logger().w('Failed to update exchange rate during startup: $e');
-    // Continue with cached data or no data - UI will handle it
-  }
+  // fetch the exchange rate, but don't await the response
+  fiatExchangeRate.updateExchangeRate();
 
   await precacheImages();
 
