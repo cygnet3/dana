@@ -85,6 +85,12 @@ Future<void> showWarningDialog(String message, WarningType type) async {
   );
 }
 
+Future<void> showMainnetWarning() async {
+  String mainnetWarning =
+      "You are currently on Mainnet. This means you are using real funds. Please note that this wallet is still considered experimental, so there may be some risks involved. Don't use funds that you are unwilling to lose. You have been warned.";
+  showWarningDialog(mainnetWarning, WarningType.warn);
+}
+
 Future<dynamic> showInputAlertDialog(TextEditingController controller,
     TextInputType inputType, String titleText, String labelText,
     {bool showReset = true}) {
@@ -184,6 +190,10 @@ AutoSizeText addressAsRichText(String address, double? fontSize) {
 
 bool get isDevEnv {
   return appFlavor == 'dev' || appFlavor == 'local';
+}
+
+bool get isLiveEnv {
+  return appFlavor == 'live';
 }
 
 Network get getNetworkForFlavor {
