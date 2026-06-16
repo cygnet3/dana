@@ -1,12 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:danawallet/constants.dart';
-import 'package:danawallet/data/enums/sync_enums.dart';
 import 'package:danawallet/services/foreground_sync_service.dart';
 import 'package:danawallet/services/in_process_sync_service.dart';
 import 'package:danawallet/states/chain_state.dart';
-import 'package:danawallet/states/permission_state.dart';
 import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -16,7 +13,6 @@ class SyncService {
   final ChainState _chainState;
   final SyncProgressState _syncProgress;
   final WalletState _walletState;
-  final PermissionState _permissionState;
 
   /// Called when the background isolate sends [bgKeyFatalError]. The backend
   /// has already committed to the foreground-service path by the time this
@@ -30,30 +26,11 @@ class SyncService {
 
   SyncService({
     required ChainState chainState,
-    required PermissionState permissionState,
     required SyncProgressState syncProgress,
     required WalletState walletState,
   })  : _chainState = chainState,
-        _permissionState = permissionState,
         _syncProgress = syncProgress,
         _walletState = walletState;
-
-  Future<SyncStartResult> start() async {
-    if (Platform.isAndroid) {
-      // on android, we use a foreground task to sync
-      if (await startForeground()) {
-        return SyncStartResult.foreground;
-      } else {
-        // if starting the foreground stask failed, fall back to in-process
-        startInProcess();
-        return SyncStartResult.fallback;
-      }
-    } else {
-      // on all other platforms, we use in-process by default
-      startInProcess();
-      return SyncStartResult.inProcess;
-    }
-  }
 
   Future<bool> startForeground() async {
     if (!_callbacksRegistered) {
@@ -61,14 +38,6 @@ class SyncService {
       _callbacksRegistered = true;
     }
 
-    await _permissionState.refresh();
-    if (!_permissionState.notificationGranted) {
-      if (await FlutterForegroundTask.isRunningService) {
-        await ForegroundSyncService.stop();
-      }
-      Logger().w('Notification permission missing');
-      return false;
-    }
     await ForegroundSyncService.start();
 
     if (await FlutterForegroundTask.isRunningService) {
