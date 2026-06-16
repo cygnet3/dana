@@ -27,7 +27,6 @@ class SyncOrchestrator extends ChangeNotifier {
   bool _running = false;
   bool _permissionRestartInFlight = false;
   bool _disposed = false;
-  Future<void> _lifecycleQueue = Future.value();
 
   bool get inProcessFallback => _inProcessFallback;
   bool get isRunning => _running;
@@ -50,61 +49,49 @@ class SyncOrchestrator extends ChangeNotifier {
 
   /// Idempotent. Call only after the navigator is live.
   Future<void> start({bool fallbackMode = false}) async {
-    await _enqueueLifecycleAction(() async {
-      if (_running) return;
-      _running = true;
-      try {
-        if (fallbackMode) {
-          _service.startInProcess();
-          _setInProcessFallback(true);
-        } else {
-          final result = await _service.start();
-          _setInProcessFallback(result == SyncStartResult.fallback);
-        }
-      } catch (_) {
-        _running = false;
-        rethrow;
+    if (_running) return;
+    _running = true;
+    try {
+      if (fallbackMode) {
+        _service.startInProcess();
+        _setInProcessFallback(true);
+      } else {
+        final result = await _service.start();
+        _setInProcessFallback(result == SyncStartResult.fallback);
       }
-    });
+    } catch (_) {
+      _running = false;
+      rethrow;
+    }
   }
 
   Future<void> stop() async {
-    await _enqueueLifecycleAction(() async {
-      if (!_running) return;
-      _running = false;
-      await _service.stop();
-      _setInProcessFallback(false);
-    });
+    if (!_running) return;
+    _running = false;
+    await _service.stop();
+    _setInProcessFallback(false);
   }
 
   Future<void> restart({bool fallbackMode = false}) async {
-    await _enqueueLifecycleAction(() async {
-      if (_running) {
-        _running = false;
-        await _service.stop();
-      }
-      _setInProcessFallback(false);
+    if (_running) {
+      _running = false;
+      await _service.stop();
+    }
+    _setInProcessFallback(false);
 
-      _running = true;
-      try {
-        if (fallbackMode) {
-          _service.startInProcess();
-          _setInProcessFallback(true);
-        } else {
-          final result = await _service.start();
-          _setInProcessFallback(result == SyncStartResult.fallback);
-        }
-      } catch (_) {
-        _running = false;
-        rethrow;
+    _running = true;
+    try {
+      if (fallbackMode) {
+        _service.startInProcess();
+        _setInProcessFallback(true);
+      } else {
+        final result = await _service.start();
+        _setInProcessFallback(result == SyncStartResult.fallback);
       }
-    });
-  }
-
-  Future<void> _enqueueLifecycleAction(Future<void> Function() action) {
-    final queued = _lifecycleQueue.then((_) => action());
-    _lifecycleQueue = queued.catchError((_) {});
-    return queued;
+    } catch (_) {
+      _running = false;
+      rethrow;
+    }
   }
 
   void _setInProcessFallback(bool value) {
