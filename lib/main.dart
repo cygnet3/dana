@@ -125,6 +125,7 @@ void main() async {
       providers: [
         // simple providers for static/immutable data
         Provider.value(value: appInfo),
+        Provider.value(value: syncOrchestrator),
         // providers for mutable data
         ChangeNotifierProvider.value(value: walletState),
         ChangeNotifierProvider.value(value: syncProgress),
@@ -133,7 +134,6 @@ void main() async {
         ChangeNotifierProvider.value(value: permissionState),
         ChangeNotifierProvider.value(value: fiatExchangeRate),
         ChangeNotifierProvider.value(value: contactsState),
-        ChangeNotifierProvider.value(value: syncOrchestrator),
       ],
       child: SilentPaymentApp(landingPage: landingPage),
     ),

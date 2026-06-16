@@ -6,19 +6,15 @@ import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/permission_state.dart';
 import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
-import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 
-class SyncOrchestrator extends ChangeNotifier {
+class SyncOrchestrator {
   final SyncService _service;
   final PermissionState _permissionState;
 
-  bool _inFallbackMode = false;
   bool _running = false;
   bool _permissionRestartInFlight = false;
-  bool _disposed = false;
 
-  bool get inFallbackMode => _inFallbackMode;
   bool get isRunning => _running;
 
   SyncOrchestrator({
@@ -47,17 +43,14 @@ class SyncOrchestrator extends ChangeNotifier {
       final success = await _service.startForeground();
       if (success) {
         Logger().i("Successfully started foreground sync service");
-        _setInProcessFallback(false);
       } else {
         Logger().w("Starting in-process service as a fallback");
         _service.startInProcess();
-        _setInProcessFallback(true);
       }
     } else {
       // for non-android platforms, we always start the sync service in-process
       _service.startInProcess();
       Logger().i("Successfully started in-process sync service");
-      _setInProcessFallback(false);
     }
     _running = true;
   }
@@ -66,19 +59,12 @@ class SyncOrchestrator extends ChangeNotifier {
     if (!_running) return;
     _running = false;
     await _service.stop();
-    _setInProcessFallback(false);
   }
 
   Future<void> restart({bool forceInProcess = false}) async {
     await stop();
 
     await start(forceInProcess: forceInProcess);
-  }
-
-  void _setInProcessFallback(bool value) {
-    if (_inFallbackMode == value) return;
-    _inFallbackMode = value;
-    notifyListeners();
   }
 
   void _onPermissionStateChanged() {
@@ -91,13 +77,5 @@ class SyncOrchestrator extends ChangeNotifier {
         _permissionRestartInFlight = false;
       }
     }());
-  }
-
-  @override
-  void dispose() {
-    if (_disposed) return;
-    _disposed = true;
-    _permissionState.removeListener(_onPermissionStateChanged);
-    super.dispose();
   }
 }
