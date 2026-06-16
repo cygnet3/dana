@@ -13,12 +13,12 @@ class SyncOrchestrator extends ChangeNotifier {
   final SyncService _service;
   final PermissionState _permissionState;
 
-  bool _inProcessFallback = false;
+  bool _inFallbackMode = false;
   bool _running = false;
   bool _permissionRestartInFlight = false;
   bool _disposed = false;
 
-  bool get inProcessFallback => _inProcessFallback;
+  bool get inFallbackMode => _inFallbackMode;
   bool get isRunning => _running;
 
   SyncOrchestrator({
@@ -76,8 +76,8 @@ class SyncOrchestrator extends ChangeNotifier {
   }
 
   void _setInProcessFallback(bool value) {
-    if (_inProcessFallback == value) return;
-    _inProcessFallback = value;
+    if (_inFallbackMode == value) return;
+    _inFallbackMode = value;
     notifyListeners();
   }
 

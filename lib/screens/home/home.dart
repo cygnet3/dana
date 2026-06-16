@@ -40,9 +40,9 @@ class HomeScreen extends StatelessWidget {
       return;
     }
 
-    if (wasGranted && syncOrchestrator.inProcessFallback) {
+    if (wasGranted && syncOrchestrator.inFallbackMode) {
       await syncOrchestrator.restart();
-      if (syncOrchestrator.inProcessFallback) {
+      if (syncOrchestrator.inFallbackMode) {
         displayWarning(
             'Background sync could not be started. Try restarting the app.');
       }
@@ -60,7 +60,7 @@ class HomeScreen extends StatelessWidget {
         child: Scaffold(
           body: Column(
             children: [
-              if (syncOrchestrator.inProcessFallback)
+              if (syncOrchestrator.inFallbackMode)
                 StatusBanner(
                   icon: Icons.sync,
                   message: bgSyncUnavailableMsg,
