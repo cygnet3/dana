@@ -177,13 +177,9 @@ class SilentPaymentApp extends StatelessWidget {
 }
 
 Future<void> precacheImages() async {
-  await precacheSvgPicture("assets/icons/address-book.svg");
-  await precacheSvgPicture("assets/icons/boxes.svg");
-  await precacheSvgPicture("assets/icons/contact.svg");
-  await precacheSvgPicture("assets/icons/hidden.svg");
   await precacheSvgPicture("assets/icons/rocket.svg");
-  await precacheSvgPicture("assets/icons/rocket-large.svg");
-  await precacheSvgPicture("assets/icons/sparkle.svg");
+  await precacheSvgPicture("assets/icons/address-book.svg");
+  await precacheSvgPicture("assets/icons/hidden.svg");
 }
 
 Future precacheSvgPicture(String svgPath) async {
