@@ -4,7 +4,7 @@ import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/chain_state.dart';
-import 'package:danawallet/states/sync_orchestrator.dart';
+import 'package:danawallet/services/sync_orchestrator.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
