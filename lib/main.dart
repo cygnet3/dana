@@ -107,12 +107,7 @@ void main() async {
 
     chainState.initialize(network);
 
-    final connected = await chainState.connect(blindbitUrl);
-    if (!connected) {
-      Logger().w("Failed to connect");
-      // Continue without chain sync - wallet still usable for local operations
-      // UI will show appropriate "offline" state
-    }
+    await chainState.connect(blindbitUrl);
 
     final addressRegistrationNeeded =
         await walletState.checkDanaAddressRegistrationNeeded();
