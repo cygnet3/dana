@@ -35,7 +35,7 @@ class SyncProgressState extends ChangeNotifier {
     });
   }
 
-  static Future<SyncProgressState> create() async {
+  static SyncProgressState create() {
     final instance = SyncProgressState._();
     instance._initialize();
     return instance;
