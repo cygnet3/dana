@@ -26,25 +26,9 @@ class HomeScreen extends StatelessWidget {
   Future<void> _onEnableBackgroundSync(BuildContext context) async {
     final permissionState =
         Provider.of<PermissionState>(context, listen: false);
-    final syncOrchestrator =
-        Provider.of<SyncOrchestrator>(context, listen: false);
-
-    // Capture state before the call: if permission was already granted,
-    // _onPermissionStateChanged won't fire and we must restart explicitly.
-    final wasGranted = permissionState.notificationGranted;
-
     if (!await permissionState.requestPermissionsAndWaitForSettingsReturn()) {
       displayWarning(
           'Notification permission is required for background sync.');
-      return;
-    }
-
-    if (wasGranted && syncOrchestrator.inFallbackMode) {
-      await syncOrchestrator.restart();
-      if (syncOrchestrator.inFallbackMode) {
-        displayWarning(
-            'Background sync could not be started. Try restarting the app.');
-      }
     }
   }
 
