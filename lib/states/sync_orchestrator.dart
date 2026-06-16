@@ -9,17 +9,6 @@ import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 
-export 'package:danawallet/services/sync_service.dart' show SyncService;
-
-/// Coordinates sync backend lifecycle and runtime reconfiguration.
-///
-/// This class serializes [start], [stop], and [restart] to avoid overlapping
-/// backend transitions, and reacts to [PermissionState] changes by restarting
-/// sync when running (for example after Android notification permission
-/// changes). It also exposes [inProcessFallback] so UI layers can surface
-/// degraded background-sync state without depending on platform details.
-///
-/// All platform-specific I/O remains inside the injected [SyncService].
 class SyncOrchestrator extends ChangeNotifier {
   final SyncService _service;
   final PermissionState _permissionState;
