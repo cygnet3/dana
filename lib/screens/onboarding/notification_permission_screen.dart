@@ -4,7 +4,7 @@ import 'package:danawallet/screens/home/home.dart';
 import 'package:danawallet/screens/onboarding/onboarding_skeleton.dart';
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/states/permission_state.dart';
-import 'package:danawallet/states/sync_orchestrator.dart';
+import 'package:danawallet/services/sync_orchestrator.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
