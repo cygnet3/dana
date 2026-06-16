@@ -108,6 +108,8 @@ void main() async {
     contactsState.initialize(
         walletState.receivePaymentCode, walletState.danaAddress);
 
+    syncOrchestrator.start();
+
     if (addressRegistrationNeeded) {
       landingPage = const RegisterDanaAddressScreen();
     } else {
@@ -136,12 +138,6 @@ void main() async {
       child: SilentPaymentApp(landingPage: landingPage),
     ),
   );
-
-  if (walletLoaded) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      syncOrchestrator.start();
-    });
-  }
 }
 
 class SilentPaymentApp extends StatelessWidget {
