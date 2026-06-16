@@ -24,7 +24,6 @@ import 'package:danawallet/states/sync_orchestrator.dart';
 import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:logger/logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -39,7 +38,6 @@ void main() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   } else if (Platform.isAndroid) {
-    FlutterForegroundTask.initCommunicationPort();
     ForegroundSyncService.initialize();
   } else {
     Logger().e('Dana wallet is not supported on this platform');
