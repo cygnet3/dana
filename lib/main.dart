@@ -70,21 +70,13 @@ void main() async {
   final chainState = ChainState();
   final contactsState = ContactsState();
   final fiatExchangeRate = await FiatExchangeRateState.create();
-  SyncOrchestrator? syncOrchestratorRef;
-  final syncService = SyncService(
+
+  final syncOrchestrator = SyncOrchestrator(
     chainState: chainState,
     syncProgress: syncProgress,
     walletState: walletState,
     permissionState: permissionState,
-    onFatalError: () =>
-        syncOrchestratorRef?.restart(fallbackMode: true) ?? Future.value(),
   );
-
-  final syncOrchestrator = SyncOrchestrator(
-    service: syncService,
-    permissionState: permissionState,
-  );
-  syncOrchestratorRef = syncOrchestrator;
 
   // fetch the exchange rate, but don't await the response
   fiatExchangeRate.updateExchangeRate();

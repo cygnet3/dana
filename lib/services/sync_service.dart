@@ -21,7 +21,7 @@ class SyncService {
   /// Called when the background isolate sends [bgKeyFatalError]. The backend
   /// has already committed to the foreground-service path by the time this
   /// fires, so the caller must trigger a restart to recover into fallback mode.
-  final Future<void> Function() onFatalError;
+  late Future<void> Function() onFatalError;
 
   bool _callbacksRegistered = false;
 
@@ -33,7 +33,6 @@ class SyncService {
     required PermissionState permissionState,
     required SyncProgressState syncProgress,
     required WalletState walletState,
-    required this.onFatalError,
   })  : _chainState = chainState,
         _permissionState = permissionState,
         _syncProgress = syncProgress,
