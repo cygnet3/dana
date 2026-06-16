@@ -70,6 +70,8 @@ class _OverviewScreenState extends State<OverviewScreen> {
     // initialize contacts state with the user's payment code
     contactsState.initialize(walletState.receivePaymentCode, null);
 
+    await orchestrator.start();
+
     if (Platform.isAndroid) {
       if (!context.mounted) return;
       Navigator.pushAndRemoveUntil(
@@ -85,7 +87,6 @@ class _OverviewScreenState extends State<OverviewScreen> {
       final nextScreen = goToDanaAddressSetup
           ? const RegisterDanaAddressScreen()
           : const HomeScreen();
-      await orchestrator.start();
       if (!context.mounted) return;
       // clear path (don't allow users to go back to registration screen by pressing 'back')
       Navigator.pushAndRemoveUntil(

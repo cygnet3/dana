@@ -4,7 +4,6 @@ import 'package:danawallet/screens/home/home.dart';
 import 'package:danawallet/screens/onboarding/onboarding_skeleton.dart';
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/states/permission_state.dart';
-import 'package:danawallet/services/sync_orchestrator.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -28,11 +27,6 @@ class NotificationPermissionScreen extends StatelessWidget {
   Future<void> _onContinue(BuildContext context) async {
     final permissions = Provider.of<PermissionState>(context, listen: false);
     await permissions.requestBackgroundSyncPermissions();
-
-    if (!context.mounted) return;
-
-    final orchestrator = Provider.of<SyncOrchestrator>(context, listen: false);
-    await orchestrator.start();
 
     if (context.mounted) {
       final nextScreen = goToDanaAddressSetup
