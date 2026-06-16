@@ -16,7 +16,6 @@ run flags="":
     #!/bin/sh
     flags={{flags}}
     flags="$flags --flavor local"
-    flags="$flags --target lib/main_local.dart"
     flags="$flags --dart-define=GIT_HASH={{git_hash}}"
     {{flutter}} run $flags
 
