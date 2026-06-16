@@ -1,12 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 
-import 'package:danawallet/data/enums/sync_enums.dart';
 import 'package:danawallet/services/sync_service.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/permission_state.dart';
 import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
+import 'package:logger/logger.dart';
 
 export 'package:danawallet/services/sync_service.dart' show SyncService;
 
@@ -40,29 +41,36 @@ class SyncOrchestrator extends ChangeNotifier {
           chainState: chainState,
           syncProgress: syncProgress,
           walletState: walletState,
-          permissionState: permissionState,
         ),
         _permissionState = permissionState {
     _permissionState.addListener(_onPermissionStateChanged);
-    _service.onFatalError = () => restart(fallbackMode: true);
+    _service.onFatalError = () => restart(forceInProcess: true);
   }
 
-  /// Idempotent. Call only after the navigator is live.
-  Future<void> start({bool fallbackMode = false}) async {
+  Future<void> start({bool forceInProcess = false}) async {
     if (_running) return;
-    _running = true;
-    try {
-      if (fallbackMode) {
+
+    bool tryForegroundTask = Platform.isAndroid &&
+        _permissionState.notificationGranted &&
+        !forceInProcess;
+
+    if (tryForegroundTask) {
+      final success = await _service.startForeground();
+      if (success) {
+        Logger().i("Successfully started foreground sync service");
+        _setInProcessFallback(false);
+      } else {
+        Logger().w("Starting in-process service as a fallback");
         _service.startInProcess();
         _setInProcessFallback(true);
-      } else {
-        final result = await _service.start();
-        _setInProcessFallback(result == SyncStartResult.fallback);
       }
-    } catch (_) {
-      _running = false;
-      rethrow;
+    } else {
+      // for non-android platforms, we always start the sync service in-process
+      _service.startInProcess();
+      Logger().i("Successfully started in-process sync service");
+      _setInProcessFallback(false);
     }
+    _running = true;
   }
 
   Future<void> stop() async {
@@ -72,26 +80,10 @@ class SyncOrchestrator extends ChangeNotifier {
     _setInProcessFallback(false);
   }
 
-  Future<void> restart({bool fallbackMode = false}) async {
-    if (_running) {
-      _running = false;
-      await _service.stop();
-    }
-    _setInProcessFallback(false);
+  Future<void> restart({bool forceInProcess = false}) async {
+    await stop();
 
-    _running = true;
-    try {
-      if (fallbackMode) {
-        _service.startInProcess();
-        _setInProcessFallback(true);
-      } else {
-        final result = await _service.start();
-        _setInProcessFallback(result == SyncStartResult.fallback);
-      }
-    } catch (_) {
-      _running = false;
-      rethrow;
-    }
+    await start(forceInProcess: forceInProcess);
   }
 
   void _setInProcessFallback(bool value) {
