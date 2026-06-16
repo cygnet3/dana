@@ -16,7 +16,7 @@ class SyncProgressState extends ChangeNotifier {
   // private constructor
   SyncProgressState._();
 
-  Future<void> _initialize() async {
+  void _initialize() {
     syncProgressSubscription = createSyncProgressStream().listen((current) {
       // Only update progress while the bar is active. Ignoring events outside
       // of an active scan prevents a trailing Rust event from re-activating the
@@ -37,7 +37,7 @@ class SyncProgressState extends ChangeNotifier {
 
   static Future<SyncProgressState> create() async {
     final instance = SyncProgressState._();
-    await instance._initialize();
+    instance._initialize();
     return instance;
   }
 
