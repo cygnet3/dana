@@ -9,7 +9,7 @@ class LoggingService {
   // private constructor
   LoggingService._();
 
-  Future<void> _initialize() async {
+  void _initialize() {
     logStreamSubscription =
         createLogStream(level: LogLevel.info, logDependencies: true)
             .listen((event) {
@@ -18,9 +18,9 @@ class LoggingService {
     });
   }
 
-  static Future<LoggingService> create() async {
+  static LoggingService create() {
     final service = LoggingService._();
-    await service._initialize();
+    service._initialize();
     return service;
   }
 }
