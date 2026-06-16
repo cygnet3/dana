@@ -2,7 +2,10 @@ import 'dart:async';
 
 import 'package:danawallet/data/enums/sync_enums.dart';
 import 'package:danawallet/services/sync_service.dart';
+import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/permission_state.dart';
+import 'package:danawallet/states/sync_progress_state.dart';
+import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
 
 export 'package:danawallet/services/sync_service.dart' show SyncService;
@@ -30,11 +33,19 @@ class SyncOrchestrator extends ChangeNotifier {
   bool get isRunning => _running;
 
   SyncOrchestrator({
-    required SyncService service,
+    required ChainState chainState,
     required PermissionState permissionState,
-  })  : _service = service,
+    required SyncProgressState syncProgress,
+    required WalletState walletState,
+  })  : _service = SyncService(
+          chainState: chainState,
+          syncProgress: syncProgress,
+          walletState: walletState,
+          permissionState: permissionState,
+        ),
         _permissionState = permissionState {
     _permissionState.addListener(_onPermissionStateChanged);
+    _service.onFatalError = () => restart(fallbackMode: true);
   }
 
   /// Idempotent. Call only after the navigator is live.
