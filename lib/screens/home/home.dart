@@ -7,7 +7,6 @@ import 'package:danawallet/screens/contacts/contacts.dart';
 import 'package:danawallet/screens/wallet/wallet.dart';
 import 'package:danawallet/screens/settings/settings_screen.dart';
 import 'package:danawallet/states/permission_state.dart';
-import 'package:danawallet/states/sync_orchestrator.dart';
 import 'package:danawallet/widgets/alerts/status_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -52,15 +51,14 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final homeState = Provider.of<HomeState>(context, listen: true);
-    final syncOrchestrator =
-        Provider.of<SyncOrchestrator>(context, listen: true);
+    final permissions = Provider.of<PermissionState>(context, listen: true);
 
     return PopScope(
         canPop: false,
         child: Scaffold(
           body: Column(
             children: [
-              if (syncOrchestrator.inFallbackMode)
+              if (!permissions.notificationGranted)
                 StatusBanner(
                   icon: Icons.sync,
                   message: bgSyncUnavailableMsg,
