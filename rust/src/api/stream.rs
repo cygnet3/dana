@@ -1,13 +1,11 @@
-use crate::{
-    frb_generated::StreamSink,
-    logger::{self, LogEntry, LogLevel},
-    stream::{self, StateUpdate},
-};
+use crate::api::structs::state_update::StateUpdate;
+use crate::logger::{LogEntry, LogLevel};
+use crate::{frb_generated::StreamSink, stream};
 
 #[flutter_rust_bridge::frb(sync)]
 pub fn create_log_stream(s: StreamSink<LogEntry>, level: LogLevel, log_dependencies: bool) {
-    logger::init_logger(level.into(), log_dependencies);
-    logger::FlutterLogger::set_stream_sink(s);
+    crate::logger::init_logger(level.into(), log_dependencies);
+    crate::logger::FlutterLogger::set_stream_sink(s);
 }
 
 #[flutter_rust_bridge::frb(sync)]

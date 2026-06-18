@@ -9,10 +9,9 @@ use spdk_wallet::{
     updater::DiscoveredOutput,
 };
 
-use crate::{
-    api::structs::owned_output::OwnedOutput,
-    stream::{send_sync_progress, send_sync_update, StateUpdate},
-};
+use crate::api::structs::owned_output::OwnedOutput;
+use crate::api::structs::state_update::StateUpdate;
+use crate::stream::{send_sync_progress, send_sync_update};
 
 use anyhow::Result;
 

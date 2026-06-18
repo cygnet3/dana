@@ -1,22 +1,13 @@
-use std::{collections::HashSet, sync::Mutex};
+use std::sync::Mutex;
 
-use crate::api::structs::owned_output::OwnedOutput;
+use crate::api::structs::state_update::StateUpdate;
 use crate::frb_generated::StreamSink;
-use flutter_rust_bridge::frb;
+
 use lazy_static::lazy_static;
 
 lazy_static! {
     static ref SCAN_PROGRESS_STREAM_SINK: Mutex<Option<StreamSink<u32>>> = Mutex::new(None);
     static ref STATE_UPDATE_STREAM_SINK: Mutex<Option<StreamSink<StateUpdate>>> = Mutex::new(None);
-}
-
-#[derive(Debug)]
-#[frb]
-pub struct StateUpdate {
-    pub blkheight: u32,
-    pub blkhash: String,
-    pub found_outputs: Vec<OwnedOutput>,
-    pub found_inputs: HashSet<crate::api::structs::outpoint::OutPoint>,
 }
 
 pub fn create_sync_progress_stream(s: StreamSink<u32>) {
