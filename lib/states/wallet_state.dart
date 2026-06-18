@@ -3,10 +3,12 @@ import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
+import 'package:danawallet/extensions/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/owned_output.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
+import 'package:danawallet/generated/rust/api/structs/state_update.dart';
 import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart';
 import 'package:danawallet/data/models/recorded_transaction.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
@@ -84,8 +86,58 @@ class WalletState extends ChangeNotifier {
     return true;
   }
 
-  Future<void> refreshAfterSync({bool lastSyncOnly = false}) async {
+  Future<void> processUpdate(StateUpdate update) async {
     if (!_initialized) return;
+    // Process found outputs (new UTXOs we own)
+    for (final found in update.foundOutputs) {
+      // first, insert the transaction data in the known transactions table
+      await transactionsRepository.addIncomingTransaction(
+        txid: found.outpoint.txid,
+        confirmationHeight: update.blkheight,
+        confirmationBlockhash: update.blkhash,
+      );
+
+      // Insert output into database
+      await ownedOutputsRepository.insertOutput(output: found);
+    }
+
+    List<OutPoint> unknownSpends = [];
+
+    // Process found inputs (our UTXOs being spent)
+    for (final outpoint in update.foundInputs) {
+      // Try to confirm an outgoing transaction
+      final confirmed = await transactionsRepository.confirmOutgoingTransaction(
+        confirmedOutpointTxid: outpoint.txid,
+        confirmedOutpointVout: outpoint.vout,
+        confirmationHeight: update.blkheight,
+        confirmationBlockhash: update.blkhash,
+      );
+
+      // this output does not have an associated transaction
+      // this can occur if a user imported their seed phrase in multiple wallets
+      // generally we should discourage this, but it's inevitable that it will happen
+      if (!confirmed) {
+        unknownSpends.add(outpoint);
+      }
+    }
+
+    if (unknownSpends.isNotEmpty) {
+      Logger().w(
+          "Unknown spends detected, marking the following outpoints as spent: ${unknownSpends.toDisplayString()}");
+      await transactionsRepository.addOutgoingTransaction(
+        spentOutpoints: unknownSpends,
+        recipients: [],
+        txid: null,
+        confirmationHeight: update.blkheight,
+        confirmationBlockhash: update.blkhash,
+      );
+    }
+
+    await walletRepository.saveLastSync(update.blkheight);
+
+    // update UI
+    final lastSyncOnly =
+        update.foundOutputs.isEmpty && update.foundInputs.isEmpty;
     await _updateWalletState(lastSyncOnly: lastSyncOnly);
     notifyListeners();
   }

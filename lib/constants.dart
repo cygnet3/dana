@@ -56,7 +56,7 @@ const String nameServerDevTestnet =
 const String bgKeyStartHeight = 'startHeight';
 const String bgKeyEndHeight = 'endHeight';
 const String bgKeyComplete = 'complete';
-const String bgKeyRefresh = 'refresh';
+const String bgKeyStateUpdate = 'stateUpdate';
 const String bgKeyInterrupt = 'interrupt';
 const String bgKeyFatalError = 'fatalError';
 

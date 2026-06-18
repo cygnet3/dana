@@ -3,10 +3,8 @@ import 'dart:async';
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
-import 'package:danawallet/extensions/outpoint.dart';
 import 'package:danawallet/generated/rust/api/chain.dart';
 import 'package:danawallet/generated/rust/api/stream.dart';
-import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/state_update.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
 import 'package:danawallet/repositories/owned_outputs_repository.dart';
@@ -30,8 +28,7 @@ class SyncEngine {
   /// on error so callers can deactivate progress indicators in both cases.
   final void Function(bool success) onSyncComplete;
 
-  /// Called after each [StateUpdate] to refresh UI state from the DB.
-  final Future<void> Function(bool lastSyncOnly) onStateUpdated;
+  final Future<void> Function(String encodedUpdate) onStateUpdate;
 
   final String _logTag;
 
@@ -48,67 +45,14 @@ class SyncEngine {
   SyncEngine({
     required this.onSyncStarted,
     required this.onSyncComplete,
-    required this.onStateUpdated,
+    required this.onStateUpdate,
     String logTag = 'sync',
   }) : _logTag = logTag {
     _syncResultSubscription = createSyncResultStream().listen(_onSyncResult);
   }
 
-  Future<void> _onSyncResult(StateUpdate event) async {
-    // Process found outputs (new UTXOs we own)
-    for (final found in event.foundOutputs) {
-      // first, insert the transaction data in the known transactions table
-      await _transactionsRepository.addIncomingTransaction(
-        txid: found.outpoint.txid,
-        confirmationHeight: event.blkheight,
-        confirmationBlockhash: event.blkhash,
-      );
-
-      // Insert output into database
-      await _ownedOutputsRepository.insertOutput(output: found);
-    }
-
-    List<OutPoint> unknownSpends = [];
-
-    // Process found inputs (our UTXOs being spent)
-    for (final outpoint in event.foundInputs) {
-      // Try to confirm an outgoing transaction
-      final confirmed =
-          await _transactionsRepository.confirmOutgoingTransaction(
-        confirmedOutpointTxid: outpoint.txid,
-        confirmedOutpointVout: outpoint.vout,
-        confirmationHeight: event.blkheight,
-        confirmationBlockhash: event.blkhash,
-      );
-
-      // this output does not have an associated transaction
-      // this can occur if a user imported their seed phrase in multiple wallets
-      // generally we should discourage this, but it's inevitable that it will happen
-      if (!confirmed) {
-        unknownSpends.add(outpoint);
-      }
-    }
-
-    if (unknownSpends.isNotEmpty) {
-      Logger().w(
-          "Unknown spends detected, marking the following outpoints as spent: ${unknownSpends.toDisplayString()}");
-      await _transactionsRepository.addOutgoingTransaction(
-        spentOutpoints: unknownSpends,
-        recipients: [],
-        txid: null,
-        confirmationHeight: event.blkheight,
-        confirmationBlockhash: event.blkhash,
-      );
-    }
-
-    await _walletRepository.saveLastSync(event.blkheight);
-
-    if (event.foundOutputs.isNotEmpty || event.foundInputs.isNotEmpty) {
-      await onStateUpdated(false);
-    } else {
-      await onStateUpdated(true);
-    }
-  }
+  Future<void> _onSyncResult(StateUpdate event) =>
+      onStateUpdate(event.encode());
 
   Future<void> trySync() async {
     if (_isSyncing) {

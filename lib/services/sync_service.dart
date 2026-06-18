@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:danawallet/constants.dart';
+import 'package:danawallet/generated/rust/api/structs/state_update.dart';
 import 'package:danawallet/services/foreground_sync_service.dart';
 import 'package:danawallet/services/in_process_sync_service.dart';
 import 'package:danawallet/states/chain_state.dart';
@@ -87,9 +88,10 @@ class SyncService {
     }
 
     // walletState update
-    if (data.containsKey(bgKeyRefresh)) {
-      final lastSyncOnly = data[bgKeyRefresh] as bool;
-      unawaited(_walletState.refreshAfterSync(lastSyncOnly: lastSyncOnly));
+    if (data.containsKey(bgKeyStateUpdate)) {
+      final update = data[bgKeyStateUpdate] as String;
+      unawaited(
+          _walletState.processUpdate(StateUpdate.decode(encoded: update)));
     }
   }
 
