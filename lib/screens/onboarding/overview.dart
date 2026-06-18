@@ -72,28 +72,24 @@ class _OverviewScreenState extends State<OverviewScreen> {
 
     await orchestrator.start();
 
+    if (!context.mounted) return;
+
+    final Widget nextScreen;
     if (Platform.isAndroid) {
-      if (!context.mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (context) => NotificationPermissionScreen(
-            goToDanaAddressSetup: goToDanaAddressSetup,
-          ),
-        ),
-        (Route<dynamic> route) => false,
+      nextScreen = NotificationPermissionScreen(
+        goToDanaAddressSetup: goToDanaAddressSetup,
       );
+    } else if (goToDanaAddressSetup) {
+      nextScreen = const RegisterDanaAddressScreen();
     } else {
-      final nextScreen = goToDanaAddressSetup
-          ? const RegisterDanaAddressScreen()
-          : const HomeScreen();
-      if (!context.mounted) return;
-      // clear path (don't allow users to go back to registration screen by pressing 'back')
-      Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => nextScreen),
-          (Route<dynamic> route) => false);
+      nextScreen = const HomeScreen();
     }
+
+    // clear path (don't allow users to go back to registration screen by pressing 'back')
+    Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => nextScreen),
+        (Route<dynamic> route) => false);
   }
 
   Future<void> onRestoreMnemonic(BuildContext context) async {

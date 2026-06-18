@@ -110,27 +110,24 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
 
       await orchestrator.start();
 
-      if (context.mounted) {
-        final Widget nextScreen = goToDanaAddressSetup
-            ? const RegisterDanaAddressScreen()
-            : const HomeScreen();
-        if (Platform.isAndroid) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(
-              builder: (context) => NotificationPermissionScreen(
-                goToDanaAddressSetup: goToDanaAddressSetup,
-              ),
-            ),
-            (Route<dynamic> route) => false,
-          );
-        } else {
-          Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => nextScreen),
-              (Route<dynamic> route) => false);
-        }
+      if (!context.mounted) return;
+
+      final Widget nextScreen;
+      if (Platform.isAndroid) {
+        nextScreen = NotificationPermissionScreen(
+          goToDanaAddressSetup: goToDanaAddressSetup,
+        );
+      } else if (goToDanaAddressSetup) {
+        nextScreen = const RegisterDanaAddressScreen();
+      } else {
+        nextScreen = const HomeScreen();
       }
+
+      // clear path (don't allow users to go back to registration screen by pressing 'back')
+      Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => nextScreen),
+          (Route<dynamic> route) => false);
     } catch (e) {
       if (context.mounted) {
         setState(() {
