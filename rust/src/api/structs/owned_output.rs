@@ -1,9 +1,10 @@
 use flutter_rust_bridge::frb;
+use serde::{Deserialize, Serialize};
 
 use crate::api::structs::amount::Amount;
 use crate::api::structs::outpoint::OutPoint;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[frb]
 pub struct OwnedOutput {
     pub outpoint: OutPoint,
