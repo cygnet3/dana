@@ -108,6 +108,8 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
       contactsState.initialize(
           walletState.receivePaymentCode, walletState.danaAddress);
 
+      await orchestrator.start();
+
       if (context.mounted) {
         final Widget nextScreen = goToDanaAddressSetup
             ? const RegisterDanaAddressScreen()
@@ -123,8 +125,6 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
             (Route<dynamic> route) => false,
           );
         } else {
-          await orchestrator.start();
-          if (!context.mounted) return;
           Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(builder: (context) => nextScreen),
