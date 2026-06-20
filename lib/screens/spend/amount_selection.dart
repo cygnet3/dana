@@ -34,12 +34,9 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
       _amountErrorText = null;
     });
 
-    final BigInt amount;
+    final Amount amount;
     try {
-      amount = BigInt.from(int.parse(amountController.text));
-      if (amount <= BigInt.from(0)) {
-        throw const FormatException('Amount must be positive');
-      }
+      amount = AmountExtension.parseUserInput(amountController.text);
     } on FormatException catch (e) {
       setState(() {
         _amountErrorText = 'Invalid amount: $e';
@@ -52,14 +49,14 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
       return;
     }
 
-    if (amount > availableBalance.field0) {
+    if (amount > availableBalance) {
       setState(() {
         _amountErrorText = 'Not enough available funds';
       });
       return;
     }
 
-    if (amount < BigInt.from(defaultDustLimit)) {
+    if (amount < Amount(field0: BigInt.from(defaultDustLimit))) {
       setState(() {
         _amountErrorText = 'Please send at least $defaultDustLimit sats';
       });
@@ -68,7 +65,7 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
 
     final recipient = Recipient(
       paymentCode: widget.paymentCode,
-      amount: Amount(field0: amount),
+      amount: amount,
     );
 
     goToScreen(
@@ -145,8 +142,9 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
                   decoration: InputDecoration(
                     border: const OutlineInputBorder(),
                     labelText: 'Enter an amount',
+                    helperText:
+                        'Integer for sats, decimal (dot \'.\' separated) for BTC',
                     errorText: _amountErrorText,
-                    suffixText: 'sats',
                   ),
                   keyboardType: TextInputType.number,
                 ),
