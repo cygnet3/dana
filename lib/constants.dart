@@ -1,3 +1,4 @@
+import 'package:danawallet/data/enums/amount_display_unit.dart';
 import 'package:danawallet/data/enums/fiat_currency.dart';
 import 'package:flutter/services.dart';
 
@@ -75,3 +76,5 @@ const String btcSymbol = '₿';
 const String satSymbol = '\uE007';
 const String satSymbolOutline = '\uE000';
 const String satFontFamily = 'SatoshiSymbol';
+
+const AmountDisplayUnit defaultAmountDisplayUnit = AmountDisplayUnit.btc;

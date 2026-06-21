@@ -19,6 +19,7 @@ import 'package:danawallet/services/app_info_service.dart';
 import 'package:danawallet/services/logging_service.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
+import 'package:danawallet/states/display_preferences_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/home_state.dart';
 import 'package:danawallet/states/permission_state.dart';
@@ -69,6 +70,7 @@ void main() async {
   final syncProgress = SyncProgressState.create();
   final chainState = ChainState();
   final contactsState = ContactsState();
+  final displayPreferencesState = await DisplayPreferencesState.create();
   final fiatExchangeRate = await FiatExchangeRateState.create();
 
   final syncOrchestrator = SyncOrchestrator(
@@ -134,6 +136,7 @@ void main() async {
         ChangeNotifierProvider.value(value: permissionState),
         ChangeNotifierProvider.value(value: fiatExchangeRate),
         ChangeNotifierProvider.value(value: contactsState),
+        ChangeNotifierProvider.value(value: displayPreferencesState)
       ],
       child: SilentPaymentApp(landingPage: landingPage),
     ),
