@@ -66,3 +66,12 @@ const String bgKeySync = 'sync';
 // Enforce english convention for amounts inputs
 const String decimalSeparator = '.';
 const String groupSeparator = ',';
+
+// Amount display symbols
+// ₿ is U+20BF, a standard Unicode character — no custom font needed
+const String btcSymbol = '₿';
+// Satoshi symbol glyphs live in the SatoshiSymbol font (Private Use Area)
+// U+E007 = satoshisymbol-solid, U+E000 = satoshisymbol-outline
+const String satSymbol = '\uE007';
+const String satSymbolOutline = '\uE000';
+const String satFontFamily = 'SatoshiSymbol';

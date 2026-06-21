@@ -158,6 +158,8 @@ class SilentPaymentApp extends StatelessWidget {
             colorScheme: ColorScheme.fromSeed(seedColor: danaBlue),
             useMaterial3: true,
             fontFamily: 'Space Grotesk',
+            // SatoshiSymbol provides the sat glyph (U+E006) via PUA fallback
+            fontFamilyFallback: const [satFontFamily],
           ),
           home: landingPage);
     });
