@@ -62,3 +62,7 @@ const String bgKeyFatalError = 'fatalError';
 
 // Message keys sent to the background sync service from the main isolate.
 const String bgKeySync = 'sync';
+
+// Enforce english convention for amounts inputs
+const String decimalSeparator = '.';
+const String groupSeparator = ',';
