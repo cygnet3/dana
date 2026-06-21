@@ -7,6 +7,7 @@ import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/states/contacts_state.dart';
+import 'package:danawallet/states/display_preferences_state.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/screens/spend/transaction_sent.dart';
 import 'package:danawallet/states/wallet_state.dart';
@@ -71,6 +72,10 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
   @override
   Widget build(BuildContext context) {
     final contacts = Provider.of<ContactsState>(context, listen: false);
+    final displayPreference =
+        Provider.of<DisplayPreferencesState>(context, listen: false);
+
+    final bitcoinUnit = displayPreference.amountDisplayUnit;
 
     final contact =
         contacts.getContactByPaymentCode(widget.recipient.paymentCode);
@@ -87,11 +92,12 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
     displayRecipient ??= widget.recipient.paymentCode
         .chunked(context, displayRecipientStyle, 0.85);
 
-    String displayAmount = widget.recipient.amount.displayBtc();
+    String displayAmount = widget.recipient.amount.display(bitcoinUnit);
 
     String displayArrivalTime = widget.fee.toEstimatedTime;
 
-    String displayEstimatedFee = widget.unsignedTx.getFeeAmount().displayBtc();
+    String displayEstimatedFee =
+        widget.unsignedTx.getFeeAmount().display(bitcoinUnit);
 
     return ScreenSkeleton(
         showBackButton: true,
