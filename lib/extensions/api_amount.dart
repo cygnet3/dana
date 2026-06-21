@@ -113,11 +113,11 @@ extension AmountExtension on Amount {
     final btcPart = field0 ~/ BigInt.from(bitcoinUnits);
     final satsPart = (field0 % BigInt.from(bitcoinUnits));
     final satsStr = satsPart.toString().padLeft(8, '0');
-    return '₿ $btcPart.${satsStr.substring(0, 2)} ${satsStr.substring(2, 5)} ${satsStr.substring(5, 8)}';
+    return '$btcSymbol $btcPart.${satsStr.substring(0, 2)} ${satsStr.substring(2, 5)} ${satsStr.substring(5, 8)}';
   }
 
   String displaySats() {
-    return '$field0 sats';
+    return '$satSymbol $field0';
   }
 
   /// Converts a [BigInt] satoshi amount to [int] for SQLite storage.
