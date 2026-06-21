@@ -8,6 +8,7 @@ import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/spend/fee_selection.dart';
 import 'package:danawallet/states/contacts_state.dart';
+import 'package:danawallet/states/display_preferences_state.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
@@ -79,6 +80,10 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
     final walletState = Provider.of<WalletState>(context, listen: false);
     final chainState = Provider.of<ChainState>(context, listen: false);
     final contacts = Provider.of<ContactsState>(context, listen: false);
+    final displayPreferences =
+        Provider.of<DisplayPreferencesState>(context, listen: false);
+
+    final bitcoinUnit = displayPreferences.amountDisplayUnit;
 
     final availableBalance = walletState.amount;
     int blocksToScan = 0;
@@ -151,7 +156,8 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
                 const SizedBox(
                   height: 10.0,
                 ),
-                Text('Available Balance: ${availableBalance.displaySats()}',
+                Text(
+                    'Available Balance: ${availableBalance.display(bitcoinUnit)}',
                     style: BitcoinTextStyle.body3(Bitcoin.black)
                         .apply(fontWeightDelta: 1)),
                 if (blocksToScan != 0)

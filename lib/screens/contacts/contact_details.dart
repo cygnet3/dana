@@ -1,6 +1,7 @@
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/constants.dart';
+import 'package:danawallet/data/enums/amount_display_unit.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/data/models/recorded_transaction.dart';
@@ -14,6 +15,7 @@ import 'package:danawallet/screens/contacts/edit_contact_sheet.dart';
 import 'package:danawallet/screens/spend/amount_selection.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
+import 'package:danawallet/states/display_preferences_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/back_button.dart';
@@ -293,8 +295,11 @@ class ContactDetailsScreen extends StatelessWidget {
     }).toList();
   }
 
-  ListTile _buildTransactionTile(RecordedTransaction tx,
-      FiatExchangeRateState exchangeRate, Contact contact) {
+  ListTile _buildTransactionTile(
+      RecordedTransaction tx,
+      FiatExchangeRateState exchangeRate,
+      AmountDisplayUnit bitcoinUnit,
+      Contact contact) {
     if (tx is! RecordedTransactionOutgoing) {
       throw Exception('Expected outgoing transaction');
     }
@@ -303,9 +308,9 @@ class ContactDetailsScreen extends StatelessWidget {
     final date = tx.confirmationHeight?.toString() ?? 'Unconfirmed';
     final color =
         tx.confirmationHeight == null ? Bitcoin.neutral4 : Bitcoin.red;
-    final amount = tx.totalOutgoing().displayBtc();
+    final amount = tx.totalOutgoing();
     const amountprefix = '-';
-    final amountFiat = exchangeRate.displayFiat(tx.totalOutgoing());
+    final amountFiat = exchangeRate.displayFiat(amount);
     const title = 'Outgoing transaction';
     final text = tx.toString();
     final image = Image(
@@ -322,7 +327,8 @@ class ContactDetailsScreen extends StatelessWidget {
             style: BitcoinTextStyle.body4(Bitcoin.black),
           ),
           const Spacer(),
-          Text('$amountprefix $amount', style: BitcoinTextStyle.body4(color)),
+          Text('$amountprefix ${amount.display(bitcoinUnit)}',
+              style: BitcoinTextStyle.body4(color)),
         ],
       ),
       subtitle: Row(
@@ -347,6 +353,8 @@ class ContactDetailsScreen extends StatelessWidget {
   void _showSentTransactionsSheet(BuildContext context, Contact contact) {
     final exchangeRate =
         Provider.of<FiatExchangeRateState>(context, listen: false);
+    final displayPrefrence =
+        Provider.of<DisplayPreferencesState>(context, listen: false);
     final sentTransactions = _getSentTransactions(context, contact);
 
     showAppBottomSheet(
@@ -370,6 +378,7 @@ class ContactDetailsScreen extends StatelessWidget {
                     return _buildTransactionTile(
                       sentTransactions[sentTransactions.length - 1 - index],
                       exchangeRate,
+                      displayPrefrence.amountDisplayUnit,
                       contact,
                     );
                   },

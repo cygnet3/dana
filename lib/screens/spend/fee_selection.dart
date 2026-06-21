@@ -1,4 +1,6 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
+import 'package:danawallet/constants.dart';
+import 'package:danawallet/data/enums/amount_display_unit.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/recommended_fee_model.dart';
 import 'package:danawallet/extensions/api_amount.dart';
@@ -7,6 +9,7 @@ import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/spend/ready_to_send.dart';
+import 'package:danawallet/states/display_preferences_state.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/screens/spend/custom_fee_screen.dart';
 import 'package:danawallet/states/chain_state.dart';
@@ -97,7 +100,8 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
     }
   }
 
-  ListTile toListTile(SelectedFee fee, FiatExchangeRateState exchangeRate) {
+  ListTile toListTile(SelectedFee fee, FiatExchangeRateState exchangeRate,
+      AmountDisplayUnit bitcoinUnit) {
     switch (fee) {
       case SelectedFee.fast:
       case SelectedFee.normal:
@@ -112,7 +116,7 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
           if (estimatedFee == null) {
             throw Exception('Fee amount not computed for $fee');
           }
-          subtitleBtc = estimatedFee.displaySats();
+          subtitleBtc = estimatedFee.display(bitcoinUnit);
           subtitleFiat = exchangeRate.displayFiat(estimatedFee);
         }
 
@@ -171,6 +175,10 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
   Widget build(BuildContext context) {
     final exchangeRate =
         Provider.of<FiatExchangeRateState>(context, listen: false);
+    final displayPreference =
+        Provider.of<DisplayPreferencesState>(context, listen: false);
+
+    final bitcoinUnit = displayPreference.amountDisplayUnit;
 
     return ScreenSkeleton(
       showBackButton: true,
@@ -186,13 +194,14 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
           },
           child: Column(children: [
             const Divider(),
-            toListTile(SelectedFee.fast, exchangeRate),
+            toListTile(SelectedFee.fast, exchangeRate, bitcoinUnit),
             const Divider(),
-            toListTile(SelectedFee.normal, exchangeRate),
+            toListTile(SelectedFee.normal, exchangeRate, bitcoinUnit),
             const Divider(),
-            toListTile(SelectedFee.slow, exchangeRate),
+            toListTile(SelectedFee.slow, exchangeRate, bitcoinUnit),
             const Divider(),
-            if (isDevEnv) toListTile(SelectedFee.custom, exchangeRate),
+            if (isDevEnv)
+              toListTile(SelectedFee.custom, exchangeRate, bitcoinUnit),
             if (isDevEnv) const Divider(),
           ])),
       footer: Column(

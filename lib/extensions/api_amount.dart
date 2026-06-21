@@ -1,4 +1,5 @@
 import 'package:danawallet/constants.dart';
+import 'package:danawallet/data/enums/amount_display_unit.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 
 BigInt _btcStringToSats(String wholePart, String fractionPart) {
@@ -109,15 +110,24 @@ extension AmountExtension on Amount {
     }
   }
 
-  String displayBtc() {
+  String _displayBtc() {
     final btcPart = field0 ~/ BigInt.from(bitcoinUnits);
     final satsPart = (field0 % BigInt.from(bitcoinUnits));
     final satsStr = satsPart.toString().padLeft(8, '0');
     return '$btcSymbol $btcPart.${satsStr.substring(0, 2)} ${satsStr.substring(2, 5)} ${satsStr.substring(5, 8)}';
   }
 
-  String displaySats() {
+  String _displaySats() {
     return '$satSymbol $field0';
+  }
+
+  String display(AmountDisplayUnit bitcoinUnit) {
+    switch (bitcoinUnit) {
+      case AmountDisplayUnit.btc:
+        return _displayBtc();
+      case AmountDisplayUnit.sats:
+        return _displaySats();
+    }
   }
 
   /// Converts a [BigInt] satoshi amount to [int] for SQLite storage.
