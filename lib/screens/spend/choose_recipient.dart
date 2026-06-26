@@ -166,9 +166,11 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
   @override
   Widget build(BuildContext context) {
     final contactsState = Provider.of<ContactsState>(context);
-    final query = textFieldController.text.toLowerCase().trim();
+    final searchText = textFieldController.text.trim();
+    final query = searchText.toLowerCase();
     final filteredContacts = contactsState.filterContacts(query);
     final hasQuery = query.isNotEmpty;
+    final noContactMatches = hasQuery && filteredContacts.isEmpty;
 
     return ScreenSkeleton(
         showBackButton: true,
@@ -203,6 +205,14 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
                       errorText: _addressErrorText,
                     ),
                   ),
+                  if (noContactMatches)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        "You don't have any contact that matches \"$searchText\". Do you want to create a new contact?",
+                        style: BitcoinTextStyle.body5(Bitcoin.neutral7),
+                      ),
+                    ),
                   if (hasQuery && filteredContacts.isNotEmpty) ...[
                     const SizedBox(height: 8.0),
                     ConstrainedBox(
