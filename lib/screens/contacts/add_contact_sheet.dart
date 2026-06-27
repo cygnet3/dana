@@ -40,7 +40,6 @@ class _AddContactSheetState extends State<AddContactSheet> {
   final TextEditingController _bip353AddressController =
       TextEditingController();
   final TextEditingController _paymentCodeController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
   bool _isSaving = false;
   bool _isResolving = false;
   String? _errorMessage;
@@ -219,10 +218,6 @@ class _AddContactSheetState extends State<AddContactSheet> {
   }
 
   Future<void> _onSaveContact() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
     final chainState = Provider.of<ChainState>(context, listen: false);
     final contactsState = Provider.of<ContactsState>(context, listen: false);
 
@@ -394,67 +389,64 @@ class _AddContactSheetState extends State<AddContactSheet> {
     return AppBottomSheetShell(
       title: 'Add Contact',
       child: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: _nameController,
-                style: BitcoinTextStyle.body4(Bitcoin.black),
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Name',
-                  hintText: 'Contact name',
-                ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _nameController,
+              style: BitcoinTextStyle.body4(Bitcoin.black),
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Name',
+                hintText: 'Contact name',
               ),
-              const SizedBox(height: 16),
-              _buildDanaSearchSection(),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _paymentCodeController,
-                style: BitcoinTextStyle.body4(
-                  (_hasDanaAddress || _isResolving)
-                      ? Bitcoin.neutral6
-                      : Bitcoin.black,
-                ),
-                decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
-                  labelText: 'Static Address (SP)',
-                  hintText:
-                      _hasDanaAddress ? 'Resolved from dana address' : 'sp1q...',
-                  suffixIcon: _isResolving
-                      ? const Padding(
-                          padding: EdgeInsets.all(12.0),
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : null,
-                  filled: _hasDanaAddress,
-                  fillColor: _hasDanaAddress ? Bitcoin.neutral2 : null,
-                ),
-                readOnly: _hasDanaAddress || _isResolving,
+            ),
+            const SizedBox(height: 16),
+            _buildDanaSearchSection(),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _paymentCodeController,
+              style: BitcoinTextStyle.body4(
+                (_hasDanaAddress || _isResolving)
+                    ? Bitcoin.neutral6
+                    : Bitcoin.black,
               ),
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 16),
-                Text(
-                  _errorMessage!,
-                  style: BitcoinTextStyle.body5(Bitcoin.red),
-                ),
-              ],
-              const SizedBox(height: 20),
-              FooterButton(
-                title: _isSaving ? 'Saving...' : 'Save',
-                onPressed: _isSaving ? null : _onSaveContact,
-                isLoading: _isSaving,
-                enabled: !_isSaving,
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                labelText: 'Static Address (SP)',
+                hintText:
+                    _hasDanaAddress ? 'Resolved from dana address' : 'sp1q...',
+                suffixIcon: _isResolving
+                    ? const Padding(
+                        padding: EdgeInsets.all(12.0),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : null,
+                filled: _hasDanaAddress,
+                fillColor: _hasDanaAddress ? Bitcoin.neutral2 : null,
+              ),
+              readOnly: _hasDanaAddress || _isResolving,
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage!,
+                style: BitcoinTextStyle.body5(Bitcoin.red),
               ),
             ],
-          ),
+            const SizedBox(height: 20),
+            FooterButton(
+              title: _isSaving ? 'Saving...' : 'Save',
+              onPressed: _isSaving ? null : _onSaveContact,
+              isLoading: _isSaving,
+              enabled: !_isSaving,
+            ),
+          ],
         ),
       ),
     );
