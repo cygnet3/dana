@@ -4,8 +4,10 @@ import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/global_functions.dart';
+import 'package:danawallet/screens/contacts/add_contact_sheet.dart';
 import 'package:danawallet/screens/spend/amount_selection.dart';
 import 'package:danawallet/states/contacts_state.dart';
+import 'package:danawallet/widgets/sheets/show_app_bottom_sheet.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/states/chain_state.dart';
@@ -147,6 +149,13 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
     }
   }
 
+  Future<void> _openAddContactSheet(String query) async {
+    await showAppBottomSheet<bool>(
+      context: context,
+      builder: (_) => AddContactSheet(initialDanaQuery: query),
+    );
+  }
+
   Future<void> onPasteFromClipboard() async {
     ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
     if (data != null) {
@@ -217,9 +226,25 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
                   if (noContactMatches)
                     Padding(
                       padding: const EdgeInsets.only(top: 8.0),
-                      child: Text(
-                        "You don't have any contact that matches \"$searchText\". Do you want to create a new contact?",
-                        style: BitcoinTextStyle.body5(Bitcoin.neutral7),
+                      child: RichText(
+                        text: TextSpan(
+                          style: BitcoinTextStyle.body5(Bitcoin.neutral7),
+                          children: [
+                            TextSpan(
+                                text: 'No contact matches "$searchText". '),
+                            WidgetSpan(
+                              alignment: PlaceholderAlignment.baseline,
+                              baseline: TextBaseline.alphabetic,
+                              child: GestureDetector(
+                                onTap: () => _openAddContactSheet(searchText),
+                                child: Text(
+                                  'Create a new contact?',
+                                  style: BitcoinTextStyle.body5(Bitcoin.orange),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   if (hasQuery && filteredContacts.isNotEmpty) ...[
