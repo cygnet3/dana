@@ -52,6 +52,12 @@ class _AddContactSheetState extends State<AddContactSheet> {
 
   static final _log = Logger();
 
+  void _resetSearchState() {
+    _remoteDanaAddresses = [];
+    _isSearchingRemote = false;
+    _errorMessage = null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -97,9 +103,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
 
     setState(() {
       _hasDanaAddress = query.isNotEmpty;
-      _remoteDanaAddresses = [];
-      _isSearchingRemote = false;
-      _errorMessage = null;
+      _resetSearchState();
     });
 
     if (query.isEmpty) return;
@@ -210,12 +214,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
       onTap: () async {
         _searchDebounceTimer?.cancel();
         _autoResolveDebounceTimer?.cancel();
-        setState(() {
-          _remoteDanaAddresses = [];
-          _isSearchingRemote = false;
-          _errorMessage = null;
-        });
-
+        setState(_resetSearchState);
         _bip353AddressController.text = danaAddress.toString();
         FocusScope.of(context).unfocus();
         await _resolveDanaAddress();
