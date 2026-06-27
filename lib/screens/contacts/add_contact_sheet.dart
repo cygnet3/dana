@@ -192,29 +192,25 @@ class _AddContactSheetState extends State<AddContactSheet> {
   }
 
   Widget _buildDanaAddressSuggestionItem(Bip353Address danaAddress) {
-    final initial = danaAddress.toString()[0].toUpperCase();
-    const avatarColor = Colors.grey;
-
+    final address = danaAddress.toString();
     return ListTile(
       dense: true,
       leading: CircleAvatar(
         radius: 16,
-        backgroundColor: avatarColor,
+        backgroundColor: Bitcoin.neutral4,
         child: Text(
-          initial,
+          address[0].toUpperCase(),
           style:
               BitcoinTextStyle.body5(Bitcoin.white).apply(fontWeightDelta: 2),
         ),
       ),
-      title: Text(
-        danaAddress.toString(),
-        style: BitcoinTextStyle.body5(Bitcoin.black),
-      ),
+      title: Text(address,
+          style: BitcoinTextStyle.body5(Bitcoin.black)),
       onTap: () async {
         _searchDebounceTimer?.cancel();
         _autoResolveDebounceTimer?.cancel();
         setState(_resetSearchState);
-        _bip353AddressController.text = danaAddress.toString();
+        _bip353AddressController.text = address;
         FocusScope.of(context).unfocus();
         await _resolveDanaAddress();
       },
@@ -290,9 +286,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
           danaAddress,
         );
         if (!shouldUpdate) {
-          setState(() {
-            _isSaving = false;
-          });
+          setState(() => _isSaving = false);
           return;
         }
         try {
@@ -301,11 +295,8 @@ class _AddContactSheetState extends State<AddContactSheet> {
             name: existingContact.name ?? name,
             bip353Address: danaAddress,
             paymentCode: existingContact.paymentCode,
-          );
-          await contactsState.updateContact(updatedContact);
-          if (mounted) {
-            Navigator.pop(context, true);
-          }
+          ));
+          if (mounted) Navigator.pop(context, true);
           return;
         } catch (e) {
           _log.e('Failed to update contact: $e');
@@ -322,9 +313,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
       if (mounted) {
         await _showContactAlreadyExistsDialog();
       }
-      setState(() {
-        _isSaving = false;
-      });
+      setState(() => _isSaving = false);
       return;
     }
 
@@ -335,10 +324,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
         network: chainState.network,
         name: name.isNotEmpty ? name : null,
       );
-
-      if (mounted) {
-        Navigator.pop(context, true);
-      }
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       _log.e('Failed to save contact: $e');
       if (mounted) {
@@ -397,22 +383,35 @@ class _AddContactSheetState extends State<AddContactSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildSectionLabel('Find by Dana address'),
+        const SizedBox(height: 8),
         TextField(
           controller: _bip353AddressController,
           style: BitcoinTextStyle.body4(Bitcoin.black),
           keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            labelText: 'Dana Address',
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            labelText: 'Dana address',
             hintText: 'user@domain.com',
+            suffixIcon: _isResolving
+                ? const Padding(
+                    padding: EdgeInsets.all(12.0),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : null,
           ),
         ),
         if (_bip353AddressController.text.trim().isNotEmpty) ...[
           const SizedBox(height: 8),
           if (_isSearchingRemote && _remoteDanaAddresses.isEmpty)
-            Text(
-              'Searching...',
-              style: BitcoinTextStyle.body5(Bitcoin.neutral6),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: Text('Searching...',
+                  style: BitcoinTextStyle.body5(Bitcoin.neutral6)),
             ),
           if (_remoteDanaAddresses.isNotEmpty)
             ConstrainedBox(
@@ -420,11 +419,9 @@ class _AddContactSheetState extends State<AddContactSheet> {
               child: ListView.separated(
                 shrinkWrap: true,
                 itemCount: _remoteDanaAddresses.length,
-                separatorBuilder: (context, index) => const Divider(),
-                itemBuilder: (context, index) {
-                  return _buildDanaAddressSuggestionItem(
-                      _remoteDanaAddresses[index]);
-                },
+                separatorBuilder: (_, __) => const Divider(),
+                itemBuilder: (_, i) =>
+                    _buildDanaAddressSuggestionItem(_remoteDanaAddresses[i]),
               ),
             ),
         ],
