@@ -39,11 +39,17 @@ class _AddContactSheetState extends State<AddContactSheet> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _bip353AddressController =
       TextEditingController();
-  final TextEditingController _paymentCodeController = TextEditingController();
+
   bool _isSaving = false;
   bool _isResolving = false;
   String? _errorMessage;
-  bool _hasDanaAddress = false;
+
+  // Confirmed address — set once user picks a Dana suggestion or types a full
+  // Dana address (auto-resolved), or via initialPaymentCode.
+  String? _confirmedPaymentCode;
+  Bip353Address? _confirmedDanaAddress;
+
+  // Remote Dana suggestion state.
   List<Bip353Address> _remoteDanaAddresses = [];
   bool _isSearchingRemote = false;
   Timer? _searchDebounceTimer;
@@ -60,24 +66,23 @@ class _AddContactSheetState extends State<AddContactSheet> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialDanaAddress != null) {
-      _bip353AddressController.text = widget.initialDanaAddress!.toString();
-      _nameController.text = widget.initialDanaAddress!.username;
-      _hasDanaAddress = true;
-    }
-    if (widget.initialPaymentCode != null) {
-      _paymentCodeController.text = widget.initialPaymentCode!;
-    }
-    _bip353AddressController.addListener(_onDanaAddressChanged);
 
-    // Automatically resolve SP address if dana address is provided but SP address is not
-    if (widget.initialDanaAddress != null &&
-        (widget.initialPaymentCode == null ||
-            widget.initialPaymentCode!.isEmpty)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _resolveDanaAddress();
-      });
-    } else if (widget.initialDanaQuery != null &&
+    if (widget.initialPaymentCode != null &&
+        widget.initialDanaAddress != null) {
+      // Both already known (e.g. opened from transaction_sent) — confirm directly,
+      // no need to resolve over the network.
+      _confirmedPaymentCode = widget.initialPaymentCode;
+      _confirmedDanaAddress = widget.initialDanaAddress;
+      _nameController.text = widget.initialDanaAddress!.username;
+    } else if (widget.initialPaymentCode != null) {
+      // SP address known, no Dana link yet (e.g. opened from transaction_details).
+      _confirmedPaymentCode = widget.initialPaymentCode;
+    }
+
+    _bip353AddressController.addListener(_onDanaAddressChanged);
+    _nameController.addListener(() => setState(() {}));
+
+    if (widget.initialDanaQuery != null &&
         widget.initialDanaAddress == null &&
         widget.initialPaymentCode == null) {
       _bip353AddressController.text = widget.initialDanaQuery!;
@@ -88,10 +93,19 @@ class _AddContactSheetState extends State<AddContactSheet> {
   void dispose() {
     _nameController.dispose();
     _bip353AddressController.dispose();
-    _paymentCodeController.dispose();
     _searchDebounceTimer?.cancel();
     _autoResolveDebounceTimer?.cancel();
     super.dispose();
+  }
+
+  void _clearConfirmedAddress() {
+    setState(() {
+      _confirmedPaymentCode = null;
+      _confirmedDanaAddress = null;
+      _resetSearchState();
+      _bip353AddressController.clear();
+      _nameController.clear();
+    });
   }
 
   void _onDanaAddressChanged() {
@@ -100,20 +114,15 @@ class _AddContactSheetState extends State<AddContactSheet> {
     _searchDebounceTimer?.cancel();
     _autoResolveDebounceTimer?.cancel();
 
-    setState(() {
-      _hasDanaAddress = query.isNotEmpty;
-      _resetSearchState();
-    });
+    setState(_resetSearchState);
 
-    if (query.isEmpty) return;
+    if (query.length < 3) return;
 
     if (query.contains('@')) {
       _autoResolveDebounceTimer =
           Timer(const Duration(milliseconds: 600), _resolveDanaAddress);
       return;
     }
-
-    if (query.length < 3) return;
 
     _searchDebounceTimer = Timer(
       const Duration(milliseconds: 500),
@@ -168,10 +177,10 @@ class _AddContactSheetState extends State<AddContactSheet> {
 
       if (resolved != null) {
         setState(() {
-          if (_nameController.text.trim().isEmpty) {
-            _nameController.text = parsed.username;
-          }
-          _paymentCodeController.text = resolved;
+          _confirmedDanaAddress = parsed;
+          _confirmedPaymentCode = resolved;
+          _remoteDanaAddresses = [];
+          _nameController.text = parsed.username;
           _isResolving = false;
         });
       } else {
@@ -204,8 +213,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
               BitcoinTextStyle.body5(Bitcoin.white).apply(fontWeightDelta: 2),
         ),
       ),
-      title: Text(address,
-          style: BitcoinTextStyle.body5(Bitcoin.black)),
+      title: Text(address, style: BitcoinTextStyle.body5(Bitcoin.black)),
       onTap: () async {
         _searchDebounceTimer?.cancel();
         _autoResolveDebounceTimer?.cancel();
@@ -218,6 +226,9 @@ class _AddContactSheetState extends State<AddContactSheet> {
   }
 
   Future<void> _onSaveContact() async {
+    final paymentCode = _confirmedPaymentCode;
+    if (paymentCode == null) return;
+
     final chainState = Provider.of<ChainState>(context, listen: false);
     final contactsState = Provider.of<ContactsState>(context, listen: false);
 
@@ -227,70 +238,33 @@ class _AddContactSheetState extends State<AddContactSheet> {
     });
 
     final name = _nameController.text.trim();
-    final danaAddressString = _bip353AddressController.text.trim();
-    String paymentCode = _paymentCodeController.text.trim();
-
-    // Validation: at least dana address OR static address must be filled, and name must be filled
     if (name.isEmpty) {
       setState(() {
+        _isSaving = false;
         _errorMessage = 'Name is required';
-        _isSaving = false;
       });
       return;
-    }
-
-    Bip353Address? danaAddress;
-    if (danaAddressString.isNotEmpty) {
-      try {
-        danaAddress = Bip353Address.fromString(danaAddressString);
-      } catch (e) {
-        setState(() {
-          _errorMessage = e.toString();
-          _isSaving = false;
-        });
-      }
-    }
-
-    if (danaAddress == null && paymentCode.isEmpty) {
-      setState(() {
-        _errorMessage =
-            'Either dana address or static address must be provided';
-        _isSaving = false;
-      });
-      return;
-    }
-
-    // user filled in a dana address, but resolution has not finished yet
-    if (danaAddress != null && paymentCode.isEmpty) {
-      await _resolveDanaAddress();
-      paymentCode = _paymentCodeController.text.trim();
-      if (paymentCode.isEmpty) {
-        setState(() => _isSaving = false);
-        return;
-      }
-      // show the user that we've resolved the sp-address
-      await Future.delayed(const Duration(milliseconds: 200));
     }
 
     final existingContact = contactsState.getContactByPaymentCode(paymentCode);
     if (existingContact != null) {
       if (mounted &&
-          danaAddress != null &&
+          _confirmedDanaAddress != null &&
           existingContact.bip353Address == null) {
         final shouldUpdate = await showConfirmationAlertDialog(
           'Contact already exists',
           'This contact is already saved with the same static address. '
-          'Do you want to add the Dana address (${danaAddress.toString()}) to it?',
+              'Do you want to add the Dana address (${_confirmedDanaAddress!}) to it?',
         );
         if (!shouldUpdate) {
           setState(() => _isSaving = false);
           return;
         }
         try {
-          final updatedContact = Contact(
+          await contactsState.updateContact(Contact(
             id: existingContact.id,
             name: existingContact.name ?? name,
-            bip353Address: danaAddress,
+            bip353Address: _confirmedDanaAddress,
             paymentCode: existingContact.paymentCode,
           ));
           if (mounted) Navigator.pop(context, true);
@@ -318,9 +292,9 @@ class _AddContactSheetState extends State<AddContactSheet> {
     try {
       await contactsState.addContact(
         paymentCode: paymentCode,
-        danaAddress: danaAddress,
+        danaAddress: _confirmedDanaAddress,
         network: chainState.network,
-        name: name.isNotEmpty ? name : null,
+        name: name,
       );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -338,8 +312,6 @@ class _AddContactSheetState extends State<AddContactSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionLabel('Find by Dana address'),
-        const SizedBox(height: 8),
         TextField(
           controller: _bip353AddressController,
           style: BitcoinTextStyle.body4(Bitcoin.black),
@@ -384,67 +356,92 @@ class _AddContactSheetState extends State<AddContactSheet> {
     );
   }
 
+  Widget _buildConfirmedAddressCard() {
+    final isDana = _confirmedDanaAddress != null;
+    final displayLabel = isDana
+        ? _confirmedDanaAddress!.toString()
+        : _confirmedPaymentCode!.truncated(maxFullLength: 24);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Bitcoin.neutral2,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Bitcoin.neutral4),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle_outline, color: Bitcoin.green, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(displayLabel,
+                    style: BitcoinTextStyle.body5(Bitcoin.black)),
+                if (isDana)
+                  Text('SP address resolved',
+                      style: BitcoinTextStyle.body5(Bitcoin.neutral6)),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: _clearConfirmedAddress,
+            child:
+                Text('Change', style: BitcoinTextStyle.body5(Bitcoin.orange)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchView() => _buildDanaSearchSection();
+
+  Widget _buildConfirmedView() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildConfirmedAddressCard(),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _nameController,
+          style: BitcoinTextStyle.body4(Bitcoin.black),
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            labelText: 'Name',
+            hintText: 'e.g. Alice',
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isConfirmed = _confirmedPaymentCode != null;
+    final canSave =
+        isConfirmed && !_isSaving && _nameController.text.trim().isNotEmpty;
+
     return AppBottomSheetShell(
-      title: 'Add Contact',
+      title: 'Add contact',
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              controller: _nameController,
-              style: BitcoinTextStyle.body4(Bitcoin.black),
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'Name',
-                hintText: 'Contact name',
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildDanaSearchSection(),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _paymentCodeController,
-              style: BitcoinTextStyle.body4(
-                (_hasDanaAddress || _isResolving)
-                    ? Bitcoin.neutral6
-                    : Bitcoin.black,
-              ),
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                labelText: 'Static Address (SP)',
-                hintText:
-                    _hasDanaAddress ? 'Resolved from dana address' : 'sp1q...',
-                suffixIcon: _isResolving
-                    ? const Padding(
-                        padding: EdgeInsets.all(12.0),
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    : null,
-                filled: _hasDanaAddress,
-                fillColor: _hasDanaAddress ? Bitcoin.neutral2 : null,
-              ),
-              readOnly: _hasDanaAddress || _isResolving,
-            ),
+            isConfirmed ? _buildConfirmedView() : _buildSearchView(),
             if (_errorMessage != null) ...[
-              const SizedBox(height: 16),
-              Text(
-                _errorMessage!,
-                style: BitcoinTextStyle.body5(Bitcoin.red),
-              ),
+              const SizedBox(height: 12),
+              Text(_errorMessage!, style: BitcoinTextStyle.body5(Bitcoin.red)),
             ],
             const SizedBox(height: 20),
             FooterButton(
-              title: _isSaving ? 'Saving...' : 'Save',
-              onPressed: _isSaving ? null : _onSaveContact,
+              title: _isSaving ? 'Saving...' : 'Add contact',
+              onPressed: canSave ? _onSaveContact : null,
               isLoading: _isSaving,
-              enabled: !_isSaving,
+              enabled: canSave,
             ),
           ],
         ),
