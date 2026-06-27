@@ -50,6 +50,8 @@ class _AddContactSheetState extends State<AddContactSheet> {
   Timer? _searchDebounceTimer;
   Timer? _autoResolveDebounceTimer;
 
+  static final _log = Logger();
+
   @override
   void initState() {
     super.initState();
@@ -140,7 +142,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
         _isSearchingRemote = false;
       });
     } catch (e) {
-      Logger().w('Failed to search remote addresses: $e');
+      _log.w('Failed to search remote addresses: $e');
       if (mounted) setState(() => _isSearchingRemote = false);
     }
   }
@@ -176,7 +178,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
         });
       }
     } catch (e) {
-      Logger().w('Failed to resolve Dana address: $e');
+      _log.w('Failed to resolve Dana address: $e');
       if (mounted) {
         setState(() {
           _errorMessage = 'Failed to resolve Dana address: $e';
@@ -308,7 +310,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
           }
           return;
         } catch (e) {
-          Logger().e('Failed to update contact: $e');
+          _log.e('Failed to update contact: $e');
           if (mounted) {
             setState(() {
               _isSaving = false;
@@ -342,7 +344,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
         Navigator.pop(context, true);
       }
     } catch (e) {
-      Logger().e('Failed to save contact: $e');
+      _log.e('Failed to save contact: $e');
       if (mounted) {
         setState(() {
           _isSaving = false;
