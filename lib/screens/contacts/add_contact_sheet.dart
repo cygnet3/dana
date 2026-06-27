@@ -128,8 +128,6 @@ class _AddContactSheetState extends State<AddContactSheet> {
   }
 
   Future<void> _searchRemoteAddresses(String prefix) async {
-    if (prefix.length < 3) return;
-
     final knownDanaAddresses =
         Provider.of<ContactsState>(context, listen: false)
             .getKnownBip353Addresses();
@@ -143,25 +141,24 @@ class _AddContactSheetState extends State<AddContactSheet> {
       final danaAddresses =
           await DanaAddressService(network: network).searchPrefix(prefix);
 
-      if (mounted) {
-        final newAddresses = danaAddresses
-            .where((address) => !knownDanaAddresses.contains(address))
-            .take(3)
-            .toList();
+      if (!mounted) return;
 
-        setState(() {
-          _remoteDanaAddresses = newAddresses;
-          _isSearchingRemote = false;
-        });
-      }
+      final newAddresses = danaAddresses
+          .where((address) => !knownDanaAddresses.contains(address))
+          .take(3)
+          .toList();
+
+      setState(() {
+        _remoteDanaAddresses = newAddresses;
+        _isSearchingRemote = false;
+      });
     } catch (e) {
       Logger().w('Failed to search remote addresses: $e');
-      if (mounted) {
-        setState(() {
-          _remoteDanaAddresses = [];
-          _isSearchingRemote = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _remoteDanaAddresses = [];
+        _isSearchingRemote = false;
+      });
     }
   }
 
@@ -179,7 +176,9 @@ class _AddContactSheetState extends State<AddContactSheet> {
       final parsed = Bip353Address.fromString(danaAddressString);
       final resolved = await Bip353Resolver.resolve(parsed, network);
 
-      if (mounted && resolved != null) {
+      if (!mounted) return null;
+
+      if (resolved != null) {
         setState(() {
           if (_nameController.text.trim().isEmpty) {
             _nameController.text = parsed.username;
@@ -188,20 +187,19 @@ class _AddContactSheetState extends State<AddContactSheet> {
           _isResolving = false;
         });
         return resolved;
-      } else if (mounted) {
-        setState(() {
-          _errorMessage = 'Could not resolve SP address for this dana address';
-          _isResolving = false;
-        });
       }
+
+      setState(() {
+        _errorMessage = 'Could not resolve SP address for this dana address';
+        _isResolving = false;
+      });
     } catch (e) {
       Logger().w('Failed to resolve dana address: $e');
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Failed to resolve dana address: $e';
-          _isResolving = false;
-        });
-      }
+      if (!mounted) return null;
+      setState(() {
+        _errorMessage = 'Failed to resolve dana address: $e';
+        _isResolving = false;
+      });
     }
     return null;
   }
@@ -380,7 +378,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
       Contact existingContact, Bip353Address danaAddress) async {
     return await showDialog<bool>(
           context: context,
-          builder: (context) => AlertDialog(
+          builder: (_) => AlertDialog(
             title: const Text('Contact already exists'),
             content: Text(
               'This contact is already saved with the same static address. '
@@ -404,7 +402,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
   Future<void> _showContactAlreadyExistsDialog() async {
     await showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (_) => AlertDialog(
         title: const Text('Contact already exists'),
         content: const Text(
           'This contact is already saved with the same static address.',
