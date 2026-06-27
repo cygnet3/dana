@@ -57,17 +57,14 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
         style: BitcoinTextStyle.body5(Bitcoin.black),
       ),
       onTap: () {
-        setState(() {
-          _addressErrorText = null;
-          textFieldController.text = contact.paymentCode;
-        });
+        setState(() => _addressErrorText = null);
         FocusScope.of(context).unfocus();
-        onContinue();
+        onContinue(contact: contact);
       },
     );
   }
 
-  Future<void> onContinue() async {
+  Future<void> onContinue({Contact? contact}) async {
     setState(() {
       _addressErrorText = null;
     });
@@ -77,48 +74,55 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
         Provider.of<ContactsState>(context, listen: false).getYouContact();
 
     try {
-      Bip353Address? bip353Address;
-      String paymentCode;
+      final String resolvedPaymentCode;
+      final Bip353Address? resolvedBip353;
 
-      String textField = textFieldController.text.trim();
+      if (contact != null) {
+        // Selected from contact list — use contact data directly, leave field unchanged.
+        resolvedPaymentCode = contact.paymentCode;
+        resolvedBip353 = contact.bip353Address;
+      } else {
+        final textField = textFieldController.text.trim();
 
-      if (textField.isEmpty) {
-        throw Exception("Please enter a valid payment info");
-      } else if (textField == youContact.paymentCode) {
-        throw Exception("You cannot send to yourself");
-      }
-
-      if (textField.contains('@')) {
-        // we interpret the input as a bip353 address
-        Logger().d('Resolving dana address: "$textField"');
-
-        bip353Address = Bip353Address.fromString(textField);
-
-        final resolvedPaymentCode =
-            await Bip353Resolver.resolve(bip353Address, network);
-
-        if (resolvedPaymentCode == null) {
-          // DNS resolution returned null - address not registered
-          Logger().w('Dana address "$textField" not found in DNS');
-          throw Exception('Dana address not found or not registered');
-        }
-
-        // set payment code to resolved code
-        paymentCode = resolvedPaymentCode;
-
-        if (paymentCode == youContact.paymentCode) {
+        if (textField.isEmpty) {
+          throw Exception("Please enter a valid payment info");
+        } else if (textField == youContact.paymentCode) {
           throw Exception("You cannot send to yourself");
         }
 
-        Logger().d(
-            'Successfully resolved dana address to SP address: ${resolvedPaymentCode.substring(0, 20)}...');
-      } else {
-        // we interpret the input field as an on-chain address
-        paymentCode = textField;
+        if (textField.contains('@')) {
+          Logger().d('Resolving dana address: "$textField"');
+
+          final parsed = Bip353Address.fromString(textField);
+          final resolved = await Bip353Resolver.resolve(parsed, network);
+
+          if (resolved == null) {
+            Logger().w('Dana address "$textField" not found in DNS');
+            throw Exception('Dana address not found or not registered');
+          }
+
+          resolvedPaymentCode = resolved;
+          resolvedBip353 = parsed;
+
+          if (resolvedPaymentCode == youContact.paymentCode) {
+            throw Exception("You cannot send to yourself");
+          }
+
+          Logger().d(
+              'Successfully resolved dana address to SP address: ${resolvedPaymentCode.substring(0, 20)}...');
+        } else {
+          resolvedPaymentCode = textField;
+          resolvedBip353 = null;
+        }
+      }
+
+      if (resolvedPaymentCode == youContact.paymentCode) {
+        throw Exception("You cannot send to yourself");
       }
 
       try {
-        validateAddressWithNetwork(address: paymentCode, network: network);
+        validateAddressWithNetwork(
+            address: resolvedPaymentCode, network: network);
       } catch (e) {
         if (e.toString().contains('network')) {
           throw InvalidNetworkException();
@@ -131,8 +135,8 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
         goToScreen(
             context,
             AmountSelectionScreen(
-              paymentCode: paymentCode,
-              providedBip353: bip353Address,
+              paymentCode: resolvedPaymentCode,
+              providedBip353: resolvedBip353,
             ));
       }
     } catch (e) {
