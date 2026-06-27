@@ -10,8 +10,11 @@ import 'package:danawallet/services/dana_address_service.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
+import 'package:danawallet/widgets/buttons/footer/footer_button_outlined.dart';
+import 'package:danawallet/widgets/qr_code_scanner_widget.dart';
 import 'package:danawallet/widgets/sheets/app_bottom_sheet_shell.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 
@@ -44,10 +47,13 @@ class _AddContactSheetState extends State<AddContactSheet> {
   bool _isResolving = false;
   String? _errorMessage;
 
-  // Confirmed address — set once user picks a Dana suggestion or types a full
-  // Dana address (auto-resolved), or via initialPaymentCode.
+  // Confirmed address — set once user picks a Dana suggestion,
+  // types a full dana address (auto-resolved), or pastes an SP address.
   String? _confirmedPaymentCode;
   Bip353Address? _confirmedDanaAddress;
+
+  // Whether the SP fallback section is expanded.
+  bool _showSpFallback = false;
 
   // Remote Dana suggestion state.
   List<Bip353Address> _remoteDanaAddresses = [];
@@ -102,6 +108,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
     setState(() {
       _confirmedPaymentCode = null;
       _confirmedDanaAddress = null;
+      _showSpFallback = false;
       _resetSearchState();
       _bip353AddressController.clear();
       _nameController.clear();
@@ -308,6 +315,44 @@ class _AddContactSheetState extends State<AddContactSheet> {
     }
   }
 
+  /// Validates a pasted/scanned SP address and, if valid, confirms it. Shows an
+  /// inline error otherwise so the confirmation card never reflects bad input.
+  void _confirmPaymentCode(String code) {
+    if (code.isEmpty) return;
+
+    final network = Provider.of<ChainState>(context, listen: false).network;
+    try {
+      validateAddressWithNetwork(address: code, network: network);
+      if (!isReusablePaymentCode(address: code)) {
+        throw Exception('Non-reusable payment info not allowed');
+      }
+    } catch (e) {
+      setState(() => _errorMessage = 'Not a valid silent payment address');
+      return;
+    }
+
+    setState(() {
+      _confirmedPaymentCode = code;
+      _confirmedDanaAddress = null;
+      _errorMessage = null;
+    });
+  }
+
+  Future<void> _pasteFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (!mounted) return;
+    _confirmPaymentCode(data?.text?.trim() ?? '');
+  }
+
+  Future<void> _scanQrCode() async {
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const QRCodeScannerWidget()),
+    );
+    if (!mounted) return;
+    _confirmPaymentCode(result?.trim() ?? '');
+  }
+
   Widget _buildDanaSearchSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -356,6 +401,25 @@ class _AddContactSheetState extends State<AddContactSheet> {
     );
   }
 
+  Widget _buildSpFallbackSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(),
+        const SizedBox(height: 8),
+        FooterButtonOutlined(
+          title: 'Paste from clipboard',
+          onPressed: _pasteFromClipboard,
+        ),
+        const SizedBox(height: 8),
+        FooterButtonOutlined(
+          title: 'Scan QR code',
+          onPressed: _scanQrCode,
+        ),
+      ],
+    );
+  }
+
   Widget _buildConfirmedAddressCard() {
     final isDana = _confirmedDanaAddress != null;
     final displayLabel = isDana
@@ -395,7 +459,28 @@ class _AddContactSheetState extends State<AddContactSheet> {
     );
   }
 
-  Widget _buildSearchView() => _buildDanaSearchSection();
+  Widget _buildSearchView() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildDanaSearchSection(),
+        const SizedBox(height: 12),
+        if (_showSpFallback)
+          _buildSpFallbackSection()
+        else
+          Center(
+            child: TextButton(
+              onPressed: () => setState(() => _showSpFallback = true),
+              child: Text(
+                "Can't find them on Dana?",
+                style: BitcoinTextStyle.body5(Bitcoin.neutral6),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 
   Widget _buildConfirmedView() {
     return Column(
