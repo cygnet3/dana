@@ -10,6 +10,7 @@ import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
+import 'package:danawallet/widgets/sheets/app_bottom_sheet_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
@@ -417,133 +418,117 @@ class _AddContactSheetState extends State<AddContactSheet> {
     );
   }
 
+  Widget _buildDanaSearchSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _bip353AddressController,
+          style: BitcoinTextStyle.body4(Bitcoin.black),
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            labelText: 'Dana Address',
+            hintText: 'user@domain.com',
+            suffixIcon: _hasDanaAddress
+                ? IconButton(
+                    icon: const Icon(Icons.search),
+                    onPressed: _resolveDanaAddress,
+                    tooltip: 'Resolve SP address',
+                  )
+                : null,
+          ),
+        ),
+        if (_bip353AddressController.text.trim().isNotEmpty) ...[
+          const SizedBox(height: 8),
+          if (_isSearchingRemote && _remoteDanaAddresses.isEmpty)
+            Text(
+              'Searching...',
+              style: BitcoinTextStyle.body5(Bitcoin.neutral6),
+            ),
+          if (_remoteDanaAddresses.isNotEmpty)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 180),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _remoteDanaAddresses.length,
+                separatorBuilder: (context, index) => const Divider(),
+                itemBuilder: (context, index) {
+                  return _buildDanaAddressSuggestionItem(
+                      _remoteDanaAddresses[index]);
+                },
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(25.0),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Bitcoin.neutral4,
-                  borderRadius: BorderRadius.circular(2),
+    return AppBottomSheetShell(
+      title: 'Add Contact',
+      child: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _nameController,
+                style: BitcoinTextStyle.body4(Bitcoin.black),
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: 'Name',
+                  hintText: 'Contact name',
                 ),
               ),
-            ),
-            // Title
-            Text(
-              'Add Contact',
-              style: BitcoinTextStyle.title4(Bitcoin.black),
-            ),
-            const SizedBox(height: 20),
-            // Name field
-            TextField(
-              controller: _nameController,
-              style: BitcoinTextStyle.body4(Bitcoin.black),
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'Name',
-                hintText: 'Contact name',
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Dana address field
-            TextField(
-              controller: _bip353AddressController,
-              style: BitcoinTextStyle.body4(Bitcoin.black),
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                labelText: 'Dana Address',
-                hintText: 'user@domain.com',
-                suffixIcon: _hasDanaAddress
-                    ? IconButton(
-                        icon: const Icon(Icons.search),
-                        onPressed: _resolveDanaAddress,
-                        tooltip: 'Resolve SP address',
-                      )
-                    : null,
-              ),
-            ),
-            if (_bip353AddressController.text.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              if (_isSearchingRemote && _remoteDanaAddresses.isEmpty)
-                Text(
-                  'Searching...',
-                  style: BitcoinTextStyle.body5(Bitcoin.neutral6),
-                ),
-              if (_remoteDanaAddresses.isNotEmpty)
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 180),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: _remoteDanaAddresses.length,
-                    separatorBuilder: (context, index) => const Divider(),
-                    itemBuilder: (context, index) {
-                      return _buildDanaAddressSuggestionItem(
-                          _remoteDanaAddresses[index]);
-                    },
-                  ),
-                ),
-            ],
-            const SizedBox(height: 16),
-            // Static address field
-            TextField(
-              controller: _paymentCodeController,
-              style: BitcoinTextStyle.body4(
-                (_hasDanaAddress || _isResolving)
-                    ? Bitcoin.neutral6
-                    : Bitcoin.black,
-              ),
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                labelText: 'Static Address (SP)',
-                hintText:
-                    _hasDanaAddress ? 'Resolved from dana address' : 'sp1q...',
-                suffixIcon: _isResolving
-                    ? const Padding(
-                        padding: EdgeInsets.all(12.0),
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    : null,
-                filled: _hasDanaAddress,
-                fillColor: _hasDanaAddress ? Bitcoin.neutral2 : null,
-              ),
-              readOnly: _hasDanaAddress || _isResolving,
-            ),
-            if (_errorMessage != null) ...[
               const SizedBox(height: 16),
-              Text(
-                _errorMessage!,
-                style: BitcoinTextStyle.body5(Bitcoin.red),
+              _buildDanaSearchSection(),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _paymentCodeController,
+                style: BitcoinTextStyle.body4(
+                  (_hasDanaAddress || _isResolving)
+                      ? Bitcoin.neutral6
+                      : Bitcoin.black,
+                ),
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  labelText: 'Static Address (SP)',
+                  hintText:
+                      _hasDanaAddress ? 'Resolved from dana address' : 'sp1q...',
+                  suffixIcon: _isResolving
+                      ? const Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : null,
+                  filled: _hasDanaAddress,
+                  fillColor: _hasDanaAddress ? Bitcoin.neutral2 : null,
+                ),
+                readOnly: _hasDanaAddress || _isResolving,
+              ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  _errorMessage!,
+                  style: BitcoinTextStyle.body5(Bitcoin.red),
+                ),
+              ],
+              const SizedBox(height: 20),
+              FooterButton(
+                title: _isSaving ? 'Saving...' : 'Save',
+                onPressed: _isSaving ? null : _onSaveContact,
+                isLoading: _isSaving,
+                enabled: !_isSaving,
               ),
             ],
-            const SizedBox(height: 20),
-            // Save button
-            FooterButton(
-              title: _isSaving ? 'Saving...' : 'Save',
-              onPressed: _isSaving ? null : _onSaveContact,
-              isLoading: _isSaving,
-              enabled: !_isSaving,
-            ),
-            SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
-          ],
+          ),
         ),
       ),
     );

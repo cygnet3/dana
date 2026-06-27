@@ -2,6 +2,7 @@ import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/models/contact_field.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
+import 'package:danawallet/widgets/sheets/app_bottom_sheet_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -146,37 +147,14 @@ class _AddEditFieldSheetState extends State<AddEditFieldSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(25.0),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+    return AppBottomSheetShell(
+      title: widget.field == null ? 'Add Field' : 'Edit Field',
       child: Form(
         key: _formKey,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Bitcoin.neutral4,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            // Title
-            Text(
-              widget.field == null ? 'Add Field' : 'Edit Field',
-              style: BitcoinTextStyle.title4(Bitcoin.black),
-            ),
-            const SizedBox(height: 20),
-            // Field Type dropdown or text field
             if (!_isCustomType)
               DropdownButtonFormField<String>(
                 initialValue: _selectedFieldType,
@@ -210,7 +188,6 @@ class _AddEditFieldSheetState extends State<AddEditFieldSheet> {
                 textCapitalization: TextCapitalization.words,
               ),
             const SizedBox(height: 16),
-            // Field Value
             TextField(
               controller: _fieldValueController,
               style: BitcoinTextStyle.body4(Bitcoin.black),
@@ -230,12 +207,10 @@ class _AddEditFieldSheetState extends State<AddEditFieldSheet> {
               ),
             ],
             const SizedBox(height: 20),
-            // Save button
             FooterButton(
               title: _isSaving ? 'Saving...' : 'Save',
               onPressed: _isSaving ? null : _saveField,
             ),
-            SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
           ],
         ),
       ),

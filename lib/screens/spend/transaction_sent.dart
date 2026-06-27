@@ -6,6 +6,7 @@ import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/screens/contacts/add_contact_sheet.dart';
+import 'package:danawallet/widgets/sheets/show_app_bottom_sheet.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
@@ -73,11 +74,9 @@ class _TransactionSentScreenState extends State<TransactionSentScreen> {
   }
 
   Future<void> _openAddContactSheet() async {
-    final result = await showModalBottomSheet<bool>(
+    final result = await showAppBottomSheet<bool>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => AddContactSheet(
+      builder: (_) => AddContactSheet(
         initialDanaAddress: widget.providedBip353,
         initialPaymentCode: widget.recipient.paymentCode,
       ),

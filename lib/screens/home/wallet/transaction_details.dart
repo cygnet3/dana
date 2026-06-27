@@ -17,6 +17,7 @@ import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
+import 'package:danawallet/widgets/sheets/show_app_bottom_sheet.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -41,17 +42,10 @@ class TransactionDetailsScreen extends StatelessWidget {
   }
 
   void _openAddContactSheet(BuildContext context, String paymentCode) {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: AddContactSheet(
-          initialPaymentCode: paymentCode,
-        ),
+      builder: (_) => AddContactSheet(
+        initialPaymentCode: paymentCode,
       ),
     );
   }

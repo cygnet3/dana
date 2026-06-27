@@ -3,6 +3,7 @@ import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/screens/contacts/add_contact_sheet.dart';
 import 'package:danawallet/screens/contacts/contact_details.dart';
 import 'package:danawallet/states/contacts_state.dart';
+import 'package:danawallet/widgets/sheets/show_app_bottom_sheet.dart';
 import 'package:danawallet/widgets/skeletons/main_screen_skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -45,11 +46,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   void _openAddContactSheet() async {
-    await showModalBottomSheet<bool>(
+    await showAppBottomSheet<bool>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const AddContactSheet(),
+      builder: (_) => const AddContactSheet(),
     );
   }
 

@@ -6,6 +6,9 @@ import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/data/models/recorded_transaction.dart';
 import 'package:danawallet/global_functions.dart';
+import 'package:danawallet/widgets/sheets/app_bottom_sheet_shell.dart';
+import 'package:danawallet/widgets/sheets/sheet_handle_bar.dart';
+import 'package:danawallet/widgets/sheets/show_app_bottom_sheet.dart';
 import 'package:danawallet/screens/spend/choose_recipient.dart';
 import 'package:danawallet/screens/home/wallet/transaction_details.dart';
 import 'package:danawallet/states/chain_state.dart';
@@ -350,10 +353,8 @@ class WalletScreenState extends State<WalletScreen> {
 
   void _showFullTransactionHistory(List<RecordedTransaction> transactions,
       FiatExchangeRateState exchangeRate) {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.9,
         minChildSize: 0.5,
@@ -361,21 +362,11 @@ class WalletScreenState extends State<WalletScreen> {
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
             color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: AppBottomSheetShell.borderRadius,
           ),
           child: Column(
             children: [
-              // Handle bar
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Bitcoin.neutral4,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              // Header with close button
+              const SheetHandleBar(margin: EdgeInsets.only(top: 12)),
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
