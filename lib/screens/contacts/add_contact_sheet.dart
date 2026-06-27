@@ -19,10 +19,16 @@ class AddContactSheet extends StatefulWidget {
   final Bip353Address? initialDanaAddress;
   final String? initialPaymentCode;
 
+  /// Pre-fills the Dana search field with an arbitrary string (e.g. a partial
+  /// username typed in ChooseRecipientScreen). Ignored when [initialDanaAddress]
+  /// or [initialPaymentCode] is also provided.
+  final String? initialDanaQuery;
+
   const AddContactSheet({
     super.key,
     this.initialDanaAddress,
     this.initialPaymentCode,
+    this.initialDanaQuery,
   });
 
   @override
@@ -63,6 +69,10 @@ class _AddContactSheetState extends State<AddContactSheet> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _resolveDanaAddress();
       });
+    } else if (widget.initialDanaQuery != null &&
+        widget.initialDanaAddress == null &&
+        widget.initialPaymentCode == null) {
+      _bip353AddressController.text = widget.initialDanaQuery!;
     }
   }
 
