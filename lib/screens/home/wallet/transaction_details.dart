@@ -1,4 +1,5 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
+import 'package:danawallet/extensions/string_display.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/extensions/date_time.dart';
@@ -159,7 +160,7 @@ class TransactionDetailsScreen extends StatelessWidget {
   Widget _buildTransactionIdRow(
       BuildContext context, String txid, Network network) {
     final truncatedTxid =
-        txid.length > 16 ? '${txid.substring(0, 16)}...' : txid;
+        txid.truncated(prefix: 16, suffix: 0, maxFullLength: 16);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -224,9 +225,8 @@ class TransactionDetailsScreen extends StatelessWidget {
   }
 
   Widget _buildOnchainAddressRow(BuildContext context, String address) {
-    final truncatedAddress = address.length > 16
-        ? '${address.substring(0, 8)}...${address.substring(address.length - 8)}'
-        : address;
+    final truncatedAddress =
+        address.truncated(prefix: 8, suffix: 8, maxFullLength: 16);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
