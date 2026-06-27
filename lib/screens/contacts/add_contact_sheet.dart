@@ -4,6 +4,7 @@ import 'package:danawallet/extensions/string_display.dart';
 import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact.dart';
+import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/services/dana_address_service.dart';
 import 'package:danawallet/states/chain_state.dart';
@@ -281,9 +282,10 @@ class _AddContactSheetState extends State<AddContactSheet> {
       if (mounted &&
           danaAddress != null &&
           existingContact.bip353Address == null) {
-        final shouldUpdate = await _showUpdateExistingContactDialog(
-          existingContact,
-          danaAddress,
+        final shouldUpdate = await showConfirmationAlertDialog(
+          'Contact already exists',
+          'This contact is already saved with the same static address. '
+          'Do you want to add the Dana address (${danaAddress.toString()}) to it?',
         );
         if (!shouldUpdate) {
           setState(() => _isSaving = false);
@@ -311,7 +313,8 @@ class _AddContactSheetState extends State<AddContactSheet> {
       }
 
       if (mounted) {
-        await _showContactAlreadyExistsDialog();
+        showAlertDialog('Contact already exists',
+            'This contact is already saved with the same static address.');
       }
       setState(() => _isSaving = false);
       return;
@@ -334,49 +337,6 @@ class _AddContactSheetState extends State<AddContactSheet> {
         });
       }
     }
-  }
-
-  Future<bool> _showUpdateExistingContactDialog(
-      Contact existingContact, Bip353Address danaAddress) async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Contact already exists'),
-            content: Text(
-              'This contact is already saved with the same static address. '
-              'Do you want to add the Dana address (${danaAddress.toString()}) to it?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Update'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-  }
-
-  Future<void> _showContactAlreadyExistsDialog() async {
-    await showDialog<void>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Contact already exists'),
-        content: const Text(
-          'This contact is already saved with the same static address.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildDanaSearchSection() {
