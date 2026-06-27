@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
+import 'package:danawallet/extensions/string_display.dart';
+import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
