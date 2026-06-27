@@ -48,6 +48,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
   List<Bip353Address> _remoteDanaAddresses = [];
   bool _isSearchingRemote = false;
   Timer? _searchDebounceTimer;
+  Timer? _autoResolveDebounceTimer;
 
   @override
   void initState() {
@@ -82,60 +83,37 @@ class _AddContactSheetState extends State<AddContactSheet> {
     _bip353AddressController.dispose();
     _paymentCodeController.dispose();
     _searchDebounceTimer?.cancel();
+    _autoResolveDebounceTimer?.cancel();
     super.dispose();
   }
 
   void _onDanaAddressChanged() {
     final query = _bip353AddressController.text.trim();
-    final hasDanaAddress = query.isNotEmpty;
-    setState(() {
-      _hasDanaAddress = hasDanaAddress;
-    });
-
-    // If dana address is filled, clear SP address field
-    if (hasDanaAddress) {
-      _paymentCodeController.clear();
-      _nameController.clear();
-    }
 
     _searchDebounceTimer?.cancel();
-    if (query.isEmpty) {
-      setState(() {
-        _remoteDanaAddresses = [];
-        _isSearchingRemote = false;
-      });
-      return;
-    }
+    _autoResolveDebounceTimer?.cancel();
+
+    setState(() {
+      _hasDanaAddress = query.isNotEmpty;
+      _remoteDanaAddresses = [];
+      _isSearchingRemote = false;
+      _errorMessage = null;
+    });
+
+    if (query.isEmpty) return;
 
     if (query.contains('@')) {
-      setState(() {
-        _remoteDanaAddresses = [];
-        _isSearchingRemote = false;
-      });
+      _autoResolveDebounceTimer =
+          Timer(const Duration(milliseconds: 600), _resolveDanaAddress);
       return;
     }
 
-    final searchPrefix = _extractSearchPrefix(query);
-    if (searchPrefix.length < 3) {
-      setState(() {
-        _remoteDanaAddresses = [];
-        _isSearchingRemote = false;
-      });
-      return;
-    }
+    if (query.length < 3) return;
 
-    // Debounce remote search to avoid too many API calls
-    _searchDebounceTimer = Timer(const Duration(milliseconds: 500), () {
-      _searchRemoteAddresses(searchPrefix);
-    });
-  }
-
-  String _extractSearchPrefix(String query) {
-    final atIndex = query.indexOf('@');
-    if (atIndex > 0) {
-      return query.substring(0, atIndex).trim();
-    }
-    return query;
+    _searchDebounceTimer = Timer(
+      const Duration(milliseconds: 500),
+      () => _searchRemoteAddresses(query),
+    );
   }
 
   Future<void> _searchRemoteAddresses(String prefix) async {
@@ -143,39 +121,33 @@ class _AddContactSheetState extends State<AddContactSheet> {
         Provider.of<ContactsState>(context, listen: false)
             .getKnownBip353Addresses();
 
-    setState(() {
-      _isSearchingRemote = true;
-    });
+    setState(() => _isSearchingRemote = true);
 
     try {
       final network = Provider.of<ChainState>(context, listen: false).network;
-      final danaAddresses =
+      final results =
           await DanaAddressService(network: network).searchPrefix(prefix);
 
       if (!mounted) return;
 
-      final newAddresses = danaAddresses
-          .where((address) => !knownDanaAddresses.contains(address))
+      final filtered = results
+          .where((a) => !knownDanaAddresses.contains(a))
           .take(3)
           .toList();
 
       setState(() {
-        _remoteDanaAddresses = newAddresses;
+        _remoteDanaAddresses = filtered;
         _isSearchingRemote = false;
       });
     } catch (e) {
       Logger().w('Failed to search remote addresses: $e');
-      if (!mounted) return;
-      setState(() {
-        _remoteDanaAddresses = [];
-        _isSearchingRemote = false;
-      });
+      if (mounted) setState(() => _isSearchingRemote = false);
     }
   }
 
-  Future<String?> _resolveDanaAddress() async {
+  Future<void> _resolveDanaAddress() async {
     final danaAddressString = _bip353AddressController.text.trim();
-    if (danaAddressString.isEmpty) return null;
+    if (danaAddressString.isEmpty) return;
 
     setState(() {
       _errorMessage = null;
@@ -187,7 +159,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
       final parsed = Bip353Address.fromString(danaAddressString);
       final resolved = await Bip353Resolver.resolve(parsed, network);
 
-      if (!mounted) return null;
+      if (!mounted) return;
 
       if (resolved != null) {
         setState(() {
@@ -197,22 +169,21 @@ class _AddContactSheetState extends State<AddContactSheet> {
           _paymentCodeController.text = resolved;
           _isResolving = false;
         });
-        return resolved;
+      } else {
+        setState(() {
+          _errorMessage = 'Could not resolve SP address for this Dana address';
+          _isResolving = false;
+        });
       }
-
-      setState(() {
-        _errorMessage = 'Could not resolve SP address for this dana address';
-        _isResolving = false;
-      });
     } catch (e) {
-      Logger().w('Failed to resolve dana address: $e');
-      if (!mounted) return null;
-      setState(() {
-        _errorMessage = 'Failed to resolve dana address: $e';
-        _isResolving = false;
-      });
+      Logger().w('Failed to resolve Dana address: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to resolve Dana address: $e';
+          _isResolving = false;
+        });
+      }
     }
-    return null;
   }
 
   Widget _buildDanaAddressSuggestionItem(Bip353Address danaAddress) {
@@ -236,6 +207,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
       ),
       onTap: () async {
         _searchDebounceTimer?.cancel();
+        _autoResolveDebounceTimer?.cancel();
         setState(() {
           _remoteDanaAddresses = [];
           _isSearchingRemote = false;
@@ -243,9 +215,6 @@ class _AddContactSheetState extends State<AddContactSheet> {
         });
 
         _bip353AddressController.text = danaAddress.toString();
-        if (_nameController.text.trim().isEmpty) {
-          _nameController.text = danaAddress.username;
-        }
         FocusScope.of(context).unfocus();
         await _resolveDanaAddress();
       },
@@ -299,16 +268,14 @@ class _AddContactSheetState extends State<AddContactSheet> {
       return;
     }
 
-    // user filled in a dana address, but did not press search
+    // user filled in a dana address, but resolution has not finished yet
     if (danaAddress != null && paymentCode.isEmpty) {
-      final resolved = await _resolveDanaAddress();
-      if (resolved == null) {
-        setState(() {
-          _isSaving = false;
-        });
+      await _resolveDanaAddress();
+      paymentCode = _paymentCodeController.text.trim();
+      if (paymentCode.isEmpty) {
+        setState(() => _isSaving = false);
         return;
       }
-      paymentCode = resolved;
       // show the user that we've resolved the sp-address
       await Future.delayed(const Duration(milliseconds: 200));
     }
@@ -435,17 +402,11 @@ class _AddContactSheetState extends State<AddContactSheet> {
         TextField(
           controller: _bip353AddressController,
           style: BitcoinTextStyle.body4(Bitcoin.black),
-          decoration: InputDecoration(
-            border: const OutlineInputBorder(),
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
             labelText: 'Dana Address',
             hintText: 'user@domain.com',
-            suffixIcon: _hasDanaAddress
-                ? IconButton(
-                    icon: const Icon(Icons.search),
-                    onPressed: _resolveDanaAddress,
-                    tooltip: 'Resolve SP address',
-                  )
-                : null,
           ),
         ),
         if (_bip353AddressController.text.trim().isNotEmpty) ...[
