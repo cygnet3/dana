@@ -8,7 +8,6 @@ import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/services/dana_address_service.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
-import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/sheets/app_bottom_sheet_shell.dart';
 import 'package:flutter/material.dart';
@@ -227,7 +226,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
       return;
     }
 
-    final walletState = Provider.of<WalletState>(context, listen: false);
+    final chainState = Provider.of<ChainState>(context, listen: false);
     final contactsState = Provider.of<ContactsState>(context, listen: false);
 
     setState(() {
@@ -330,12 +329,10 @@ class _AddContactSheetState extends State<AddContactSheet> {
     }
 
     try {
-      final network = walletState.network;
-
       await contactsState.addContact(
         paymentCode: paymentCode,
         danaAddress: danaAddress,
-        network: network,
+        network: chainState.network,
         name: name.isNotEmpty ? name : null,
       );
 
