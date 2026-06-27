@@ -27,6 +27,7 @@ class ChooseRecipientScreen extends StatefulWidget {
 class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
   late final TextEditingController textFieldController;
   String? _addressErrorText;
+  bool _showContactSuggestions = true;
 
   @override
   void initState() {
@@ -149,6 +150,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
   Future<void> onPasteFromClipboard() async {
     ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
     if (data != null) {
+      setState(() => _showContactSuggestions = false);
       textFieldController.text = data.text ?? '';
       await onContinue();
     }
@@ -162,6 +164,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
       ),
     );
     if (result is String && result != "") {
+      setState(() => _showContactSuggestions = false);
       textFieldController.text = result;
       await onContinue();
     }
@@ -174,7 +177,8 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
     final query = searchText.toLowerCase();
     final filteredContacts = contactsState.filterContacts(query);
     final hasQuery = query.isNotEmpty;
-    final noContactMatches = hasQuery && filteredContacts.isEmpty;
+    final noContactMatches =
+        _showContactSuggestions && hasQuery && filteredContacts.isEmpty;
 
     return ScreenSkeleton(
         showBackButton: true,
@@ -197,6 +201,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
                     }),
                     onChanged: (_) => setState(() {
                       _addressErrorText = null;
+                      _showContactSuggestions = true;
                     }),
                     style: BitcoinTextStyle.body4(Bitcoin.black),
                     controller: textFieldController,
