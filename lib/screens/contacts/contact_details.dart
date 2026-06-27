@@ -18,6 +18,8 @@ import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/back_button.dart';
 import 'package:danawallet/widgets/loading_widget.dart';
+import 'package:danawallet/widgets/sheets/app_bottom_sheet_shell.dart';
+import 'package:danawallet/widgets/sheets/show_app_bottom_sheet.dart';
 import 'package:danawallet/widgets/text/scrollable_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -59,11 +61,9 @@ class ContactDetailsScreen extends StatelessWidget {
   }
 
   void _showEditContactSheet(BuildContext context, Contact contact) async {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => EditContactSheet(
+      builder: (_) => EditContactSheet(
         contact: contact,
       ),
     );
@@ -133,22 +133,18 @@ class ContactDetailsScreen extends StatelessWidget {
   }
 
   void _showAddFieldSheet(BuildContext context, int contactId) {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => AddEditFieldSheet(
+      builder: (_) => AddEditFieldSheet(
         contactId: contactId,
       ),
     );
   }
 
   void _showEditFieldSheet(BuildContext context, ContactField field) {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => AddEditFieldSheet(
+      builder: (_) => AddEditFieldSheet(
         field: field,
         contactId: contactId,
       ),
@@ -235,38 +231,13 @@ class ContactDetailsScreen extends StatelessWidget {
   }
 
   void _showStaticAddressSheet(BuildContext context, String paymentCode) {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(25.0),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
+      builder: (_) => AppBottomSheetShell(
+        title: 'Static Address',
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Bitcoin.neutral4,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            // Title
-            Text(
-              'Static Address',
-              style: BitcoinTextStyle.title4(Bitcoin.black),
-            ),
-            const SizedBox(height: 20),
-            // QR Code
             GestureDetector(
               onTap: () => _copyStaticAddress(context, paymentCode),
               child: Container(
@@ -282,7 +253,6 @@ class ContactDetailsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            // Address text
             GestureDetector(
               onTap: () => _copyStaticAddress(context, paymentCode),
               child: Container(
@@ -303,7 +273,6 @@ class ContactDetailsScreen extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
           ],
         ),
       ),
@@ -380,62 +349,31 @@ class ContactDetailsScreen extends StatelessWidget {
         Provider.of<FiatExchangeRateState>(context, listen: false);
     final sentTransactions = _getSentTransactions(context, contact);
 
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(25.0),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Bitcoin.neutral4,
-                  borderRadius: BorderRadius.circular(2),
+      builder: (_) => AppBottomSheetShell(
+        title: 'Sent to ${contact.displayName}',
+        child: Flexible(
+          child: sentTransactions.isEmpty
+              ? Center(
+                  child: Text(
+                    'No transactions sent to this contact',
+                    style: BitcoinTextStyle.body3(Bitcoin.neutral6),
+                  ),
+                )
+              : ListView.separated(
+                  shrinkWrap: true,
+                  separatorBuilder: (context, index) => const Divider(),
+                  reverse: false,
+                  itemCount: sentTransactions.length,
+                  itemBuilder: (context, index) {
+                    return _buildTransactionTile(
+                      sentTransactions[sentTransactions.length - 1 - index],
+                      exchangeRate,
+                      contact,
+                    );
+                  },
                 ),
-              ),
-            ),
-            // Title
-            Text(
-              'Sent to ${contact.displayName}',
-              style: BitcoinTextStyle.title4(Bitcoin.black),
-            ),
-            const SizedBox(height: 20),
-            // Transactions list
-            Flexible(
-              child: sentTransactions.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No transactions sent to this contact',
-                        style: BitcoinTextStyle.body3(Bitcoin.neutral6),
-                      ),
-                    )
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      separatorBuilder: (context, index) => const Divider(),
-                      reverse: false,
-                      itemCount: sentTransactions.length,
-                      itemBuilder: (context, index) {
-                        return _buildTransactionTile(
-                          sentTransactions[sentTransactions.length - 1 - index],
-                          exchangeRate,
-                          contact,
-                        );
-                      },
-                    ),
-            ),
-            SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
-          ],
         ),
       ),
     );
