@@ -1,4 +1,5 @@
 pub mod amount;
+pub mod bip321_uri;
 pub mod discovered_output;
 pub mod network;
 pub mod outpoint;
