@@ -26,8 +26,12 @@ import 'package:provider/provider.dart';
 class AmountSelectionScreen extends StatefulWidget {
   final String paymentCode;
   final Bip353Address? providedBip353;
+  final Amount? initialAmount;
   const AmountSelectionScreen(
-      {super.key, required this.paymentCode, this.providedBip353});
+      {super.key,
+      required this.paymentCode,
+      this.providedBip353,
+      this.initialAmount});
 
   @override
   AmountSelectionScreenState createState() => AmountSelectionScreenState();
@@ -211,7 +215,7 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
 
     // if no human-readable name available, format payment code nicely
     recipientName ??=
-        widget.paymentCode.chunked(context, recipientTextStyle, 0.86);
+        widget.paymentCode.chunked(context, recipientTextStyle, 0.70);
 
     return ScreenSkeleton(
       showBackButton: true,
