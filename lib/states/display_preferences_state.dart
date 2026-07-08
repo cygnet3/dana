@@ -32,4 +32,9 @@ class DisplayPreferencesState extends ChangeNotifier {
     amountDisplayUnit = unit;
     notifyListeners();
   }
+
+  void reset() {
+    fiatCurrency = defaultCurrency;
+    amountDisplayUnit = defaultAmountDisplayUnit;
+  }
 }

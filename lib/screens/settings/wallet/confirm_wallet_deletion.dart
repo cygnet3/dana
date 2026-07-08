@@ -3,6 +3,7 @@ import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/screens/onboarding/introduction.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
+import 'package:danawallet/states/display_preferences_state.dart';
 import 'package:danawallet/states/home_state.dart';
 import 'package:danawallet/services/sync_orchestrator.dart';
 import 'package:danawallet/states/wallet_state.dart';
@@ -30,6 +31,8 @@ class ConfirmWalletDeletionScreen extends StatelessWidget {
     final chainState = Provider.of<ChainState>(context, listen: false);
     final orchestrator = Provider.of<SyncOrchestrator>(context, listen: false);
     final contacts = Provider.of<ContactsState>(context, listen: false);
+    final displayPreferences =
+        Provider.of<DisplayPreferencesState>(context, listen: false);
 
     await orchestrator.stop();
     chainState.reset();
@@ -37,6 +40,7 @@ class ConfirmWalletDeletionScreen extends StatelessWidget {
     await SettingsRepository.instance.resetAll();
     contacts.reset();
     homeState.reset();
+    displayPreferences.reset();
 
     if (context.mounted) {
       Navigator.pushReplacement(context,
