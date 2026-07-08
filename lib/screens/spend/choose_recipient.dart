@@ -33,6 +33,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
   late final TextEditingController textFieldController;
   String? _addressErrorText;
   bool _showContactSuggestions = true;
+  String? _externalPaymentInfo;
 
   @override
   void initState() {
@@ -86,10 +87,14 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
 
       if (contact != null) {
         // Selected from contact list — use contact data directly, leave field unchanged.
+        _externalPaymentInfo = null;
         resolvedPaymentCode = contact.paymentCode;
         resolvedBip353 = contact.bip353Address;
       } else {
-        final textField = textFieldController.text.trim();
+        final external = _externalPaymentInfo?.trim();
+        final textField = (external != null && external.isNotEmpty)
+            ? external
+            : textFieldController.text.trim();
 
         if (textField.isEmpty) {
           throw Exception("Please enter a valid payment info");
@@ -187,7 +192,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
     ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
     if (data != null) {
       setState(() => _showContactSuggestions = false);
-      textFieldController.text = data.text ?? '';
+      _externalPaymentInfo = data.text ?? '';
       await onContinue();
     }
   }
@@ -201,7 +206,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
     );
     if (result is String && result != "") {
       setState(() => _showContactSuggestions = false);
-      textFieldController.text = result;
+      _externalPaymentInfo = result;
       await onContinue();
     }
   }
@@ -237,6 +242,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
                     }),
                     onChanged: (_) => setState(() {
                       _addressErrorText = null;
+                      _externalPaymentInfo = null;
                       _showContactSuggestions = true;
                     }),
                     style: BitcoinTextStyle.body4(Bitcoin.black),
@@ -274,7 +280,9 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
                         ),
                       ),
                     ),
-                  if (hasQuery && filteredContacts.isNotEmpty) ...[
+                  if (_showContactSuggestions &&
+                      hasQuery &&
+                      filteredContacts.isNotEmpty) ...[
                     const SizedBox(height: 8.0),
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxHeight: 180),
