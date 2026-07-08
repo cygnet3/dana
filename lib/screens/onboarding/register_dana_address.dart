@@ -497,10 +497,9 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
             ],
           ),
 
-          SizedBox(height: Adaptive.h(4)),
-
           // "Your Dana address will be" at the bottom
           if (_addressToRegister != null) ...[
+            SizedBox(height: Adaptive.h(4)),
             AutoSizeText(
               'Your Dana address will be',
               style: BitcoinTextStyle.body3(Bitcoin.neutral6)
@@ -511,62 +510,6 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
             SizedBox(height: Adaptive.h(2)),
             _addressToRegister!.asRichText(17.0)
           ],
-
-          SizedBox(height: Adaptive.h(4)),
-
-          // BIP353 info block
-          GestureDetector(
-            onTap: () async {
-              final url = Uri.parse(
-                  'https://bitcoin.design/guide/how-it-works/human-readable-addresses/');
-              if (await canLaunchUrl(url)) {
-                await launchUrl(url, mode: LaunchMode.externalApplication);
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              decoration: BoxDecoration(
-                color: Bitcoin.neutral2,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: Bitcoin.neutral7,
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: RichText(
-                      textAlign: TextAlign.center,
-                      text: TextSpan(
-                        style: BitcoinTextStyle.body2(Bitcoin.neutral7)
-                            .copyWith(fontSize: 11),
-                        children: [
-                          const TextSpan(
-                              text: 'Dana addresses are using BIP353, '),
-                          TextSpan(
-                            text: 'click here to know more',
-                            style:
-                                BitcoinTextStyle.body2(Bitcoin.blue).copyWith(
-                              fontSize: 11,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Extra bottom padding for keyboard clearance
-          SizedBox(height: Adaptive.h(10)),
         ],
       ),
     );
@@ -593,16 +536,65 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
       enabled: isButtonEnabled && !_isRegistering,
     );
 
-    final Widget footer;
-    if (isDevEnv) {
-      footer = Column(children: [
+    final bip353Info =
+        // BIP353 info block
+        GestureDetector(
+      onTap: () async {
+        final url = Uri.parse(
+            'https://bitcoin.design/guide/how-it-works/human-readable-addresses/');
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
+          color: Bitcoin.neutral2,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.info_outline,
+              size: 16,
+              color: Bitcoin.neutral7,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: RichText(
+                textAlign: TextAlign.center,
+                text: TextSpan(
+                  style: BitcoinTextStyle.body2(Bitcoin.neutral7)
+                      .copyWith(fontSize: 11),
+                  children: [
+                    const TextSpan(text: 'Dana addresses are using BIP353, '),
+                    TextSpan(
+                      text: 'click here to know more',
+                      style: BitcoinTextStyle.body2(Bitcoin.blue).copyWith(
+                        fontSize: 11,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final Widget footer = Column(children: [
+      bip353Info,
+      SizedBox(height: Adaptive.h(2)),
+      if (isDevEnv) ...[
         skipButton,
         SizedBox(height: Adaptive.h(2)),
-        registerButton,
-      ]);
-    } else {
-      footer = registerButton;
-    }
+      ],
+      registerButton,
+    ]);
 
     return PopScope(
       canPop: false,
