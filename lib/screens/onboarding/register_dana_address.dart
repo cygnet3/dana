@@ -422,6 +422,7 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
                   helperText:
                       'Letters, numbers, hyphens, periods, and underscores',
                   errorText: _validationError,
+                  errorMaxLines: 3,
                 ),
                 autocorrect: false,
                 enableSuggestions: false,
@@ -518,15 +519,30 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
           SizedBox(height: Adaptive.h(2)),
 
           // Display current dana address (custom if entered, otherwise suggested)
-          if (finalDanaAddress != null)
-            Bip353Address.fromString(finalDanaAddress).asRichText(17.0)
-          else
-            AutoSizeText(
-              'No Dana address available',
-              style: BitcoinTextStyle.body2(Bitcoin.neutral6),
-              maxLines: 1,
-              textAlign: TextAlign.center,
-            ),
+          Builder(
+            builder: (context) {
+              if (finalDanaAddress != null && _validationError == null) {
+                try {
+                  return Bip353Address.fromString(finalDanaAddress)
+                      .asRichText(17.0);
+                } catch (e) {
+                  displayError('Invalid address', e);
+                  // Keep UI stable even if parsing fails unexpectedly.
+                  return Text(finalDanaAddress);
+                }
+              } else if (_customUsername != null && _validationError != null) {
+                // Show user his input along with an error message that warns him it's invalid
+                return Text(_customUsername!);
+              } else {
+                return AutoSizeText(
+                  'No Dana address available',
+                  style: BitcoinTextStyle.body2(Bitcoin.neutral6),
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                );
+              }
+            },
+          ),
 
           SizedBox(height: Adaptive.h(4)),
 
