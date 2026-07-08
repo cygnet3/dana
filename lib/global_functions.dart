@@ -141,7 +141,12 @@ String exceptionToString(Object e) {
   } else if (e is InvalidNetworkException) {
     message = "Invalid network";
   } else {
-    message = e.toString();
+    final stringified = e.toString();
+    if (stringified.startsWith("Exception: ")) {
+      message = stringified.substring(11);
+    } else {
+      message = stringified;
+    }
   }
   return message;
 }
