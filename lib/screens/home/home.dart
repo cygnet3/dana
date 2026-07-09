@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/global_functions.dart';
+import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/home_state.dart';
 import 'package:danawallet/screens/contacts/contacts.dart';
 import 'package:danawallet/screens/wallet/wallet.dart';
@@ -92,7 +93,15 @@ class HomeScreen extends StatelessWidget {
             ],
             currentIndex: homeState.selectedIndex,
             selectedItemColor: Bitcoin.blue,
-            onTap: homeState.setIndex,
+            onTap: (index) {
+              if (index == 0) {
+                unawaited(context
+                    .read<FiatExchangeRateState>()
+                    .updateExchangeRates());
+              }
+
+              homeState.setIndex(index);
+            },
           ),
         ));
   }
