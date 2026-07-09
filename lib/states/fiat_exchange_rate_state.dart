@@ -107,6 +107,35 @@ class FiatExchangeRateState extends ChangeNotifier {
         BigInt.from(pow(10, bitcoinUnits));
   }
 
+  /// Converts [amount] to fiat minor units (e.g. cents for USD) using the
+  /// cached rate. Uses integer floor division, symmetric with [fiatToSat].
+  BigInt satsAmountToFiat(Amount amount, FiatCurrency currency) {
+    final rate = exchangeRateFor(currency);
+    if (rate == null) throw StateError('Exchange rate not available');
+    return _satsToFiatMinor(amount, rate, currency);
+  }
+
+  /// Converts fiat minor units to satoshis using the cached rate.
+  /// Rounds down so the send amount never exceeds the entered fiat value.
+  Amount fiatToSat(BigInt fiatAmount, FiatCurrency currency) {
+    if (fiatAmount == BigInt.zero) {
+      return Amount(field0: BigInt.zero);
+    } else if (fiatAmount.isNegative) {
+      throw ArgumentError.value(fiatAmount, 'fiatAmount', 'must be positive');
+    }
+
+    final rate = exchangeRateFor(currency);
+    if (rate == null) {
+      throw StateError('Exchange rate not available');
+    }
+
+    final scale = pow(10, currency.minorUnits()).toInt();
+    final sats = fiatAmount *
+        BigInt.from(pow(10, bitcoinUnits)) ~/
+        (BigInt.from(rate) * BigInt.from(scale));
+    return Amount(field0: sats);
+  }
+
   String displayFiat(Amount amount, FiatCurrency currency) {
     final rate = exchangeRateFor(currency);
     if (rate == null) return '${currency.symbol()} ---';
