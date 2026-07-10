@@ -87,7 +87,7 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
 
     final availableBalance = walletState.amount;
     int blocksToScan = 0;
-    if (walletState.lastSync != null) {
+    if (walletState.lastSync != null && chainState.available) {
       blocksToScan = chainState.tip - walletState.lastSync!;
     }
 
