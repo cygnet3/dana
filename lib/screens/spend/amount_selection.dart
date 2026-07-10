@@ -37,7 +37,7 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
 
     final Amount amount;
     try {
-      amount = AmountExtension.parseUserInput(amountController.text);
+      amount = AmountExtension.parseBtcInput(amountController.text);
     } on FormatException catch (e) {
       setState(() {
         _amountErrorText = 'Invalid amount: $e';
