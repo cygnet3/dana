@@ -28,6 +28,9 @@ const int defaultDustLimit = 600;
 // default fiat currency
 const FiatCurrency defaultCurrency = FiatCurrency.usd;
 
+// Exchange rate older than this is considered stale in the spend flow.
+const Duration staleExchangeRateThreshold = Duration(hours: 1);
+
 // colors
 const Color danaBlue = Color.fromARGB(255, 10, 109, 214);
 
