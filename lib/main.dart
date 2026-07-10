@@ -81,7 +81,7 @@ void main() async {
   );
 
   // fetch the exchange rate, but don't await the response
-  fiatExchangeRate.updateExchangeRate();
+  fiatExchangeRate.updateExchangeRates();
 
   await precacheImages();
 

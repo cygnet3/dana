@@ -61,7 +61,7 @@ class PersonalisationSettingsScreen extends StatelessWidget {
               currentCurrency: displayPreferences.fiatCurrency,
               onConfirm: (chosen) async {
                 await displayPreferences.updateFiatCurrency(chosen);
-                unawaited(fiatExchangeRate.updateExchangeRate());
+                unawaited(fiatExchangeRate.updateExchangeRates());
 
                 if (context.mounted) {
                   goToHomeScreen(context);
