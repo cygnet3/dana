@@ -187,13 +187,17 @@ class WalletScreenState extends State<WalletScreen> {
     }
   }
 
-  Widget buildAmountDisplay(Amount amount, FiatExchangeRateState exchangeRate,
-      AmountDisplayUnit bitcoinUnit) {
+  Widget buildAmountDisplay(
+      Amount amount,
+      FiatExchangeRateState exchangeRate,
+      AmountDisplayUnit bitcoinUnit,
+      DisplayPreferencesState displayPreference) {
     String btcAmount =
         hideAmount ? hideAmountFormat : amount.display(bitcoinUnit);
 
-    String fiatAmount =
-        hideAmount ? hideAmountFormat : exchangeRate.displayFiat(amount);
+    String fiatAmount = hideAmount
+        ? hideAmountFormat
+        : exchangeRate.displayFiat(amount, displayPreference.fiatCurrency);
 
     return GestureDetector(
       onTap: () => setState(() {
@@ -217,8 +221,11 @@ class WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  ListTile toListTile(RecordedTransaction tx,
-      FiatExchangeRateState exchangeRate, AmountDisplayUnit bitcoinUnit) {
+  ListTile toListTile(
+      RecordedTransaction tx,
+      FiatExchangeRateState exchangeRate,
+      AmountDisplayUnit bitcoinUnit,
+      DisplayPreferencesState displayPreference) {
     Color? color;
     String amount;
     String amountprefix;
@@ -243,7 +250,8 @@ class WalletScreenState extends State<WalletScreen> {
         amountprefix = '+';
         amountFiat = hideAmount
             ? hideAmountFormat
-            : exchangeRate.displayFiat(incoming.amount);
+            : exchangeRate.displayFiat(
+                incoming.amount, displayPreference.fiatCurrency);
         leadingWidget = Image(
             image: const AssetImage("icons/receive.png", package: "bitcoin_ui"),
             color: Bitcoin.neutral3Dark);
@@ -268,7 +276,8 @@ class WalletScreenState extends State<WalletScreen> {
         amountprefix = '-';
         amountFiat = hideAmount
             ? hideAmountFormat
-            : exchangeRate.displayFiat(outgoing.totalOutgoing());
+            : exchangeRate.displayFiat(
+                outgoing.totalOutgoing(), displayPreference.fiatCurrency);
         // Show contact avatar if contact is known, otherwise show send icon
         final contact = paymentCode != null
             ? contactsState.getContactByPaymentCode(paymentCode)
@@ -301,7 +310,8 @@ class WalletScreenState extends State<WalletScreen> {
         amountprefix = '-';
         amountFiat = hideAmount
             ? hideAmountFormat
-            : exchangeRate.displayFiat(unknown.amount);
+            : exchangeRate.displayFiat(
+                unknown.amount, displayPreference.fiatCurrency);
         leadingWidget = Image(
             image: const AssetImage("icons/send.png", package: "bitcoin_ui"),
             color: Bitcoin.neutral3Dark);
@@ -328,8 +338,11 @@ class WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  void _showFullTransactionHistory(List<RecordedTransaction> transactions,
-      FiatExchangeRateState exchangeRate, AmountDisplayUnit bitcoinUnit) {
+  void _showFullTransactionHistory(
+      List<RecordedTransaction> transactions,
+      FiatExchangeRateState exchangeRate,
+      AmountDisplayUnit bitcoinUnit,
+      DisplayPreferencesState displayPreference) {
     showAppBottomSheet(
       context: context,
       builder: (context) => DraggableScrollableSheet(
@@ -375,8 +388,8 @@ class WalletScreenState extends State<WalletScreen> {
                             const Divider(),
                         itemCount: transactions.length,
                         itemBuilder: (context, index) {
-                          return toListTile(
-                              transactions[index], exchangeRate, bitcoinUnit);
+                          return toListTile(transactions[index], exchangeRate,
+                              bitcoinUnit, displayPreference);
                         },
                       ),
               ),
@@ -387,8 +400,11 @@ class WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget buildTransactionHistory(List<RecordedTransaction> transactions,
-      FiatExchangeRateState exchangeRate, AmountDisplayUnit bitcoinUnit) {
+  Widget buildTransactionHistory(
+      List<RecordedTransaction> transactions,
+      FiatExchangeRateState exchangeRate,
+      AmountDisplayUnit bitcoinUnit,
+      DisplayPreferencesState displayPreference) {
     if (transactions.isEmpty) {
       return Center(
           child: Text('No transactions yet.',
@@ -410,7 +426,8 @@ class WalletScreenState extends State<WalletScreen> {
           return Column(
             children: [
               if (index > 0) const Divider(height: 1),
-              toListTile(preview[index], exchangeRate, bitcoinUnit),
+              toListTile(
+                  preview[index], exchangeRate, bitcoinUnit, displayPreference),
             ],
           );
         }),
@@ -418,7 +435,7 @@ class WalletScreenState extends State<WalletScreen> {
           const Divider(height: 1),
           GestureDetector(
             onTap: () => _showFullTransactionHistory(
-                transactions, exchangeRate, bitcoinUnit),
+                transactions, exchangeRate, bitcoinUnit, displayPreference),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
@@ -650,14 +667,14 @@ class WalletScreenState extends State<WalletScreen> {
                     maintainState: true,
                     child: buildOfflineStatus(chainState)),
                 const SizedBox(height: 20.0),
-                buildAmountDisplay(
-                    amount, exchangeRate, displayPreference.amountDisplayUnit),
+                buildAmountDisplay(amount, exchangeRate,
+                    displayPreference.amountDisplayUnit, displayPreference),
                 const SizedBox(height: 20.0),
                 // Show Dana address banner if available
                 if (danaAddress != null) buildDanaAddressBanner(danaAddress),
                 const Spacer(),
                 buildTransactionHistory(walletState.transactions, exchangeRate,
-                    displayPreference.amountDisplayUnit),
+                    displayPreference.amountDisplayUnit, displayPreference),
                 buildBottomButtons(walletState.receivePaymentCode),
                 const SizedBox(
                   height: 20.0,

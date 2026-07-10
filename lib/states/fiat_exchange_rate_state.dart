@@ -5,37 +5,22 @@ import 'package:danawallet/data/models/mempool_prices_response.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/data/enums/fiat_currency.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
-import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 
 class FiatExchangeRateState extends ChangeNotifier {
   MempoolApiRepository repository = MempoolApiRepository();
 
-  late FiatCurrency currency;
   Map<FiatCurrency, int> _cachedRates = const {};
 
-  // private constructor, create class using static async 'create' instead
   FiatExchangeRateState._();
 
   static Future<FiatExchangeRateState> create() async {
-    final instance = FiatExchangeRateState._();
-    final currency =
-        await SettingsRepository.instance.getFiatCurrency() ?? defaultCurrency;
-    instance.currency = currency;
-
-    return instance;
+    return FiatExchangeRateState._();
   }
 
   Map<FiatCurrency, int> get exchangeRates => Map.unmodifiable(_cachedRates);
   int? exchangeRateFor(FiatCurrency currency) => _cachedRates[currency];
-  int? get exchangeRate => exchangeRateFor(currency);
-
-  Future<void> updateCurrency(FiatCurrency currency) async {
-    await SettingsRepository.instance.setFiatCurrency(currency);
-    this.currency = currency;
-    notifyListeners();
-  }
 
   Future<void> updateExchangeRate() async {
     try {
@@ -70,7 +55,7 @@ class FiatExchangeRateState extends ChangeNotifier {
     };
   }
 
-  BigInt _satsToFiatMinor(Amount amount, int rate) {
+  BigInt _satsToFiatMinor(Amount amount, int rate, FiatCurrency currency) {
     final scale = pow(10, currency.minorUnits()).toInt();
     return amount.field0 *
         BigInt.from(rate) *
@@ -78,21 +63,18 @@ class FiatExchangeRateState extends ChangeNotifier {
         BigInt.from(bitcoinUnits);
   }
 
-  String displayFiat(Amount amount) {
-    final symbol = currency.symbol();
-    final minorUnits = currency.minorUnits();
-    final rate = exchangeRate;
-    if (rate == null) {
-      return '$symbol ---';
-    }
+  String displayFiat(Amount amount, FiatCurrency currency) {
+    final rate = exchangeRateFor(currency);
+    if (rate == null) return '${currency.symbol()} ---';
 
-    final minor = _satsToFiatMinor(amount, rate);
+    final minor = _satsToFiatMinor(amount, rate, currency);
+    final minorUnits = currency.minorUnits();
     if (minorUnits == 0) {
-      return '$symbol $minor';
+      return '${currency.symbol()} $minor';
     }
     final scale = BigInt.from(pow(10, minorUnits));
     final whole = minor ~/ scale;
     final fraction = (minor % scale).toString().padLeft(minorUnits, '0');
-    return '$symbol $whole.$fraction';
+    return '${currency.symbol()} $whole.$fraction';
   }
 }

@@ -260,7 +260,8 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
                             _isLoadingFees
                                 ? 'Loading...'
                                 : exchangeRate.displayFiat(
-                                    _feeAmounts[_selectedFeeRate]!),
+                                    _feeAmounts[_selectedFeeRate]!,
+                                    displayPreference.fiatCurrency),
                             style: BitcoinTextStyle.body5(Bitcoin.neutral7),
                           ),
                         ],
