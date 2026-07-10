@@ -16,6 +16,27 @@ void main() {
     });
   });
 
+  group('FiatExchangeRateState.timeSinceLastExchangeRateUpdate', () {
+    test('returns null when never updated', () {
+      final state = FiatExchangeRateState();
+      expect(state.timeSinceLastExchangeRateUpdate, isNull);
+    });
+
+    test('returns elapsed duration since last update', () {
+      final lastUpdated =
+          DateTime.now().toUtc().subtract(const Duration(minutes: 5));
+      final state = FiatExchangeRateState.withRateForTesting(
+        rates: {FiatCurrency.usd: 50000},
+        lastExchangeRateUpdateAt: lastUpdated,
+      );
+
+      final elapsed = state.timeSinceLastExchangeRateUpdate;
+      expect(elapsed, isNotNull);
+      expect(elapsed!, greaterThanOrEqualTo(const Duration(minutes: 5)));
+      expect(elapsed, lessThan(const Duration(minutes: 6)));
+    });
+  });
+
   group('FiatExchangeRateState.updateExchangeRates', () {
     test('keeps last known-good cache on refresh failure', () async {
       final lastUpdated = DateTime.utc(2026, 1, 1, 10, 0, 0);
