@@ -1,6 +1,10 @@
+import 'dart:math';
+
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+BigInt fullSatoshis = BigInt.from(pow(10, bitcoinUnits));
 
 void main() {
   group('AmountExtension.parseUserInput', () {
@@ -31,7 +35,7 @@ void main() {
     test('parses BTC strings with trailing fractional zeros', () {
       final amount = AmountExtension.parseUserInput('1.0');
 
-      expect(amount.field0, BigInt.from(bitcoinUnits));
+      expect(amount.field0, fullSatoshis);
     });
 
     test('parses the smallest BTC unit as one satoshi', () {
@@ -124,7 +128,7 @@ void main() {
       test('parses grouped decimal strings as BTC', () {
         final amount = AmountExtension.parseUserInput('1,234.5');
 
-        expect(amount.field0, BigInt.from(1234.5 * bitcoinUnits));
+        expect(amount.field0, BigInt.from(1234.5 * pow(10, bitcoinUnits)));
       });
     });
 

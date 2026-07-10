@@ -104,7 +104,7 @@ class FiatExchangeRateState extends ChangeNotifier {
     return amount.field0 *
         BigInt.from(rate) *
         BigInt.from(scale) ~/
-        BigInt.from(bitcoinUnits);
+        BigInt.from(pow(10, bitcoinUnits));
   }
 
   String displayFiat(Amount amount, FiatCurrency currency) {

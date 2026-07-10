@@ -1,16 +1,18 @@
+import 'dart:math';
+
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/enums/amount_display_unit.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 
 BigInt _btcStringToSats(String wholePart, String fractionPart) {
-  if (fractionPart.length > 8) {
+  if (fractionPart.length > bitcoinUnits) {
     throw const FormatException('BTC amount has too many decimal places');
   }
 
   final whole = BigInt.parse(wholePart);
-  final fractionSats = BigInt.parse(fractionPart.padRight(8, '0'));
+  final fractionSats = BigInt.parse(fractionPart.padRight(bitcoinUnits, '0'));
 
-  final sats = whole * BigInt.from(bitcoinUnits) + fractionSats;
+  final sats = whole * BigInt.from(pow(10, bitcoinUnits)) + fractionSats;
   if (sats <= BigInt.zero) {
     throw const FormatException('Amount must be positive');
   }
@@ -35,7 +37,7 @@ BigInt _btcStringToSats(String wholePart, String fractionPart) {
         'BTC amount has an invalid whole part \'$wholePart\'');
   }
   final fractionPart = parts[1];
-  if (fractionPart.length > 8) {
+  if (fractionPart.length > bitcoinUnits) {
     throw const FormatException('BTC amount has too many decimal places');
   } else if (fractionPart.isEmpty) {
     throw const FormatException('BTC amount with empty fraction part');
@@ -111,9 +113,9 @@ extension AmountExtension on Amount {
   }
 
   String _displayBtc() {
-    final btcPart = field0 ~/ BigInt.from(bitcoinUnits);
-    final satsPart = (field0 % BigInt.from(bitcoinUnits));
-    final satsStr = satsPart.toString().padLeft(8, '0');
+    final btcPart = field0 ~/ BigInt.from(pow(10, bitcoinUnits));
+    final satsPart = (field0 % BigInt.from(pow(10, bitcoinUnits)));
+    final satsStr = satsPart.toString().padLeft(bitcoinUnits, '0');
     return '$btcSymbol $btcPart.${satsStr.substring(0, 2)} ${satsStr.substring(2, 5)} ${satsStr.substring(5, 8)}';
   }
 

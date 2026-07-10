@@ -39,8 +39,8 @@ const String exampleAddress =
 const String exampleMnemonic =
     "gloom police month stamp viable claim hospital heart alcohol off ocean ghost";
 
-// number of satoshis in 1 btc
-const int bitcoinUnits = 100000000;
+// number of decimals in 1 btc
+const int bitcoinUnits = 8;
 // String that displays when amount is hidden
 const String hideAmountFormat = "*****";
 
