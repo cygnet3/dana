@@ -14,6 +14,7 @@ import 'package:danawallet/screens/spend/fee_selection.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/display_preferences_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
+import 'package:danawallet/widgets/alerts/inline_warning_banner.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
@@ -37,15 +38,39 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
   String? _amountErrorText;
   Amount? _parsedAmount; // always sats
   bool _isFiatSelected = false;
+  Duration? _staleExchangeRateAge;
 
   @override
   void initState() {
     super.initState();
     amountController.addListener(_onAmountChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      unawaited(context.read<FiatExchangeRateState>().updateExchangeRates());
+      unawaited(_refreshExchangeRateAndWarnIfStale());
     });
+  }
+
+  Future<void> _refreshExchangeRateAndWarnIfStale() async {
+    final fiatExchangeRate =
+        Provider.of<FiatExchangeRateState>(context, listen: false);
+    await fiatExchangeRate.updateExchangeRates();
+    if (!mounted) return;
+
+    final age = fiatExchangeRate.timeSinceLastExchangeRateUpdate;
+    final isStale = age != null && age >= staleExchangeRateThreshold;
+    setState(() => _staleExchangeRateAge = isStale ? age : null);
+  }
+
+  String _formatAge(Duration age) {
+    if (age.inDays > 0) {
+      final days = age.inDays;
+      return '$days day${days == 1 ? '' : 's'}';
+    }
+    if (age.inHours > 0) {
+      final hours = age.inHours;
+      return '$hours hour${hours == 1 ? '' : 's'}';
+    }
+    final minutes = age.inMinutes;
+    return '$minutes minute${minutes == 1 ? '' : 's'}';
   }
 
   @override
@@ -274,10 +299,17 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
                 if (blocksToScan != 0)
                   Padding(
                     padding: const EdgeInsets.only(top: 8.0),
-                    child: Text(
-                      'Warning: $blocksToScan block(s) to scan, balance might be inaccurate.',
-                      style: BitcoinTextStyle.body5(Bitcoin.orange),
-                      textAlign: TextAlign.center,
+                    child: InlineWarningBanner(
+                      message:
+                          '$blocksToScan block(s) to scan, balance might be inaccurate.',
+                    ),
+                  ),
+                if (_staleExchangeRateAge != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: InlineWarningBanner(
+                      message:
+                          'Exchange rate last updated ${_formatAge(_staleExchangeRateAge!)} ago, ${fiatCurrency.displayName()} conversion may be inaccurate.',
                     ),
                   ),
               ],
