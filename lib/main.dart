@@ -71,7 +71,7 @@ void main() async {
   final chainState = ChainState();
   final contactsState = ContactsState();
   final displayPreferencesState = await DisplayPreferencesState.create();
-  final fiatExchangeRate = await FiatExchangeRateState.create();
+  final fiatExchangeRate = FiatExchangeRateState();
 
   final syncOrchestrator = SyncOrchestrator(
     chainState: chainState,
