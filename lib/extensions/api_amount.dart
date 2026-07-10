@@ -2,73 +2,28 @@ import 'dart:math';
 
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/enums/amount_display_unit.dart';
+import 'package:danawallet/parsing/amount_input.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 
-BigInt _btcStringToSats(String wholePart, String fractionPart) {
-  if (fractionPart.length > bitcoinUnits) {
-    throw const FormatException('BTC amount has too many decimal places');
+BigInt _stringToDecimals(
+    String wholePart, String fractionPart, int maxFractionDigits) {
+  if (maxFractionDigits < 0) {
+    throw Exception('maxFractionDigits can\'t be negative');
   }
-
   final whole = BigInt.parse(wholePart);
-  final fractionSats = BigInt.parse(fractionPart.padRight(bitcoinUnits, '0'));
 
-  final sats = whole * BigInt.from(pow(10, bitcoinUnits)) + fractionSats;
-  if (sats <= BigInt.zero) {
+  BigInt decimals;
+  if (maxFractionDigits > 0) {
+    final fractions =
+        BigInt.parse(fractionPart.padRight(maxFractionDigits, '0'));
+    decimals = whole * BigInt.from(pow(10, maxFractionDigits)) + fractions;
+  } else {
+    decimals = whole;
+  }
+  if (decimals <= BigInt.zero) {
     throw const FormatException('Amount must be positive');
   }
-  return sats;
-}
-
-(String, String) _parseDecimal(String input) {
-  final parts = input.split(decimalSeparator);
-  if (parts.length == 1) {
-    return (input, ''); // We return only the whole part
-  }
-  if (parts.length != 2) {
-    // Having more than one decimal separator is invalid input
-    throw FormatException('Invalid BTC amount: $input');
-  }
-
-  final wholePart = parts[0];
-  if (wholePart.isEmpty) {
-    throw const FormatException('BTC amount has an empty whole part');
-  } else if (wholePart.contains(RegExp(r'\D'))) {
-    throw FormatException(
-        'BTC amount has an invalid whole part \'$wholePart\'');
-  }
-  final fractionPart = parts[1];
-  if (fractionPart.length > bitcoinUnits) {
-    throw const FormatException('BTC amount has too many decimal places');
-  } else if (fractionPart.isEmpty) {
-    throw const FormatException('BTC amount with empty fraction part');
-  }
-  return (wholePart, fractionPart);
-}
-
-String _validateGroupsDigits(String wholePart) {
-  final parts = wholePart.split(groupSeparator);
-  if (parts.length > 1) {
-    // We protect against trailing comma at the beginning
-    if (parts[0].isEmpty) {
-      throw const FormatException(
-          'Incorrectly formatted number: starting with a \'$groupSeparator\'');
-    }
-    // Other than the first part, each part must be 3 digits
-    for (var i = 1; i < parts.length; i++) {
-      final part = parts[i];
-      if (part.length != 3) {
-        throw const FormatException(
-            'Group separator must be followed by exactly 3 digits');
-      } else if (part.contains(RegExp(r'\D'))) {
-        throw FormatException('Invalid character in grouped number $part');
-      }
-    }
-
-    return parts.join();
-  } else {
-    // There's no separator, just return the input as is
-    return wholePart;
-  }
+  return decimals;
 }
 
 extension AmountExtension on Amount {
@@ -88,27 +43,39 @@ extension AmountExtension on Amount {
     return field0 < other.field0;
   }
 
-  /// Parses user-entered spend amounts. Integer strings are interpreted as
-  /// satoshis; non-integer strings are parsed as BTC.
-  static Amount parseUserInput(String text) {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty) {
-      throw const FormatException('Amount is empty');
-    }
+  /// Parses user-entered fiat amounts into minor units (e.g. cents).
+  /// Whole numbers and decimals are both major units (e.g. dollars).
+  static BigInt parseFiatInput(String text, int currencyMaxDecimals) {
+    final parsed = parseGroupedDecimalInput(
+      text,
+      currencyMaxDecimals,
+    );
 
-    final (wholePart, fractionPart) = _parseDecimal(trimmed);
-    final sanitizedWholePart = _validateGroupsDigits(wholePart);
+    return _stringToDecimals(
+      parsed.sanitizedWholePart,
+      parsed.fractionPart,
+      currencyMaxDecimals,
+    );
+  }
 
-    final hasDecimal = fractionPart.isNotEmpty;
+  /// Parses user-entered BTC/sats amounts into satoshis.
+  /// Integer strings are satoshis; decimals are BTC.
+  static Amount parseBtcInput(String text) {
+    final parsed = parseGroupedDecimalInput(
+      text,
+      bitcoinUnits,
+    );
 
-    if (!hasDecimal) {
-      final satsAmount = BigInt.parse(sanitizedWholePart);
+    if (!parsed.hasDecimal) {
+      final satsAmount = BigInt.parse(parsed.sanitizedWholePart);
       if (satsAmount <= BigInt.zero) {
         throw const FormatException('Amount must be positive');
       }
       return Amount(field0: satsAmount);
     } else {
-      return Amount(field0: _btcStringToSats(sanitizedWholePart, fractionPart));
+      return Amount(
+          field0: _stringToDecimals(
+              parsed.sanitizedWholePart, parsed.fractionPart, bitcoinUnits));
     }
   }
 
