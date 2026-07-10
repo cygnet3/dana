@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:danawallet/constants.dart';
+import 'package:danawallet/data/models/mempool_prices_response.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/data/enums/fiat_currency.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
@@ -12,7 +13,7 @@ class FiatExchangeRateState extends ChangeNotifier {
   MempoolApiRepository repository = MempoolApiRepository();
 
   late FiatCurrency currency;
-  int? _cachedRate;
+  Map<FiatCurrency, int> _cachedRates = const {};
 
   // private constructor, create class using static async 'create' instead
   FiatExchangeRateState._();
@@ -26,51 +27,47 @@ class FiatExchangeRateState extends ChangeNotifier {
     return instance;
   }
 
-  int? get exchangeRate => _cachedRate;
+  Map<FiatCurrency, int> get exchangeRates => Map.unmodifiable(_cachedRates);
+  int? exchangeRateFor(FiatCurrency currency) => _cachedRates[currency];
+  int? get exchangeRate => exchangeRateFor(currency);
 
   Future<void> updateCurrency(FiatCurrency currency) async {
     await SettingsRepository.instance.setFiatCurrency(currency);
     this.currency = currency;
-
-    // Reset exchange rate when currency changes
-    _cachedRate = null;
     notifyListeners();
-
-    // Try to fetch fresh data for new currency
-    return await updateExchangeRate();
   }
 
   Future<void> updateExchangeRate() async {
     try {
-      Logger().i("Updating exchange rate: ${currency.displayName()}");
-      final rate = await _fetchExchangeRate(currency);
-      _cachedRate = rate;
+      Logger().i('Updating exchange rates for all currencies');
+      _cachedRates = await _fetchExchangeRates();
     } catch (e) {
       Logger().w('Failed to update exchange rate: $e');
-      _cachedRate = null;
     }
     notifyListeners();
   }
 
-  Future<int> _fetchExchangeRate(FiatCurrency currency) async {
+  Future<Map<FiatCurrency, int>> _fetchExchangeRates() async {
     final rates = await repository.getExchangeRate();
-
-    switch (currency) {
-      case FiatCurrency.eur:
-        return rates.eur;
-      case FiatCurrency.usd:
-        return rates.usd;
-      case FiatCurrency.gbp:
-        return rates.gbp;
-      case FiatCurrency.cad:
-        return rates.cad;
-      case FiatCurrency.chf:
-        return rates.chf;
-      case FiatCurrency.aud:
-        return rates.aud;
-      case FiatCurrency.jpy:
-        return rates.jpy;
+    final mappedRates = _mapRatesByCurrency(rates);
+    for (final entry in mappedRates.entries) {
+      if (entry.value <= 0) {
+        throw Exception('invalid rate for ${entry.key.name}: ${entry.value}');
+      }
     }
+    return mappedRates;
+  }
+
+  Map<FiatCurrency, int> _mapRatesByCurrency(MempoolPricesResponse rates) {
+    return {
+      FiatCurrency.usd: rates.usd,
+      FiatCurrency.eur: rates.eur,
+      FiatCurrency.gbp: rates.gbp,
+      FiatCurrency.cad: rates.cad,
+      FiatCurrency.chf: rates.chf,
+      FiatCurrency.aud: rates.aud,
+      FiatCurrency.jpy: rates.jpy,
+    };
   }
 
   BigInt _satsToFiatMinor(Amount amount, int rate) {
@@ -84,7 +81,7 @@ class FiatExchangeRateState extends ChangeNotifier {
   String displayFiat(Amount amount) {
     final symbol = currency.symbol();
     final minorUnits = currency.minorUnits();
-    final rate = _cachedRate;
+    final rate = exchangeRate;
     if (rate == null) {
       return '$symbol ---';
     }
