@@ -298,7 +298,7 @@ class ContactDetailsScreen extends StatelessWidget {
   ListTile _buildTransactionTile(
       RecordedTransaction tx,
       FiatExchangeRateState exchangeRate,
-      AmountDisplayUnit bitcoinUnit,
+      DisplayPreferencesState displayPreference,
       Contact contact) {
     if (tx is! RecordedTransactionOutgoing) {
       throw Exception('Expected outgoing transaction');
@@ -310,7 +310,8 @@ class ContactDetailsScreen extends StatelessWidget {
         tx.confirmationHeight == null ? Bitcoin.neutral4 : Bitcoin.red;
     final amount = tx.totalOutgoing();
     const amountprefix = '-';
-    final amountFiat = exchangeRate.displayFiat(amount);
+    final amountFiat =
+        exchangeRate.displayFiat(amount, displayPreference.fiatCurrency);
     const title = 'Outgoing transaction';
     final text = tx.toString();
     final image = Image(
@@ -327,7 +328,8 @@ class ContactDetailsScreen extends StatelessWidget {
             style: BitcoinTextStyle.body4(Bitcoin.black),
           ),
           const Spacer(),
-          Text('$amountprefix ${amount.display(bitcoinUnit)}',
+          Text(
+              '$amountprefix ${amount.display(displayPreference.amountDisplayUnit)}',
               style: BitcoinTextStyle.body4(color)),
         ],
       ),
@@ -353,7 +355,7 @@ class ContactDetailsScreen extends StatelessWidget {
   void _showSentTransactionsSheet(BuildContext context, Contact contact) {
     final exchangeRate =
         Provider.of<FiatExchangeRateState>(context, listen: false);
-    final displayPrefrence =
+    final displayPreference =
         Provider.of<DisplayPreferencesState>(context, listen: false);
     final sentTransactions = _getSentTransactions(context, contact);
 
@@ -378,7 +380,7 @@ class ContactDetailsScreen extends StatelessWidget {
                     return _buildTransactionTile(
                       sentTransactions[sentTransactions.length - 1 - index],
                       exchangeRate,
-                      displayPrefrence.amountDisplayUnit,
+                      displayPreference,
                       contact,
                     );
                   },
