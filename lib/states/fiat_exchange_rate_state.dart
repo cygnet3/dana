@@ -42,6 +42,14 @@ class FiatExchangeRateState extends ChangeNotifier {
   Map<FiatCurrency, int> get exchangeRates => Map.unmodifiable(_cachedRates);
   int? exchangeRateFor(FiatCurrency currency) => _cachedRates[currency];
   DateTime? get lastExchangeRateUpdateAt => _lastExchangeRateUpdateAt;
+
+  /// Elapsed time since the last successful rate update, or `null` if never updated.
+  Duration? get timeSinceLastExchangeRateUpdate {
+    final lastUpdate = _lastExchangeRateUpdateAt;
+    if (lastUpdate == null) return null;
+    return DateTime.now().toUtc().difference(lastUpdate);
+  }
+
   bool get isUpdating => _isUpdating;
 
   Future<void> updateExchangeRates() async {
