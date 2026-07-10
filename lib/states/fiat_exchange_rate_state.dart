@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/data/enums/fiat_currency.dart';
@@ -10,7 +12,7 @@ class FiatExchangeRateState extends ChangeNotifier {
   MempoolApiRepository repository = MempoolApiRepository();
 
   late FiatCurrency currency;
-  double? _cachedRate; // Make nullable to represent "no data available"
+  int? _cachedRate;
 
   // private constructor, create class using static async 'create' instead
   FiatExchangeRateState._();
@@ -24,9 +26,7 @@ class FiatExchangeRateState extends ChangeNotifier {
     return instance;
   }
 
-  double? get exchangeRate {
-    return _cachedRate; // Can be null if no data available
-  }
+  int? get exchangeRate => _cachedRate;
 
   Future<void> updateCurrency(FiatCurrency currency) async {
     await SettingsRepository.instance.setFiatCurrency(currency);
@@ -52,36 +52,50 @@ class FiatExchangeRateState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<double> _fetchExchangeRate(FiatCurrency currency) async {
+  Future<int> _fetchExchangeRate(FiatCurrency currency) async {
     final rates = await repository.getExchangeRate();
 
     switch (currency) {
       case FiatCurrency.eur:
-        return rates.eur.toDouble();
+        return rates.eur;
       case FiatCurrency.usd:
-        return rates.usd.toDouble();
+        return rates.usd;
       case FiatCurrency.gbp:
-        return rates.gbp.toDouble();
+        return rates.gbp;
       case FiatCurrency.cad:
-        return rates.cad.toDouble();
+        return rates.cad;
       case FiatCurrency.chf:
-        return rates.chf.toDouble();
+        return rates.chf;
       case FiatCurrency.aud:
-        return rates.aud.toDouble();
+        return rates.aud;
       case FiatCurrency.jpy:
-        return rates.jpy.toDouble();
+        return rates.jpy;
     }
+  }
+
+  BigInt _satsToFiatMinor(Amount amount, int rate) {
+    final scale = pow(10, currency.minorUnits()).toInt();
+    return amount.field0 *
+        BigInt.from(rate) *
+        BigInt.from(scale) ~/
+        BigInt.from(bitcoinUnits);
   }
 
   String displayFiat(Amount amount) {
     final symbol = currency.symbol();
     final minorUnits = currency.minorUnits();
-    if (_cachedRate != null) {
-      final btcAmount = amount.field0.toDouble() / bitcoinUnits.toDouble();
-      final fiatAmount = btcAmount * _cachedRate!;
-      return "$symbol ${fiatAmount.toStringAsFixed(minorUnits)}";
-    } else {
-      return "$symbol ---";
+    final rate = _cachedRate;
+    if (rate == null) {
+      return '$symbol ---';
     }
+
+    final minor = _satsToFiatMinor(amount, rate);
+    if (minorUnits == 0) {
+      return '$symbol $minor';
+    }
+    final scale = BigInt.from(pow(10, minorUnits));
+    final whole = minor ~/ scale;
+    final fraction = (minor % scale).toString().padLeft(minorUnits, '0');
+    return '$symbol $whole.$fraction';
   }
 }
