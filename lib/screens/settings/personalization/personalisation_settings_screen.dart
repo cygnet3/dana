@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/settings/personalization/change_amount_display_screen.dart';
@@ -59,7 +61,7 @@ class PersonalisationSettingsScreen extends StatelessWidget {
               currentCurrency: displayPreferences.fiatCurrency,
               onConfirm: (chosen) async {
                 await displayPreferences.updateFiatCurrency(chosen);
-                await fiatExchangeRate.updateCurrency(chosen);
+                unawaited(fiatExchangeRate.updateExchangeRate());
 
                 if (context.mounted) {
                   goToHomeScreen(context);

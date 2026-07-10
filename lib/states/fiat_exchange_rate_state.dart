@@ -13,11 +13,7 @@ class FiatExchangeRateState extends ChangeNotifier {
 
   Map<FiatCurrency, int> _cachedRates = const {};
 
-  FiatExchangeRateState._();
-
-  static Future<FiatExchangeRateState> create() async {
-    return FiatExchangeRateState._();
-  }
+  FiatExchangeRateState();
 
   Map<FiatCurrency, int> get exchangeRates => Map.unmodifiable(_cachedRates);
   int? exchangeRateFor(FiatCurrency currency) => _cachedRates[currency];
