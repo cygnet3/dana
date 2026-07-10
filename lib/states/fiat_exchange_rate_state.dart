@@ -9,23 +9,63 @@ import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 
 class FiatExchangeRateState extends ChangeNotifier {
+  static const _minRefreshInterval = Duration(minutes: 1);
+
   MempoolApiRepository repository = MempoolApiRepository();
 
   Map<FiatCurrency, int> _cachedRates = const {};
+  DateTime? _lastExchangeRateUpdateAt;
+  bool _isUpdating = false;
 
   FiatExchangeRateState();
 
+  /// Visible for tests only.
+  static FiatExchangeRateState withRateForTesting({
+    required Map<FiatCurrency, int> rates,
+    DateTime? lastExchangeRateUpdateAt,
+  }) {
+    for (final entry in rates.entries) {
+      if (entry.value <= 0) {
+        throw ArgumentError.value(
+          entry.value,
+          'rates[${entry.key.name}]',
+          'must be a positive number',
+        );
+      }
+    }
+    final instance = FiatExchangeRateState();
+    instance._cachedRates = Map<FiatCurrency, int>.from(rates);
+    instance._lastExchangeRateUpdateAt = lastExchangeRateUpdateAt;
+    return instance;
+  }
+
   Map<FiatCurrency, int> get exchangeRates => Map.unmodifiable(_cachedRates);
   int? exchangeRateFor(FiatCurrency currency) => _cachedRates[currency];
+  DateTime? get lastExchangeRateUpdateAt => _lastExchangeRateUpdateAt;
+  bool get isUpdating => _isUpdating;
 
-  Future<void> updateExchangeRate() async {
+  Future<void> updateExchangeRates() async {
+    if (_isUpdating) return;
+
+    final lastUpdate = _lastExchangeRateUpdateAt;
+    if (lastUpdate != null &&
+        DateTime.now().toUtc().difference(lastUpdate) < _minRefreshInterval) {
+      return;
+    }
+
+    _isUpdating = true;
+    notifyListeners();
+
     try {
       Logger().i('Updating exchange rates for all currencies');
       _cachedRates = await _fetchExchangeRates();
+      _lastExchangeRateUpdateAt = DateTime.now().toUtc();
     } catch (e) {
-      Logger().w('Failed to update exchange rate: $e');
+      Logger().e('Failed to update exchange rate: $e');
+    } finally {
+      _isUpdating = false;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<Map<FiatCurrency, int>> _fetchExchangeRates() async {
