@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/constants.dart';
+import 'package:danawallet/data/enums/amount_display_unit.dart';
 import 'package:danawallet/data/enums/fiat_currency.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/api_amount.dart';
@@ -121,6 +122,25 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
     return 'Decimal (dot \'.\' separated) amount in ${currency.symbol()}';
   }
 
+  String? _conversionHint({
+    required bool hasFiatRate,
+    required FiatExchangeRateState fiatExchangeRate,
+    required FiatCurrency fiatCurrency,
+    required AmountDisplayUnit bitcoinUnit,
+  }) {
+    if (!hasFiatRate) {
+      return 'Conversion rate unavailable';
+    }
+    final amount = _parsedAmount;
+    if (amount == null) {
+      return null;
+    }
+    if (_isFiatSelected) {
+      return '≈ ${amount.display(bitcoinUnit)}';
+    }
+    return '≈ ${fiatExchangeRate.displayFiat(amount, fiatCurrency)}';
+  }
+
   void onContinue() {
     final amount = _parsedAmount;
     if (amount == null) {
@@ -150,6 +170,12 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
     final fiatCurrency = displayPreferences.fiatCurrency;
     final bitcoinUnit = displayPreferences.amountDisplayUnit;
     final hasFiatRate = fiatExchangeRate.exchangeRateFor(fiatCurrency) != null;
+    final conversionHint = _conversionHint(
+      hasFiatRate: hasFiatRate,
+      fiatExchangeRate: fiatExchangeRate,
+      fiatCurrency: fiatCurrency,
+      bitcoinUnit: bitcoinUnit,
+    );
 
     final availableBalance = walletState.amount;
     int blocksToScan = 0;
@@ -227,6 +253,17 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
                   ),
                   keyboardType: TextInputType.number,
                 ),
+                if (conversionHint != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        conversionHint,
+                        style: BitcoinTextStyle.body5(Bitcoin.neutral7),
+                      ),
+                    ),
+                  ),
                 const SizedBox(
                   height: 10.0,
                 ),
