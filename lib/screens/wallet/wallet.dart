@@ -18,6 +18,7 @@ import 'package:danawallet/states/display_preferences_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
+import 'package:danawallet/widgets/alerts/inline_warning_banner.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/skeletons/main_screen_skeleton.dart';
 import 'package:flutter/material.dart';
@@ -120,101 +121,70 @@ class WalletScreenState extends State<WalletScreen> {
   }
 
   Widget buildOfflineStatus(ChainState chainState) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Bitcoin.orange.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Bitcoin.orange.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.cloud_off, color: Bitcoin.orange, size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Sync offline - balance may be outdated',
-              style: BitcoinTextStyle.body5(Bitcoin.orange),
-            ),
-          ),
-          GestureDetector(
-            onTap: () async {
-              // Show immediate feedback that retry is happening
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation(Bitcoin.white),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text('Retrying connection...'),
-                    ],
-                  ),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
+    return InlineWarningBanner(
+      icon: Icons.cloud_off,
+      message: 'Sync offline - balance may be outdated',
+      actionLabel: 'Retry',
+      onActionPressed: () => _retryChainConnection(chainState),
+    );
+  }
 
-              final success = await chainState.reconnect();
-
-              if (mounted) {
-                // Clear the "retrying" message first
-                ScaffoldMessenger.of(context).clearSnackBars();
-
-                if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(
-                        children: [
-                          Icon(Icons.check_circle,
-                              color: Bitcoin.green, size: 16),
-                          const SizedBox(width: 8),
-                          const Text('Successfully reconnected!'),
-                        ],
-                      ),
-                      backgroundColor: Bitcoin.green.withValues(alpha: 0.1),
-                      duration: const Duration(seconds: 3),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(
-                        children: [
-                          Icon(Icons.error_outline,
-                              color: Bitcoin.orange, size: 16),
-                          const SizedBox(width: 8),
-                          const Text(
-                              'Still unable to connect. Please try again later.'),
-                        ],
-                      ),
-                      backgroundColor: Bitcoin.red.withValues(alpha: 0.8),
-                      duration: const Duration(seconds: 4),
-                    ),
-                  );
-                }
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Bitcoin.orange,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                'Retry',
-                style: BitcoinTextStyle.body5(Bitcoin.white),
+  Future<void> _retryChainConnection(ChainState chainState) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation(Bitcoin.white),
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            const Text('Retrying connection...'),
+          ],
+        ),
+        duration: const Duration(seconds: 2),
       ),
     );
+
+    final success = await chainState.reconnect();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Bitcoin.green, size: 16),
+              const SizedBox(width: 8),
+              const Text('Successfully reconnected!'),
+            ],
+          ),
+          backgroundColor: Bitcoin.green.withValues(alpha: 0.1),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.error_outline, color: Bitcoin.orange, size: 16),
+              const SizedBox(width: 8),
+              const Text('Still unable to connect. Please try again later.'),
+            ],
+          ),
+          backgroundColor: Bitcoin.red.withValues(alpha: 0.8),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   Widget buildAmountDisplay(Amount amount, FiatExchangeRateState exchangeRate,
