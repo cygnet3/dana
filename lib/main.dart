@@ -19,14 +19,14 @@ import 'package:danawallet/services/app_info_service.dart';
 import 'package:danawallet/services/logging_service.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
+import 'package:danawallet/states/display_preferences_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/home_state.dart';
 import 'package:danawallet/states/permission_state.dart';
-import 'package:danawallet/states/sync_orchestrator.dart';
+import 'package:danawallet/services/sync_orchestrator.dart';
 import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:logger/logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -37,13 +37,12 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await RustLib.init();
-  await LoggingService.create();
+  LoggingService.create();
 
   if (Platform.isLinux) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   } else if (Platform.isAndroid) {
-    FlutterForegroundTask.initCommunicationPort();
     ForegroundSyncService.initialize();
   } else {
     Logger().e('Dana wallet is not supported on this platform');
@@ -66,35 +65,23 @@ void main() async {
   // after database migration, enable foreign_keys pragma
   DatabaseHelper.instance.enableForeignKeysPragma();
 
-  final walletState = await WalletState.create();
+  final walletState = WalletState.create();
   final permissionState = await PermissionState.create();
-  final syncProgress = await SyncProgressState.create();
+  final syncProgress = SyncProgressState.create();
   final chainState = ChainState();
   final contactsState = ContactsState();
+  final displayPreferencesState = await DisplayPreferencesState.create();
   final fiatExchangeRate = await FiatExchangeRateState.create();
-  SyncOrchestrator? syncOrchestratorRef;
-  final syncService = SyncService(
+
+  final syncOrchestrator = SyncOrchestrator(
     chainState: chainState,
     syncProgress: syncProgress,
     walletState: walletState,
     permissionState: permissionState,
-    onFatalError: () =>
-        syncOrchestratorRef?.restart(fallbackMode: true) ?? Future.value(),
   );
 
-  final syncOrchestrator = SyncOrchestrator(
-    service: syncService,
-    permissionState: permissionState,
-  );
-  syncOrchestratorRef = syncOrchestrator;
-
-  // Try to update exchange rate, but don't crash if it fails
-  try {
-    await fiatExchangeRate.updateExchangeRate();
-  } catch (e) {
-    Logger().w('Failed to update exchange rate during startup: $e');
-    // Continue with cached data or no data - UI will handle it
-  }
+  // fetch the exchange rate, but don't await the response
+  fiatExchangeRate.updateExchangeRate();
 
   await precacheImages();
 
@@ -114,12 +101,7 @@ void main() async {
 
     chainState.initialize(network);
 
-    final connected = await chainState.connect(blindbitUrl);
-    if (!connected) {
-      Logger().w("Failed to connect");
-      // Continue without chain sync - wallet still usable for local operations
-      // UI will show appropriate "offline" state
-    }
+    await chainState.connect(blindbitUrl);
 
     final addressRegistrationNeeded =
         await walletState.checkDanaAddressRegistrationNeeded();
@@ -127,6 +109,8 @@ void main() async {
     // initialize contacts with the 'you' contact
     contactsState.initialize(
         walletState.receivePaymentCode, walletState.danaAddress);
+
+    syncOrchestrator.start();
 
     if (addressRegistrationNeeded) {
       landingPage = const RegisterDanaAddressScreen();
@@ -143,6 +127,7 @@ void main() async {
       providers: [
         // simple providers for static/immutable data
         Provider.value(value: appInfo),
+        Provider.value(value: syncOrchestrator),
         // providers for mutable data
         ChangeNotifierProvider.value(value: walletState),
         ChangeNotifierProvider.value(value: syncProgress),
@@ -151,17 +136,11 @@ void main() async {
         ChangeNotifierProvider.value(value: permissionState),
         ChangeNotifierProvider.value(value: fiatExchangeRate),
         ChangeNotifierProvider.value(value: contactsState),
-        ChangeNotifierProvider.value(value: syncOrchestrator),
+        ChangeNotifierProvider.value(value: displayPreferencesState)
       ],
       child: SilentPaymentApp(landingPage: landingPage),
     ),
   );
-
-  if (walletLoaded) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      syncOrchestrator.start();
-    });
-  }
 }
 
 class SilentPaymentApp extends StatelessWidget {
@@ -182,6 +161,8 @@ class SilentPaymentApp extends StatelessWidget {
             colorScheme: ColorScheme.fromSeed(seedColor: danaBlue),
             useMaterial3: true,
             fontFamily: 'Space Grotesk',
+            // SatoshiSymbol provides the sat glyph (U+E006) via PUA fallback
+            fontFamilyFallback: const [satFontFamily],
           ),
           home: landingPage);
     });
@@ -189,13 +170,9 @@ class SilentPaymentApp extends StatelessWidget {
 }
 
 Future<void> precacheImages() async {
-  await precacheSvgPicture("assets/icons/address-book.svg");
-  await precacheSvgPicture("assets/icons/boxes.svg");
-  await precacheSvgPicture("assets/icons/contact.svg");
-  await precacheSvgPicture("assets/icons/hidden.svg");
   await precacheSvgPicture("assets/icons/rocket.svg");
-  await precacheSvgPicture("assets/icons/rocket-large.svg");
-  await precacheSvgPicture("assets/icons/sparkle.svg");
+  await precacheSvgPicture("assets/icons/address-book.svg");
+  await precacheSvgPicture("assets/icons/hidden.svg");
 }
 
 Future precacheSvgPicture(String svgPath) async {

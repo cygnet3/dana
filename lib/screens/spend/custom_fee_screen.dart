@@ -6,6 +6,7 @@ import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/spend/ready_to_send.dart';
+import 'package:danawallet/states/display_preferences_state.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
@@ -110,6 +111,8 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
   Widget build(BuildContext context) {
     final exchangeRate =
         Provider.of<FiatExchangeRateState>(context, listen: false);
+    final displayPreference =
+        Provider.of<DisplayPreferencesState>(context, listen: false);
 
     return ScreenSkeleton(
       showBackButton: true,
@@ -238,8 +241,8 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
                           Text(
                             _isLoadingFees
                                 ? 'Loading...'
-                                : _feeAmounts[_selectedFeeRate]
-                                        ?.displaySats() ??
+                                : _feeAmounts[_selectedFeeRate]?.display(
+                                        displayPreference.amountDisplayUnit) ??
                                     'N/A',
                             style: BitcoinTextStyle.body4(Bitcoin.black),
                           ),

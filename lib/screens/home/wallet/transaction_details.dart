@@ -1,4 +1,5 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
+import 'package:danawallet/extensions/string_display.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/extensions/date_time.dart';
@@ -12,10 +13,12 @@ import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/screens/contacts/add_contact_sheet.dart';
 import 'package:danawallet/screens/contacts/contact_details.dart';
 import 'package:danawallet/screens/home/wallet/transaction_note_screen.dart';
+import 'package:danawallet/data/enums/amount_display_unit.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
-import 'package:danawallet/states/fiat_exchange_rate_state.dart';
+import 'package:danawallet/states/display_preferences_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
+import 'package:danawallet/widgets/sheets/show_app_bottom_sheet.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -40,17 +43,10 @@ class TransactionDetailsScreen extends StatelessWidget {
   }
 
   void _openAddContactSheet(BuildContext context, String paymentCode) {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: AddContactSheet(
-          initialPaymentCode: paymentCode,
-        ),
+      builder: (_) => AddContactSheet(
+        initialPaymentCode: paymentCode,
       ),
     );
   }
@@ -159,7 +155,7 @@ class TransactionDetailsScreen extends StatelessWidget {
   Widget _buildTransactionIdRow(
       BuildContext context, String txid, Network network) {
     final truncatedTxid =
-        txid.length > 16 ? '${txid.substring(0, 16)}...' : txid;
+        txid.truncated(prefix: 16, suffix: 0, maxFullLength: 16);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -224,9 +220,8 @@ class TransactionDetailsScreen extends StatelessWidget {
   }
 
   Widget _buildOnchainAddressRow(BuildContext context, String address) {
-    final truncatedAddress = address.length > 16
-        ? '${address.substring(0, 8)}...${address.substring(address.length - 8)}'
-        : address;
+    final truncatedAddress =
+        address.truncated(prefix: 8, suffix: 8, maxFullLength: 16);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -267,7 +262,8 @@ class TransactionDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailsSection(_TransactionData txData, ChainState chainState) {
+  Widget _buildDetailsSection(
+      _TransactionData txData, ChainState chainState, AmountDisplayUnit unit) {
     int? confirmations;
     if (txData.confirmationHeight != null && chainState.available) {
       confirmations = chainState.tip - txData.confirmationHeight! + 1;
@@ -282,9 +278,9 @@ class TransactionDetailsScreen extends StatelessWidget {
               confirmations != null
                   ? '${txData.confirmationHeight} ($confirmations ${confirmations == 1 ? 'confirmation' : 'confirmations'})'
                   : txData.confirmationHeight.toString()),
-        if (txData.fee != null) _buildInfoRow('Fee', txData.fee!.displayBtc()),
+        if (txData.fee != null) _buildInfoRow('Fee', txData.fee!.display(unit)),
         if (txData.change != null && txData.change!.field0 > BigInt.zero)
-          _buildInfoRow('Change', txData.change!.displayBtc()),
+          _buildInfoRow('Change', txData.change!.display(unit)),
       ],
     );
   }
@@ -320,14 +316,14 @@ class TransactionDetailsScreen extends StatelessWidget {
   }
 
   _TransactionData _extractTransactionData(
-      RecordedTransaction tx, FiatExchangeRateState exchangeRate) {
+      RecordedTransaction tx, AmountDisplayUnit unit) {
     final dateDisplay = _getDateDisplay(tx);
 
     switch (tx) {
       case RecordedTransactionIncoming incoming:
         return _TransactionData(
           txid: incoming.txid,
-          amount: incoming.amount.displaySats(),
+          amount: incoming.amount.display(unit),
           amountPrefix: '+',
           amountColor: Bitcoin.green,
           isIncoming: true,
@@ -340,7 +336,7 @@ class TransactionDetailsScreen extends StatelessWidget {
       case RecordedTransactionOutgoing outgoing:
         return _TransactionData(
           txid: outgoing.txid,
-          amount: outgoing.totalOutgoing().displaySats(),
+          amount: outgoing.totalOutgoing().display(unit),
           amountPrefix: '-',
           amountColor: outgoing.confirmationHeight == null
               ? Bitcoin.neutral4
@@ -357,7 +353,7 @@ class TransactionDetailsScreen extends StatelessWidget {
       case RecordedTransactionUnknownOutgoing unknown:
         return _TransactionData(
           txid: 'Unknown',
-          amount: unknown.amount.displaySats(),
+          amount: unknown.amount.display(unit),
           amountPrefix: '-',
           amountColor: Bitcoin.red,
           isIncoming: false,
@@ -387,14 +383,15 @@ class TransactionDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final walletState = Provider.of<WalletState>(context);
     final chainState = Provider.of<ChainState>(context);
-    final exchangeRate = Provider.of<FiatExchangeRateState>(context);
+    final displayPreference = Provider.of<DisplayPreferencesState>(context);
     final contactsState = Provider.of<ContactsState>(context);
     final network = walletState.network;
 
     final transaction = walletState.transactions.firstWhere(
       (t) => t.id == transactionId,
     );
-    final txData = _extractTransactionData(transaction, exchangeRate);
+    final txData = _extractTransactionData(
+        transaction, displayPreference.amountDisplayUnit);
 
     return ScreenSkeleton(
       showBackButton: true,
@@ -495,7 +492,8 @@ class TransactionDetailsScreen extends StatelessWidget {
             const Divider(height: 1),
             _buildTransactionIdRow(context, txData.txid, network),
             const Divider(height: 1),
-            _buildDetailsSection(txData, chainState),
+            _buildDetailsSection(
+                txData, chainState, displayPreference.amountDisplayUnit),
           ],
         ),
       ),

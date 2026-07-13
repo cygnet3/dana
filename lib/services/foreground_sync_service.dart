@@ -13,6 +13,7 @@ class ForegroundSyncService {
 
   /// Call once at app startup, before runApp().
   static void initialize() {
+    FlutterForegroundTask.initCommunicationPort();
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: _notificationChannelId,

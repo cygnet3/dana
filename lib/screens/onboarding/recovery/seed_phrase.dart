@@ -12,7 +12,7 @@ import 'package:danawallet/screens/onboarding/recovery/birthday_picker_screen.da
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
-import 'package:danawallet/states/sync_orchestrator.dart';
+import 'package:danawallet/services/sync_orchestrator.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/loading_widget.dart';
@@ -108,29 +108,26 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
       contactsState.initialize(
           walletState.receivePaymentCode, walletState.danaAddress);
 
-      if (context.mounted) {
-        final Widget nextScreen = goToDanaAddressSetup
-            ? const RegisterDanaAddressScreen()
-            : const HomeScreen();
-        if (Platform.isAndroid) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(
-              builder: (context) => NotificationPermissionScreen(
-                goToDanaAddressSetup: goToDanaAddressSetup,
-              ),
-            ),
-            (Route<dynamic> route) => false,
-          );
-        } else {
-          await orchestrator.start();
-          if (!context.mounted) return;
-          Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => nextScreen),
-              (Route<dynamic> route) => false);
-        }
+      await orchestrator.start();
+
+      if (!context.mounted) return;
+
+      final Widget nextScreen;
+      if (Platform.isAndroid) {
+        nextScreen = NotificationPermissionScreen(
+          goToDanaAddressSetup: goToDanaAddressSetup,
+        );
+      } else if (goToDanaAddressSetup) {
+        nextScreen = const RegisterDanaAddressScreen();
+      } else {
+        nextScreen = const HomeScreen();
       }
+
+      // clear path (don't allow users to go back to registration screen by pressing 'back')
+      Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => nextScreen),
+          (Route<dynamic> route) => false);
     } catch (e) {
       if (context.mounted) {
         setState(() {

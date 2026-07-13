@@ -8,6 +8,7 @@ import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/spend/fee_selection.dart';
 import 'package:danawallet/states/contacts_state.dart';
+import 'package:danawallet/states/display_preferences_state.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
@@ -34,12 +35,9 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
       _amountErrorText = null;
     });
 
-    final BigInt amount;
+    final Amount amount;
     try {
-      amount = BigInt.from(int.parse(amountController.text));
-      if (amount <= BigInt.from(0)) {
-        throw const FormatException('Amount must be positive');
-      }
+      amount = AmountExtension.parseUserInput(amountController.text);
     } on FormatException catch (e) {
       setState(() {
         _amountErrorText = 'Invalid amount: $e';
@@ -52,14 +50,14 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
       return;
     }
 
-    if (amount > availableBalance.field0) {
+    if (amount > availableBalance) {
       setState(() {
         _amountErrorText = 'Not enough available funds';
       });
       return;
     }
 
-    if (amount < BigInt.from(defaultDustLimit)) {
+    if (amount < Amount(field0: BigInt.from(defaultDustLimit))) {
       setState(() {
         _amountErrorText = 'Please send at least $defaultDustLimit sats';
       });
@@ -68,7 +66,7 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
 
     final recipient = Recipient(
       paymentCode: widget.paymentCode,
-      amount: Amount(field0: amount),
+      amount: amount,
     );
 
     goToScreen(
@@ -82,10 +80,14 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
     final walletState = Provider.of<WalletState>(context, listen: false);
     final chainState = Provider.of<ChainState>(context, listen: false);
     final contacts = Provider.of<ContactsState>(context, listen: false);
+    final displayPreferences =
+        Provider.of<DisplayPreferencesState>(context, listen: false);
+
+    final bitcoinUnit = displayPreferences.amountDisplayUnit;
 
     final availableBalance = walletState.amount;
     int blocksToScan = 0;
-    if (walletState.lastSync != null) {
+    if (walletState.lastSync != null && chainState.available) {
       blocksToScan = chainState.tip - walletState.lastSync!;
     }
 
@@ -145,15 +147,17 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
                   decoration: InputDecoration(
                     border: const OutlineInputBorder(),
                     labelText: 'Enter an amount',
+                    helperText:
+                        'Integer for sats, decimal (dot \'.\' separated) for BTC',
                     errorText: _amountErrorText,
-                    suffixText: 'sats',
                   ),
                   keyboardType: TextInputType.number,
                 ),
                 const SizedBox(
                   height: 10.0,
                 ),
-                Text('Available Balance: ${availableBalance.displaySats()}',
+                Text(
+                    'Available Balance: ${availableBalance.display(bitcoinUnit)}',
                     style: BitcoinTextStyle.body3(Bitcoin.black)
                         .apply(fontWeightDelta: 1)),
                 if (blocksToScan != 0)

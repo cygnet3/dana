@@ -1,7 +1,7 @@
 name: danawallet
 description: A silent payments wallet built in flutter.
 publish_to: 'none'
-version: 0.8.0+38
+version: 0.8.1+43
 
 environment:
   sdk: ^3.5.2
@@ -80,3 +80,6 @@ flutter:
           weight: 600
         - asset: fonts/SpaceGrotesk-Bold.ttf
           weight: 700
+    - family: SatoshiSymbol
+      fonts:
+        - asset: fonts/SatoshiSymbol.ttf

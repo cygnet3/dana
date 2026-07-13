@@ -21,14 +21,6 @@ class FiatExchangeRateState extends ChangeNotifier {
         await SettingsRepository.instance.getFiatCurrency() ?? defaultCurrency;
     instance.currency = currency;
 
-    try {
-      final rate = await instance._fetchExchangeRate(currency);
-      instance._cachedRate = rate;
-    } catch (e) {
-      Logger().w('Failed to fetch exchange rate: $e');
-      instance._cachedRate = null;
-    }
-
     return instance;
   }
 
@@ -53,12 +45,11 @@ class FiatExchangeRateState extends ChangeNotifier {
       Logger().i("Updating exchange rate: ${currency.displayName()}");
       final rate = await _fetchExchangeRate(currency);
       _cachedRate = rate;
-      notifyListeners();
     } catch (e) {
       Logger().w('Failed to update exchange rate: $e');
-      // Keep current state (which might be null), don't crash
-      // UI will show unavailable indicator
+      _cachedRate = null;
     }
+    notifyListeners();
   }
 
   Future<double> _fetchExchangeRate(FiatCurrency currency) async {

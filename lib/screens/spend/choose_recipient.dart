@@ -4,8 +4,10 @@ import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/global_functions.dart';
+import 'package:danawallet/screens/contacts/add_contact_sheet.dart';
 import 'package:danawallet/screens/spend/amount_selection.dart';
 import 'package:danawallet/states/contacts_state.dart';
+import 'package:danawallet/widgets/sheets/show_app_bottom_sheet.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/states/chain_state.dart';
@@ -27,6 +29,7 @@ class ChooseRecipientScreen extends StatefulWidget {
 class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
   late final TextEditingController textFieldController;
   String? _addressErrorText;
+  bool _showContactSuggestions = true;
 
   @override
   void initState() {
@@ -57,17 +60,14 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
         style: BitcoinTextStyle.body5(Bitcoin.black),
       ),
       onTap: () {
-        setState(() {
-          _addressErrorText = null;
-          textFieldController.text = contact.paymentCode;
-        });
+        setState(() => _addressErrorText = null);
         FocusScope.of(context).unfocus();
-        onContinue();
+        onContinue(contact: contact);
       },
     );
   }
 
-  Future<void> onContinue() async {
+  Future<void> onContinue({Contact? contact}) async {
     setState(() {
       _addressErrorText = null;
     });
@@ -77,48 +77,55 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
         Provider.of<ContactsState>(context, listen: false).getYouContact();
 
     try {
-      Bip353Address? bip353Address;
-      String paymentCode;
+      final String resolvedPaymentCode;
+      final Bip353Address? resolvedBip353;
 
-      String textField = textFieldController.text.trim();
+      if (contact != null) {
+        // Selected from contact list — use contact data directly, leave field unchanged.
+        resolvedPaymentCode = contact.paymentCode;
+        resolvedBip353 = contact.bip353Address;
+      } else {
+        final textField = textFieldController.text.trim();
 
-      if (textField.isEmpty) {
-        throw Exception("Please enter a valid payment info");
-      } else if (textField == youContact.paymentCode) {
-        throw Exception("You cannot send to yourself");
-      }
-
-      if (textField.contains('@')) {
-        // we interpret the input as a bip353 address
-        Logger().d('Resolving dana address: "$textField"');
-
-        bip353Address = Bip353Address.fromString(textField);
-
-        final resolvedPaymentCode =
-            await Bip353Resolver.resolve(bip353Address, network);
-
-        if (resolvedPaymentCode == null) {
-          // DNS resolution returned null - address not registered
-          Logger().w('Dana address "$textField" not found in DNS');
-          throw Exception('Dana address not found or not registered');
-        }
-
-        // set payment code to resolved code
-        paymentCode = resolvedPaymentCode;
-
-        if (paymentCode == youContact.paymentCode) {
+        if (textField.isEmpty) {
+          throw Exception("Please enter a valid payment info");
+        } else if (textField == youContact.paymentCode) {
           throw Exception("You cannot send to yourself");
         }
 
-        Logger().d(
-            'Successfully resolved dana address to SP address: ${resolvedPaymentCode.substring(0, 20)}...');
-      } else {
-        // we interpret the input field as an on-chain address
-        paymentCode = textField;
+        if (textField.contains('@')) {
+          Logger().d('Resolving dana address: "$textField"');
+
+          final parsed = Bip353Address.fromString(textField);
+          final resolved = await Bip353Resolver.resolve(parsed, network);
+
+          if (resolved == null) {
+            Logger().w('Dana address "$textField" not found in DNS');
+            throw Exception('Dana address not found or not registered');
+          }
+
+          resolvedPaymentCode = resolved;
+          resolvedBip353 = parsed;
+
+          if (resolvedPaymentCode == youContact.paymentCode) {
+            throw Exception("You cannot send to yourself");
+          }
+
+          Logger().d(
+              'Successfully resolved dana address to SP address: ${resolvedPaymentCode.substring(0, 20)}...');
+        } else {
+          resolvedPaymentCode = textField;
+          resolvedBip353 = null;
+        }
+      }
+
+      if (resolvedPaymentCode == youContact.paymentCode) {
+        throw Exception("You cannot send to yourself");
       }
 
       try {
-        validateAddressWithNetwork(address: paymentCode, network: network);
+        validateAddressWithNetwork(
+            address: resolvedPaymentCode, network: network);
       } catch (e) {
         if (e.toString().contains('network')) {
           throw InvalidNetworkException();
@@ -131,8 +138,8 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
         goToScreen(
             context,
             AmountSelectionScreen(
-              paymentCode: paymentCode,
-              providedBip353: bip353Address,
+              paymentCode: resolvedPaymentCode,
+              providedBip353: resolvedBip353,
             ));
       }
     } catch (e) {
@@ -142,9 +149,17 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
     }
   }
 
+  Future<void> _openAddContactSheet(String query) async {
+    await showAppBottomSheet<bool>(
+      context: context,
+      builder: (_) => AddContactSheet(initialDanaQuery: query),
+    );
+  }
+
   Future<void> onPasteFromClipboard() async {
     ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
     if (data != null) {
+      setState(() => _showContactSuggestions = false);
       textFieldController.text = data.text ?? '';
       await onContinue();
     }
@@ -158,6 +173,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
       ),
     );
     if (result is String && result != "") {
+      setState(() => _showContactSuggestions = false);
       textFieldController.text = result;
       await onContinue();
     }
@@ -166,9 +182,12 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
   @override
   Widget build(BuildContext context) {
     final contactsState = Provider.of<ContactsState>(context);
-    final query = textFieldController.text.toLowerCase().trim();
+    final searchText = textFieldController.text.trim();
+    final query = searchText.toLowerCase();
     final filteredContacts = contactsState.filterContacts(query);
     final hasQuery = query.isNotEmpty;
+    final noContactMatches =
+        _showContactSuggestions && hasQuery && filteredContacts.isEmpty;
 
     return ScreenSkeleton(
         showBackButton: true,
@@ -191,6 +210,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
                     }),
                     onChanged: (_) => setState(() {
                       _addressErrorText = null;
+                      _showContactSuggestions = true;
                     }),
                     style: BitcoinTextStyle.body4(Bitcoin.black),
                     controller: textFieldController,
@@ -203,6 +223,30 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
                       errorText: _addressErrorText,
                     ),
                   ),
+                  if (noContactMatches)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: RichText(
+                        text: TextSpan(
+                          style: BitcoinTextStyle.body5(Bitcoin.neutral7),
+                          children: [
+                            TextSpan(
+                                text: 'No contact matches "$searchText". '),
+                            WidgetSpan(
+                              alignment: PlaceholderAlignment.baseline,
+                              baseline: TextBaseline.alphabetic,
+                              child: GestureDetector(
+                                onTap: () => _openAddContactSheet(searchText),
+                                child: Text(
+                                  'Create a new contact?',
+                                  style: BitcoinTextStyle.body5(Bitcoin.orange),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   if (hasQuery && filteredContacts.isNotEmpty) ...[
                     const SizedBox(height: 8.0),
                     ConstrainedBox(

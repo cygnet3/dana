@@ -1,4 +1,4 @@
-default: prepare run
+default: run
 
 # use fvm if available, else use flutter directly
 flutter := if `which fvm 2> /dev/null || true` != "" { "fvm flutter" }  else { "flutter" }
@@ -16,7 +16,6 @@ run flags="":
     #!/bin/sh
     flags={{flags}}
     flags="$flags --flavor local"
-    flags="$flags --target lib/main_local.dart"
     flags="$flags --dart-define=GIT_HASH={{git_hash}}"
     {{flutter}} run $flags
 
@@ -37,7 +36,7 @@ inspect-db:
           sqlite3 /tmp/dana.db
         ;;
         "linux-x64")
-          sqlite3 .dart_tool/sqflite_common_ffi/databases/dana.db
+          sqlite3 ~/.dana/dana.db
         ;;
         *) echo "unknown platform: {{platform}}"
     esac

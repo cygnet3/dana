@@ -51,7 +51,7 @@ class WalletState extends ChangeNotifier {
   // private constructor
   WalletState._();
 
-  static Future<WalletState> create() async {
+  static WalletState create() {
     final instance = WalletState._();
     return instance;
   }

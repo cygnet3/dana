@@ -1,3 +1,4 @@
+import 'package:danawallet/data/enums/amount_display_unit.dart';
 import 'package:danawallet/data/enums/fiat_currency.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -5,6 +6,7 @@ const String _keyBlindbitUrl = "blindbiturl";
 const String _keyDustLimit = "dustlimit";
 const String _keyFiatCurrency = "fiatcurrency";
 const String _keyBlockExplorerUrl = "blockexplorerurl";
+const String _keyAmountDisplayUnit = "amountdisplayunit";
 
 class SettingsRepository {
   final SharedPreferencesAsync prefs = SharedPreferencesAsync();
@@ -20,7 +22,8 @@ class SettingsRepository {
       _keyBlindbitUrl,
       _keyDustLimit,
       _keyFiatCurrency,
-      _keyBlockExplorerUrl
+      _keyBlockExplorerUrl,
+      _keyAmountDisplayUnit,
     });
   }
 
@@ -72,5 +75,19 @@ class SettingsRepository {
     final currency = await prefs.getString(_keyFiatCurrency);
 
     return currency != null ? FiatCurrency.values.byName(currency) : null;
+  }
+
+  Future<void> setAmountDisplayUnit(AmountDisplayUnit? unit) async {
+    if (unit != null) {
+      return await prefs.setString(_keyAmountDisplayUnit, unit.name);
+    } else {
+      return await prefs.remove(_keyAmountDisplayUnit);
+    }
+  }
+
+  Future<AmountDisplayUnit?> getAmountDisplayUnit() async {
+    final unit = await prefs.getString(_keyAmountDisplayUnit);
+
+    return unit != null ? AmountDisplayUnit.values.byName(unit) : null;
   }
 }

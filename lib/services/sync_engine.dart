@@ -7,7 +7,7 @@ import 'package:danawallet/extensions/outpoint.dart';
 import 'package:danawallet/generated/rust/api/chain.dart';
 import 'package:danawallet/generated/rust/api/stream.dart';
 import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
-import 'package:danawallet/generated/rust/stream.dart';
+import 'package:danawallet/generated/rust/api/structs/state_update.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
 import 'package:danawallet/repositories/owned_outputs_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';

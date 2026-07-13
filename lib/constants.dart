@@ -1,3 +1,4 @@
+import 'package:danawallet/data/enums/amount_display_unit.dart';
 import 'package:danawallet/data/enums/fiat_currency.dart';
 import 'package:flutter/services.dart';
 
@@ -62,3 +63,18 @@ const String bgKeyFatalError = 'fatalError';
 
 // Message keys sent to the background sync service from the main isolate.
 const String bgKeySync = 'sync';
+
+// Enforce english convention for amounts inputs
+const String decimalSeparator = '.';
+const String groupSeparator = ',';
+
+// Amount display symbols
+// ₿ is U+20BF, a standard Unicode character — no custom font needed
+const String btcSymbol = '₿';
+// Satoshi symbol glyphs live in the SatoshiSymbol font (Private Use Area)
+// U+E007 = satoshisymbol-solid, U+E000 = satoshisymbol-outline
+const String satSymbol = '\uE007';
+const String satSymbolOutline = '\uE000';
+const String satFontFamily = 'SatoshiSymbol';
+
+const AmountDisplayUnit defaultAmountDisplayUnit = AmountDisplayUnit.btc;

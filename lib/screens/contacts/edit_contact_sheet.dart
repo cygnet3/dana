@@ -6,6 +6,7 @@ import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
+import 'package:danawallet/widgets/sheets/app_bottom_sheet_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
@@ -190,37 +191,14 @@ class _EditContactSheetState extends State<EditContactSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(25.0),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+    return AppBottomSheetShell(
+      title: 'Edit Contact',
       child: Form(
         key: _formKey,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Bitcoin.neutral4,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            // Title
-            Text(
-              'Edit Contact',
-              style: BitcoinTextStyle.title4(Bitcoin.black),
-            ),
-            const SizedBox(height: 20),
-            // Name field
             TextField(
               controller: _nameController,
               focusNode: _nameFocusNode,
@@ -232,7 +210,6 @@ class _EditContactSheetState extends State<EditContactSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            // Dana address field
             TextField(
               controller: _bip353Controller,
               focusNode: _bip353FocusNode,
@@ -252,20 +229,17 @@ class _EditContactSheetState extends State<EditContactSheet> {
               ),
             ],
             const SizedBox(height: 20),
-            // Save button
             FooterButton(
               title: _isUpdating ? 'Updating...' : 'Update',
               onPressed: _isUpdating ? null : _updateContact,
               enabled: !_isUpdating,
             ),
             const SizedBox(height: 12),
-            // Delete button
             FooterButton(
               title: 'Delete Contact',
               onPressed: _deleteContact,
               color: Colors.red,
             ),
-            SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
           ],
         ),
       ),

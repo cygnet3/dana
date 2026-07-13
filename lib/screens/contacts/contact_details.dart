@@ -1,6 +1,7 @@
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/constants.dart';
+import 'package:danawallet/data/enums/amount_display_unit.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/data/models/recorded_transaction.dart';
@@ -14,10 +15,13 @@ import 'package:danawallet/screens/contacts/edit_contact_sheet.dart';
 import 'package:danawallet/screens/spend/amount_selection.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
+import 'package:danawallet/states/display_preferences_state.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/back_button.dart';
 import 'package:danawallet/widgets/loading_widget.dart';
+import 'package:danawallet/widgets/sheets/app_bottom_sheet_shell.dart';
+import 'package:danawallet/widgets/sheets/show_app_bottom_sheet.dart';
 import 'package:danawallet/widgets/text/scrollable_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -59,11 +63,9 @@ class ContactDetailsScreen extends StatelessWidget {
   }
 
   void _showEditContactSheet(BuildContext context, Contact contact) async {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => EditContactSheet(
+      builder: (_) => EditContactSheet(
         contact: contact,
       ),
     );
@@ -133,22 +135,18 @@ class ContactDetailsScreen extends StatelessWidget {
   }
 
   void _showAddFieldSheet(BuildContext context, int contactId) {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => AddEditFieldSheet(
+      builder: (_) => AddEditFieldSheet(
         contactId: contactId,
       ),
     );
   }
 
   void _showEditFieldSheet(BuildContext context, ContactField field) {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => AddEditFieldSheet(
+      builder: (_) => AddEditFieldSheet(
         field: field,
         contactId: contactId,
       ),
@@ -235,38 +233,13 @@ class ContactDetailsScreen extends StatelessWidget {
   }
 
   void _showStaticAddressSheet(BuildContext context, String paymentCode) {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(25.0),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
+      builder: (_) => AppBottomSheetShell(
+        title: 'Static Address',
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Bitcoin.neutral4,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            // Title
-            Text(
-              'Static Address',
-              style: BitcoinTextStyle.title4(Bitcoin.black),
-            ),
-            const SizedBox(height: 20),
-            // QR Code
             GestureDetector(
               onTap: () => _copyStaticAddress(context, paymentCode),
               child: Container(
@@ -282,7 +255,6 @@ class ContactDetailsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            // Address text
             GestureDetector(
               onTap: () => _copyStaticAddress(context, paymentCode),
               child: Container(
@@ -303,7 +275,6 @@ class ContactDetailsScreen extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
           ],
         ),
       ),
@@ -324,8 +295,11 @@ class ContactDetailsScreen extends StatelessWidget {
     }).toList();
   }
 
-  ListTile _buildTransactionTile(RecordedTransaction tx,
-      FiatExchangeRateState exchangeRate, Contact contact) {
+  ListTile _buildTransactionTile(
+      RecordedTransaction tx,
+      FiatExchangeRateState exchangeRate,
+      AmountDisplayUnit bitcoinUnit,
+      Contact contact) {
     if (tx is! RecordedTransactionOutgoing) {
       throw Exception('Expected outgoing transaction');
     }
@@ -334,9 +308,9 @@ class ContactDetailsScreen extends StatelessWidget {
     final date = tx.confirmationHeight?.toString() ?? 'Unconfirmed';
     final color =
         tx.confirmationHeight == null ? Bitcoin.neutral4 : Bitcoin.red;
-    final amount = tx.totalOutgoing().displayBtc();
+    final amount = tx.totalOutgoing();
     const amountprefix = '-';
-    final amountFiat = exchangeRate.displayFiat(tx.totalOutgoing());
+    final amountFiat = exchangeRate.displayFiat(amount);
     const title = 'Outgoing transaction';
     final text = tx.toString();
     final image = Image(
@@ -353,7 +327,8 @@ class ContactDetailsScreen extends StatelessWidget {
             style: BitcoinTextStyle.body4(Bitcoin.black),
           ),
           const Spacer(),
-          Text('$amountprefix $amount', style: BitcoinTextStyle.body4(color)),
+          Text('$amountprefix ${amount.display(bitcoinUnit)}',
+              style: BitcoinTextStyle.body4(color)),
         ],
       ),
       subtitle: Row(
@@ -378,64 +353,36 @@ class ContactDetailsScreen extends StatelessWidget {
   void _showSentTransactionsSheet(BuildContext context, Contact contact) {
     final exchangeRate =
         Provider.of<FiatExchangeRateState>(context, listen: false);
+    final displayPrefrence =
+        Provider.of<DisplayPreferencesState>(context, listen: false);
     final sentTransactions = _getSentTransactions(context, contact);
 
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(25.0),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Bitcoin.neutral4,
-                  borderRadius: BorderRadius.circular(2),
+      builder: (_) => AppBottomSheetShell(
+        title: 'Sent to ${contact.displayName}',
+        child: Flexible(
+          child: sentTransactions.isEmpty
+              ? Center(
+                  child: Text(
+                    'No transactions sent to this contact',
+                    style: BitcoinTextStyle.body3(Bitcoin.neutral6),
+                  ),
+                )
+              : ListView.separated(
+                  shrinkWrap: true,
+                  separatorBuilder: (context, index) => const Divider(),
+                  reverse: false,
+                  itemCount: sentTransactions.length,
+                  itemBuilder: (context, index) {
+                    return _buildTransactionTile(
+                      sentTransactions[sentTransactions.length - 1 - index],
+                      exchangeRate,
+                      displayPrefrence.amountDisplayUnit,
+                      contact,
+                    );
+                  },
                 ),
-              ),
-            ),
-            // Title
-            Text(
-              'Sent to ${contact.displayName}',
-              style: BitcoinTextStyle.title4(Bitcoin.black),
-            ),
-            const SizedBox(height: 20),
-            // Transactions list
-            Flexible(
-              child: sentTransactions.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No transactions sent to this contact',
-                        style: BitcoinTextStyle.body3(Bitcoin.neutral6),
-                      ),
-                    )
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      separatorBuilder: (context, index) => const Divider(),
-                      reverse: false,
-                      itemCount: sentTransactions.length,
-                      itemBuilder: (context, index) {
-                        return _buildTransactionTile(
-                          sentTransactions[sentTransactions.length - 1 - index],
-                          exchangeRate,
-                          contact,
-                        );
-                      },
-                    ),
-            ),
-            SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
-          ],
         ),
       ),
     );

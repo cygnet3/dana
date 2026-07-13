@@ -68,7 +68,7 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
   bool _isCheckingAvailability = false;
   bool? _isCustomUsernameAvailable;
   bool _isRegistering = false;
-  String? _customUsername;
+  Bip353Address? _addressToRegister;
   String? _validationError;
   bool _hasUserEdited = false;
   String? _suggestedUsername;
@@ -94,8 +94,16 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
       try {
         final suggestedUsername = await walletState.createSuggestedUsername();
         final domain = await addressService.danaAddressDomain;
+        final Bip353Address? addressToRegister;
+        if (suggestedUsername != null) {
+          addressToRegister =
+              Bip353Address(username: suggestedUsername, domain: domain);
+        } else {
+          addressToRegister = null;
+        }
 
         setState(() {
+          _addressToRegister = addressToRegister;
           _danaAddressService = addressService;
           _suggestedUsername = suggestedUsername;
           _domain = domain;
@@ -124,7 +132,6 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
         _customUsernameController.text = _suggestedUsername!;
         _hasUserEdited = false;
         setState(() {
-          _customUsername = null;
           _isCustomUsernameAvailable = null;
           _validationError = null;
         });
@@ -150,18 +157,20 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
   /// - Not be a reserved name
   ///
   /// This ensures DNS compatibility and BIP353 compliance
-  String? _validateUsername(String username) {
+  Bip353Address _validateUsername(String username, String domain) {
     // Normalize to lowercase for validation
     final cleaned = username.trim().toLowerCase();
 
     // Check minimum length
     if (cleaned.length < _minUsernameLength) {
-      return 'Dana address must be at least $_minUsernameLength characters';
+      throw Exception(
+          'Dana address must be at least $_minUsernameLength characters');
     }
 
     // Check maximum length
     if (cleaned.length > _maxUsernameLength) {
-      return 'Dana address must be $_maxUsernameLength characters or less';
+      throw Exception(
+          'Dana address must be $_maxUsernameLength characters or less');
     }
 
     // Check DNS-safe characters: letters, numbers, hyphens, and periods
@@ -169,25 +178,27 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
     final dnsRegex = RegExp(r'^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$');
     if (!dnsRegex.hasMatch(cleaned)) {
       if (cleaned.startsWith('-') || cleaned.endsWith('-')) {
-        return 'Dana address cannot start or end with a hyphen';
+        throw Exception('Dana address cannot start or end with a hyphen');
       }
       if (cleaned.startsWith('.') || cleaned.endsWith('.')) {
-        return 'Dana address cannot start or end with a period';
+        throw Exception('Dana address cannot start or end with a period');
       }
       if (cleaned.startsWith('_') || cleaned.endsWith('_')) {
-        return 'Dana address cannot start or end with an underscore';
+        throw Exception('Dana address cannot start or end with an underscore');
       }
       if (cleaned.contains(' ')) {
-        return 'Dana address cannot contain spaces';
+        throw Exception('Dana address cannot contain spaces');
       }
-      return 'Dana address can only contain letters, numbers, hyphens, periods, and underscores';
+      throw Exception(
+          'Dana address can only contain letters, numbers, hyphens, periods, and underscores');
     }
 
     // Check for consecutive special characters
     if (cleaned.contains('--') ||
         cleaned.contains('..') ||
         cleaned.contains('__')) {
-      return 'Dana address cannot contain consecutive special characters';
+      throw Exception(
+          'Dana address cannot contain consecutive special characters');
     }
 
     // Check for mixed consecutive special characters
@@ -197,60 +208,68 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
         cleaned.contains('_.') ||
         cleaned.contains('_-') ||
         cleaned.contains('-_')) {
-      return 'Dana address cannot mix special characters';
+      throw Exception('Dana address cannot mix special characters');
     }
 
     // Check reserved names
     if (_reservedNames.contains(cleaned)) {
-      return 'Dana address "$cleaned" is reserved';
+      throw Exception('Dana address "$cleaned" is reserved');
     }
 
-    return null; // Valid
+    // if the resulting Dana address is not a valid bip353 address, we will throw an error
+    return Bip353Address(username: username, domain: domain);
   }
 
   void _onUsernameChanged(String value) {
     // Cancel any pending debounce timer
     _debounceTimer?.cancel();
 
-    final username = value.trim();
-
-    // Handle empty input
-    if (username.isEmpty || _domain == null) {
+    // domain must be set
+    if (_domain == null) {
       setState(() {
         _isCustomUsernameAvailable = null;
-        _customUsername = null;
         _validationError = null;
         _isCheckingAvailability = false;
       });
       return;
     }
 
-    // Normalize to lowercase for consistency
-    final normalized = username.toLowerCase();
+    final username = value.trim();
 
-    // Validate username format
-    final validationError = _validateUsername(normalized);
-    if (validationError != null) {
+    try {
+      Bip353Address addressToRegister;
+      if (username.isNotEmpty) {
+        // if using a custom username, check for validity
+        addressToRegister = _validateUsername(username, _domain!);
+      } else {
+        // if no username is provided, use the sugggested username
+        if (_suggestedUsername == null) {
+          throw Exception(
+              "No username provided, and no suggested username available");
+        }
+        // note: this can still fail if the suggested username is not a valid bip353 address
+        addressToRegister =
+            Bip353Address(username: _suggestedUsername!, domain: _domain!);
+      }
       setState(() {
-        _customUsername = normalized;
+        _addressToRegister = addressToRegister;
         _isCustomUsernameAvailable = null;
-        _validationError = validationError;
+        _validationError = null;
         _isCheckingAvailability = false;
       });
-      return;
+      // Debounce: wait for user to stop typing before checking availability
+      _debounceTimer = Timer(_debounceDuration, () {
+        _checkAvailability(addressToRegister.username);
+      });
+    } catch (e) {
+      // if we receive an error while validating, display this error to the user
+      setState(() {
+        _addressToRegister = null;
+        _isCustomUsernameAvailable = null;
+        _validationError = exceptionToString(e);
+        _isCheckingAvailability = false;
+      });
     }
-
-    // Clear validation error and set username
-    setState(() {
-      _customUsername = normalized;
-      _validationError = null;
-      _isCheckingAvailability = false;
-    });
-
-    // Debounce: wait for user to stop typing before checking availability
-    _debounceTimer = Timer(_debounceDuration, () {
-      _checkAvailability(normalized);
-    });
   }
 
   Future<void> _checkAvailability(String username) async {
@@ -261,7 +280,7 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
     try {
       final isAvailable =
           await _danaAddressService!.isDanaUsernameAvailable(username);
-      if (mounted && _customUsername == username) {
+      if (mounted && _addressToRegister?.username == username) {
         setState(() {
           _isCustomUsernameAvailable = isAvailable;
           _isCheckingAvailability = false;
@@ -269,7 +288,7 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
       }
     } catch (e) {
       Logger().e('Error checking availability: $e');
-      if (mounted && _customUsername == username) {
+      if (mounted && _addressToRegister?.username == username) {
         setState(() {
           _isCustomUsernameAvailable = null;
           _isCheckingAvailability = false;
@@ -281,26 +300,9 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
   Future<void> _onRegister() async {
     final walletState = Provider.of<WalletState>(context, listen: false);
     final contactsState = Provider.of<ContactsState>(context, listen: false);
-    // Determine which username to use (from the text field)
-    final currentText = _customUsernameController.text.trim();
-    final rawUsername =
-        currentText.isNotEmpty ? currentText : _suggestedUsername;
-
-    if (rawUsername == null || rawUsername.isEmpty) {
+    if (_addressToRegister == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No Dana address available to register')),
-      );
-      return;
-    }
-
-    // Normalize username to lowercase before registration
-    final usernameToRegister = rawUsername.toLowerCase();
-
-    // Validate the username one more time before registration
-    final validationError = _validateUsername(usernameToRegister);
-    if (validationError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Invalid username: $validationError')),
       );
       return;
     }
@@ -310,7 +312,7 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
     });
 
     try {
-      await walletState.registerDanaAddress(usernameToRegister);
+      await walletState.registerDanaAddress(_addressToRegister!.username);
 
       if (!mounted) return;
 
@@ -331,6 +333,13 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
             MaterialPageRoute(builder: (context) => const HomeScreen()),
             (Route<dynamic> route) => false,
           );
+
+          // if we're using the live environment, show a warning message after redirecting
+          if (isLiveEnv) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              showMainnetWarning();
+            });
+          }
         }
       } else {
         throw Exception('Registration succeeded but dana address is null');
@@ -357,13 +366,6 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
     if (_domain == null) {
       return const LoadingWidget();
     }
-
-    // Determine which username will be registered
-    final finalUsername = _customUsername?.isNotEmpty == true
-        ? _customUsername
-        : _suggestedUsername;
-    final finalDanaAddress =
-        (finalUsername != null) ? '$finalUsername@$_domain' : null;
 
     final body = SingleChildScrollView(
       child: Column(
@@ -425,11 +427,9 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
                   if (value.isEmpty) {
                     setState(() {
                       _hasUserEdited = false;
-                      _customUsername = null;
                       _isCustomUsernameAvailable = null;
                       _validationError = null;
                     });
-                    return;
                   } else if (!_hasUserEdited && value.isNotEmpty) {
                     setState(() {
                       _hasUserEdited = true;
@@ -451,8 +451,8 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
 
               // Availability indicator below text field (only show if user has edited and it's different from suggested)
               if (_hasUserEdited &&
-                  _customUsername?.isNotEmpty == true &&
-                  _customUsername != _suggestedUsername &&
+                  _addressToRegister != null &&
+                  _addressToRegister?.username != _suggestedUsername &&
                   _validationError == null) ...[
                 const SizedBox(height: 12),
                 Row(
@@ -497,85 +497,19 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
             ],
           ),
 
-          SizedBox(height: Adaptive.h(4)),
-
           // "Your Dana address will be" at the bottom
-          AutoSizeText(
-            'Your Dana address will be',
-            style: BitcoinTextStyle.body3(Bitcoin.neutral6)
-                .copyWith(fontFamily: 'Inter', fontWeight: FontWeight.w400),
-            maxLines: 1,
-            textAlign: TextAlign.center,
-          ),
-
-          SizedBox(height: Adaptive.h(2)),
-
-          // Display current dana address (custom if entered, otherwise suggested)
-          if (finalDanaAddress != null)
-            Bip353Address.fromString(finalDanaAddress).asRichText(17.0)
-          else
+          if (_addressToRegister != null) ...[
+            SizedBox(height: Adaptive.h(4)),
             AutoSizeText(
-              'No Dana address available',
-              style: BitcoinTextStyle.body2(Bitcoin.neutral6),
+              'Your Dana address will be',
+              style: BitcoinTextStyle.body3(Bitcoin.neutral6)
+                  .copyWith(fontFamily: 'Inter', fontWeight: FontWeight.w400),
               maxLines: 1,
               textAlign: TextAlign.center,
             ),
-
-          SizedBox(height: Adaptive.h(4)),
-
-          // BIP353 info block
-          GestureDetector(
-            onTap: () async {
-              final url = Uri.parse(
-                  'https://bitcoin.design/guide/how-it-works/human-readable-addresses/');
-              if (await canLaunchUrl(url)) {
-                await launchUrl(url, mode: LaunchMode.externalApplication);
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              decoration: BoxDecoration(
-                color: Bitcoin.neutral2,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: Bitcoin.neutral7,
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: RichText(
-                      textAlign: TextAlign.center,
-                      text: TextSpan(
-                        style: BitcoinTextStyle.body2(Bitcoin.neutral7)
-                            .copyWith(fontSize: 11),
-                        children: [
-                          const TextSpan(
-                              text: 'Dana addresses are using BIP353, '),
-                          TextSpan(
-                            text: 'click here to know more',
-                            style:
-                                BitcoinTextStyle.body2(Bitcoin.blue).copyWith(
-                              fontSize: 11,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Extra bottom padding for keyboard clearance
-          SizedBox(height: Adaptive.h(10)),
+            SizedBox(height: Adaptive.h(2)),
+            _addressToRegister!.asRichText(17.0)
+          ],
         ],
       ),
     );
@@ -602,16 +536,65 @@ class _RegisterDanaAddressScreenState extends State<RegisterDanaAddressScreen> {
       enabled: isButtonEnabled && !_isRegistering,
     );
 
-    final Widget footer;
-    if (isDevEnv) {
-      footer = Column(children: [
+    final bip353Info =
+        // BIP353 info block
+        GestureDetector(
+      onTap: () async {
+        final url = Uri.parse(
+            'https://bitcoin.design/guide/how-it-works/human-readable-addresses/');
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
+          color: Bitcoin.neutral2,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.info_outline,
+              size: 16,
+              color: Bitcoin.neutral7,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: RichText(
+                textAlign: TextAlign.center,
+                text: TextSpan(
+                  style: BitcoinTextStyle.body2(Bitcoin.neutral7)
+                      .copyWith(fontSize: 11),
+                  children: [
+                    const TextSpan(text: 'Dana addresses are using BIP353, '),
+                    TextSpan(
+                      text: 'click here to know more',
+                      style: BitcoinTextStyle.body2(Bitcoin.blue).copyWith(
+                        fontSize: 11,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final Widget footer = Column(children: [
+      bip353Info,
+      SizedBox(height: Adaptive.h(2)),
+      if (isDevEnv) ...[
         skipButton,
         SizedBox(height: Adaptive.h(2)),
-        registerButton,
-      ]);
-    } else {
-      footer = registerButton;
-    }
+      ],
+      registerButton,
+    ]);
 
     return PopScope(
       canPop: false,

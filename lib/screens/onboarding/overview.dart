@@ -14,7 +14,7 @@ import 'package:danawallet/screens/onboarding/onboarding_skeleton.dart';
 import 'package:danawallet/screens/onboarding/recovery/seed_phrase.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
-import 'package:danawallet/states/sync_orchestrator.dart';
+import 'package:danawallet/services/sync_orchestrator.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button_outlined.dart';
@@ -70,29 +70,26 @@ class _OverviewScreenState extends State<OverviewScreen> {
     // initialize contacts state with the user's payment code
     contactsState.initialize(walletState.receivePaymentCode, null);
 
+    await orchestrator.start();
+
+    if (!context.mounted) return;
+
+    final Widget nextScreen;
     if (Platform.isAndroid) {
-      if (!context.mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (context) => NotificationPermissionScreen(
-            goToDanaAddressSetup: goToDanaAddressSetup,
-          ),
-        ),
-        (Route<dynamic> route) => false,
+      nextScreen = NotificationPermissionScreen(
+        goToDanaAddressSetup: goToDanaAddressSetup,
       );
+    } else if (goToDanaAddressSetup) {
+      nextScreen = const RegisterDanaAddressScreen();
     } else {
-      final nextScreen = goToDanaAddressSetup
-          ? const RegisterDanaAddressScreen()
-          : const HomeScreen();
-      await orchestrator.start();
-      if (!context.mounted) return;
-      // clear path (don't allow users to go back to registration screen by pressing 'back')
-      Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => nextScreen),
-          (Route<dynamic> route) => false);
+      nextScreen = const HomeScreen();
     }
+
+    // clear path (don't allow users to go back to registration screen by pressing 'back')
+    Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => nextScreen),
+        (Route<dynamic> route) => false);
   }
 
   Future<void> onRestoreMnemonic(BuildContext context) async {
