@@ -1,14 +1,12 @@
 import 'dart:typed_data';
 
 import 'package:danawallet/extensions/api_amount.dart';
-import 'package:danawallet/generated/rust/api/legacy/owned_outputs.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/owned_output.dart';
 import 'package:danawallet/generated/rust/lib.dart';
 import 'package:danawallet/repositories/database_helper.dart';
 import 'package:logger/logger.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 class OwnedOutputsRepository {
@@ -134,47 +132,4 @@ class OwnedOutputsRepository {
       WHERE blockheight > ?
     ''', [height]);
   }
-}
-
-// ============================================
-// LEGACY MIGRATION
-// ============================================
-
-/// Checks SharedPreferences for a legacy owned-outputs blob and, if found,
-/// migrates it into SQLite and removes the old key.
-///
-/// LEGACY: can be removed once no users remain on pre-SQLite versions.
-Future<void> migrateOutputsFromSharedPreferences() async {
-  final prefs = SharedPreferencesAsync();
-  final encoded = await prefs.getString('ownedoutputs');
-  if (encoded == null) return;
-
-  Logger().i("Migrating owned outputs from SharedPreferences to SQLite");
-
-  final decoded = LegacyOwnedOutputsStruct.decode(encodedOutputs: encoded);
-  final outputs = decoded.toApiOwnedOutputs();
-
-  int migrated = 0;
-
-  final db = await DatabaseHelper.instance.database;
-  await db.transaction((txn) async {
-    for (final output in outputs) {
-      Uint8List? label;
-      if (output.label != null) {
-        label = Uint8List.fromList(output.label!);
-      }
-      await txn.insert('owned_outputs', {
-        'txid': output.outpoint.txid,
-        'vout': output.outpoint.vout,
-        'tweak': Uint8List.fromList(output.tweak.toList()),
-        'amount_sat': output.amount.toSat(),
-        'script': output.script,
-        'label': label,
-      });
-      migrated++;
-    }
-  });
-
-  Logger().i("Migrated $migrated outputs (of ${outputs.length} total)");
-  await prefs.remove('ownedoutputs');
 }

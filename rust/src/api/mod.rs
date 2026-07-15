@@ -4,7 +4,6 @@
 
 pub mod bip39;
 pub mod chain;
-pub mod legacy;
 pub mod simple;
 pub mod stream;
 pub mod structs;
