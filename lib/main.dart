@@ -51,9 +51,6 @@ void main() async {
   // Initialize database
   await DatabaseHelper.instance.database;
 
-  // after database migration, enable foreign_keys pragma
-  DatabaseHelper.instance.enableForeignKeysPragma();
-
   final walletState = WalletState.create();
   final permissionState = await PermissionState.create();
   final syncProgress = SyncProgressState.create();

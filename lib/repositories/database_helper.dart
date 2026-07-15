@@ -44,6 +44,7 @@ class DatabaseHelper {
       version: version,
       onUpgrade: (db, oldVersion, newVersion) =>
           _performMigrations(db, oldVersion, migrations),
+      onConfigure: _onConfigure,
     );
   }
 
@@ -60,8 +61,7 @@ class DatabaseHelper {
     }
   }
 
-  Future<void> enableForeignKeysPragma() async {
-    final db = await database;
+  Future<void> _onConfigure(Database db) async {
     await db.execute("PRAGMA foreign_keys = ON");
   }
 
