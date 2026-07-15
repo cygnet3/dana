@@ -1,15 +1,11 @@
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/data/models/recorded_transaction.dart';
-import 'package:danawallet/generated/rust/api/legacy/history.dart';
-import 'package:danawallet/generated/rust/api/legacy/recorded_transaction.dart'
-    as frb_legacy;
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/repositories/database_helper.dart';
 import 'package:logger/logger.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 class TransactionsRepository {
@@ -362,104 +358,5 @@ class TransactionsRepository {
       'UPDATE transactions SET user_note = ?, user_note_updated_at = ? WHERE id = ?',
       [note.isEmpty ? null : note, updatedAt, transactionId],
     );
-  }
-}
-
-// ============================================
-// LEGACY MIGRATION
-// ============================================
-
-/// Checks SharedPreferences for a legacy tx-history blob and, if found,
-/// migrates it into SQLite and removes the old key.
-///
-/// LEGACY: TxHistory.decode() is only used here for migration.
-/// Can be removed once no users remain on pre-SQLite versions.
-Future<void> migrateTxHistoryFromSharedPreferences(String changeCode) async {
-  final prefs = SharedPreferencesAsync();
-  final encoded = await prefs.getString('txhistory');
-  if (encoded == null) return;
-
-  Logger().i("Migrating transaction history from SharedPreferences to SQLite");
-
-  final history = LegacyTxHistoryStruct.decode(encodedHistory: encoded);
-  final transactions = history.toApiTransactions();
-
-  final db = await DatabaseHelper.instance.database;
-  await db.transaction((txn) async {
-    for (final tx in transactions) {
-      await _insertTransaction(txn, tx, changeCode);
-    }
-  });
-
-  Logger().i("Migrated ${transactions.length} transactions");
-  await prefs.remove('txhistory');
-}
-
-Future<void> _insertTransaction(DatabaseExecutor executor,
-    frb_legacy.RecordedTransaction tx, String changeCode) async {
-  switch (tx) {
-    case frb_legacy.RecordedTransaction_Incoming(:final field0):
-      await executor.insert(
-          'transactions',
-          {
-            'txid': field0.txid,
-            'confirmation_height': field0.confirmationHeight,
-            'confirmation_blockhash': field0.confirmationBlockhash,
-          },
-          conflictAlgorithm: ConflictAlgorithm.ignore);
-      break;
-
-    case frb_legacy.RecordedTransaction_Outgoing(:final field0):
-      final txOutgoingId = await executor.insert(
-          'transactions',
-          {
-            'txid': field0.txid,
-            'confirmation_height': field0.confirmationHeight?.toInt(),
-            'confirmation_blockhash': field0.confirmationBlockhash?.toString(),
-          },
-          conflictAlgorithm: ConflictAlgorithm.ignore);
-
-      for (final outpoint in field0.spentOutpoints) {
-        await executor.insert('tx_spent_outpoints', {
-          'transaction_id': txOutgoingId,
-          'outpoint_txid': outpoint.txid,
-          'outpoint_vout': outpoint.vout,
-        });
-      }
-
-      for (final recipient in field0.recipients) {
-        await executor.insert('tx_recipients', {
-          'transaction_id': txOutgoingId,
-          'payment_code': recipient.paymentCode,
-          'amount_sat': recipient.amount.toSat(),
-        });
-      }
-      // in the legacy output format we used to store the change amount separately
-      // to migrate, we need to add a new change output ourselves manually
-      if (field0.change > Amount.zero()) {
-        await executor.insert('tx_recipients', {
-          'transaction_id': txOutgoingId,
-          'payment_code': changeCode,
-          'amount_sat': field0.change.toSat(),
-        });
-      }
-
-      break;
-
-    case frb_legacy.RecordedTransaction_UnknownOutgoing(:final field0):
-      final txOutgoingId = await executor.insert('transactions', {
-        'txid': null,
-        'confirmation_height': field0.confirmationHeight,
-        'confirmation_blockhash': field0.confirmationBlockhash,
-      });
-
-      for (final outpoint in field0.spentOutpoints) {
-        await executor.insert('tx_spent_outpoints', {
-          'transaction_id': txOutgoingId,
-          'outpoint_txid': outpoint.txid,
-          'outpoint_vout': outpoint.vout,
-        });
-      }
-      break;
   }
 }
