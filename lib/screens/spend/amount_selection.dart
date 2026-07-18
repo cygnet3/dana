@@ -266,7 +266,7 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
                     labelText: 'Enter an amount',
                     helperText: _amountHelperText(fiatCurrency),
                     errorText: _amountErrorText,
-                    suffix: CurrencyUnitToggle(
+                    suffixIcon: CurrencyUnitToggle(
                       isFiatSelected: _isFiatSelected,
                       fiatSymbol: fiatCurrency.symbol(),
                       enabled: hasFiatRate,
