@@ -168,7 +168,7 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
 
   void onContinue() {
     final amount = _parsedAmount;
-    if (amount == null) {
+    if (amount == null || _amountErrorText != null) {
       return;
     }
 
@@ -324,7 +324,7 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
         children: [
           FooterButton(
             title: 'Proceed to fee selection',
-            enabled: _parsedAmount != null,
+            enabled: _parsedAmount != null && _amountErrorText == null,
             onPressed: onContinue,
           ),
         ],
