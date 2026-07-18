@@ -293,7 +293,7 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
                   height: 10.0,
                 ),
                 Text(
-                    'Available Balance: ${availableBalance.display(bitcoinUnit)}',
+                    'Available Balance: ${_isFiatSelected && hasFiatRate ? fiatExchangeRate.displayFiat(availableBalance, fiatCurrency) : availableBalance.display(bitcoinUnit)}',
                     style: BitcoinTextStyle.body3(Bitcoin.black)
                         .apply(fontWeightDelta: 1)),
                 if (blocksToScan != 0)
