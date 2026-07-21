@@ -50,6 +50,10 @@ class FiatExchangeRateState extends ChangeNotifier {
     return DateTime.now().toUtc().difference(lastUpdate);
   }
 
+  bool get isStale => timeSinceLastExchangeRateUpdate == null
+      ? false
+      : timeSinceLastExchangeRateUpdate! >= staleExchangeRateThreshold;
+
   bool get isUpdating => _isUpdating;
 
   Future<void> updateExchangeRates() async {

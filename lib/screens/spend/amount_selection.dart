@@ -38,26 +38,17 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
   String? _amountErrorText;
   Amount? _parsedAmount; // always sats
   bool _isFiatSelected = false;
-  Duration? _staleExchangeRateAge;
 
   @override
   void initState() {
     super.initState();
     amountController.addListener(_onAmountChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_refreshExchangeRateAndWarnIfStale());
+      // after intializing, force an update of the exchange rate
+      final fiatExchangeRate =
+          Provider.of<FiatExchangeRateState>(context, listen: false);
+      unawaited(fiatExchangeRate.updateExchangeRates());
     });
-  }
-
-  Future<void> _refreshExchangeRateAndWarnIfStale() async {
-    final fiatExchangeRate =
-        Provider.of<FiatExchangeRateState>(context, listen: false);
-    await fiatExchangeRate.updateExchangeRates();
-    if (!mounted) return;
-
-    final age = fiatExchangeRate.timeSinceLastExchangeRateUpdate;
-    final isStale = age != null && age >= staleExchangeRateThreshold;
-    setState(() => _staleExchangeRateAge = isStale ? age : null);
   }
 
   String _formatAge(Duration age) {
@@ -304,12 +295,12 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
                           '$blocksToScan block(s) to scan, balance might be inaccurate.',
                     ),
                   ),
-                if (_staleExchangeRateAge != null)
+                if (fiatExchangeRate.isStale)
                   Padding(
                     padding: const EdgeInsets.only(top: 8.0),
                     child: InlineWarningBanner(
                       message:
-                          'Exchange rate last updated ${_formatAge(_staleExchangeRateAge!)} ago, ${fiatCurrency.displayName()} conversion may be inaccurate.',
+                          'Exchange rate last updated ${_formatAge(fiatExchangeRate.timeSinceLastExchangeRateUpdate!)} ago, ${fiatCurrency.displayName()} conversion may be inaccurate.',
                     ),
                   ),
               ],
