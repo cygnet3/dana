@@ -119,8 +119,8 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "backend-blindbit-v1"
-version = "0.7.0"
-source = "git+https://github.com/cygnet3/spdk?tag=v0.7.0#89ba87409979f00041b3719fd140e983f0330ada"
+version = "0.1.0"
+source = "git+https://github.com/cygnet3/spdk?rev=83fc3cdabbfca366ad5a405e4d3fa5d1a0201f28#83fc3cdabbfca366ad5a405e4d3fa5d1a0201f28"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -150,8 +150,9 @@ dependencies = [
 
 [[package]]
 name = "bark-bitcoin-ext"
-version = "0.6.0"
-source = "git+https://gitlab.com/Sosthene00/bark.git?rev=83ab79264159869503b16fa475e0ed61ffa33174#83ab79264159869503b16fa475e0ed61ffa33174"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66b37e898a854bfab1f0cc74438c0209b11bea560ed8aa18f47e8b86582eb6d3"
 dependencies = [
  "bitcoin 0.32.8",
  "lazy_static",
@@ -209,10 +210,13 @@ checksum = "32637268377fc7b10a8c6d51de3e7fba1ce5dd371a96e342b34e6078db558e7f"
 [[package]]
 name = "bip321"
 version = "0.4.0"
-source = "git+https://gitlab.com/Sosthene00/bark.git?rev=83ab79264159869503b16fa475e0ed61ffa33174#83ab79264159869503b16fa475e0ed61ffa33174"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f271e8045de1a54f03466b260a59633b902f3f3dc98967c5eaca2dac40b79e5"
 dependencies = [
  "bark-bitcoin-ext",
  "bitcoin 0.32.8",
+ "lightning",
+ "lightning-invoice",
  "percent-encoding",
  "thiserror",
 ]
@@ -590,6 +594,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dnssec-prover"
+version = "0.6.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9468f1a08c50bd1e5ad91b151e11ce8e806f8fa1c1eb9b07f66c7011de45a2e"
+
+[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -819,6 +829,12 @@ name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
+
+[[package]]
+name = "hashbrown"
+version = "0.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43a3c133739dddd0d2990f9a4bdf8eb4b21ef50e4851ca85ab661199821d510e"
 
 [[package]]
 name = "hashbrown"
@@ -1198,6 +1214,60 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5aba8db14291edd000dfcc4d620c7ebfb122c613afb886ca8803fa4e128a20a"
 
 [[package]]
+name = "libm"
+version = "0.2.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
+
+[[package]]
+name = "lightning"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ab16d2a714c0b26d7230bd388ac383a30fce231c8927c62752afc0471a36dc6"
+dependencies = [
+ "bech32 0.11.1",
+ "bitcoin 0.32.8",
+ "dnssec-prover",
+ "hashbrown 0.13.2",
+ "libm",
+ "lightning-invoice",
+ "lightning-macros",
+ "lightning-types",
+ "possiblyrandom",
+]
+
+[[package]]
+name = "lightning-invoice"
+version = "0.34.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47d83bd798e04ab9eecc8bbef1fa17d3808859bcdc0406bd16c55d51c8834444"
+dependencies = [
+ "bech32 0.11.1",
+ "bitcoin 0.32.8",
+ "lightning-types",
+]
+
+[[package]]
+name = "lightning-macros"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4c717494cdc2c8bb85bee7113031248f5f6c64f8802b33c1c9e2d98e594aa71"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.96",
+]
+
+[[package]]
+name = "lightning-types"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c77c676d4a34cceb2ae3756916e446b4d17f9430a24107e099981f0f9aec77e6"
+dependencies = [
+ "bitcoin 0.32.8",
+]
+
+[[package]]
 name = "litemap"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1389,6 +1459,15 @@ name = "portable-atomic"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "350e9b48cbc6b0e028b0473b114454c6316e57336ee184ceab6e53f72c178b3e"
+
+[[package]]
+name = "possiblyrandom"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c564dbf654befd49035528299f1208a40508f6e07efb11c163444e304e4484f"
+dependencies = [
+ "getrandom 0.2.15",
+]
 
 [[package]]
 name = "powerfmt"
@@ -1909,8 +1988,8 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "silentpayments"
-version = "0.7.0"
-source = "git+https://github.com/cygnet3/spdk?tag=v0.7.0#89ba87409979f00041b3719fd140e983f0330ada"
+version = "0.6.0"
+source = "git+https://github.com/cygnet3/spdk?rev=83fc3cdabbfca366ad5a405e4d3fa5d1a0201f28#83fc3cdabbfca366ad5a405e4d3fa5d1a0201f28"
 dependencies = [
  "bech32 0.9.1",
  "bitcoin_hashes 0.13.0",
@@ -1967,8 +2046,8 @@ dependencies = [
 
 [[package]]
 name = "spdk-core"
-version = "0.7.0"
-source = "git+https://github.com/cygnet3/spdk?tag=v0.7.0#89ba87409979f00041b3719fd140e983f0330ada"
+version = "0.1.0"
+source = "git+https://github.com/cygnet3/spdk?rev=83fc3cdabbfca366ad5a405e4d3fa5d1a0201f28#83fc3cdabbfca366ad5a405e4d3fa5d1a0201f28"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1980,8 +2059,8 @@ dependencies = [
 
 [[package]]
 name = "spdk-wallet"
-version = "0.7.0"
-source = "git+https://github.com/cygnet3/spdk?tag=v0.7.0#89ba87409979f00041b3719fd140e983f0330ada"
+version = "0.1.0"
+source = "git+https://github.com/cygnet3/spdk?rev=83fc3cdabbfca366ad5a405e4d3fa5d1a0201f28#83fc3cdabbfca366ad5a405e4d3fa5d1a0201f28"
 dependencies = [
  "anyhow",
  "backend-blindbit-v1",
@@ -1990,6 +2069,7 @@ dependencies = [
  "bitcoin 0.32.8",
  "futures",
  "log",
+ "rand 0.8.5",
  "rayon",
  "serde",
  "silentpayments",

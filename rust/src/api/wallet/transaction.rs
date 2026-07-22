@@ -1,18 +1,52 @@
 use crate::api::structs::network::Network;
-use crate::api::structs::owned_output::OwnedOutput;
+use crate::api::structs::owned_output::{OwnedOutput, WalletUtxo};
 use crate::api::structs::recipient::Recipient;
 use crate::api::structs::unsigned_transaction::SilentPaymentUnsignedTransaction;
 
 use anyhow::Result;
 use bip39::rand::{thread_rng, RngCore};
 use spdk_wallet::backend_blindbit_v1::BlindbitClient;
-use spdk_wallet::bitcoin::secp256k1::Scalar;
-use spdk_wallet::bitcoin::ScriptBuf;
-use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex, OutPoint};
-use spdk_wallet::client::{FeeRate, RecipientAddress, SpClient};
-use spdk_wallet::updater::DiscoveredOutput;
+use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex};
+use spdk_wallet::client::{
+    propose_coin_selections, propose_drain_selection, FeeRate, RecipientAddress, SpClient, Strategy,
+};
 
 use super::SpWallet;
+
+/// We currently always create a single change output.
+const N_CHANGE_OUTPUTS: usize = 1;
+
+/// Pick the preferred selection out of the candidates produced by the
+/// coin-selection strategies: a changeless transaction first (no change
+/// output to fingerprint), then the lowest fee, then the greedy fallback.
+fn pick_default_selection(
+    mut selections: Vec<spdk_wallet::client::InputSelection>,
+) -> Result<spdk_wallet::client::InputSelection> {
+    for preferred in [Strategy::Changeless, Strategy::LowestFee, Strategy::Greedy] {
+        if let Some(pos) = selections.iter().position(|s| s.strategy == preferred) {
+            return Ok(selections.swap_remove(pos));
+        }
+    }
+    selections
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow::Error::msg("no successful coin selection"))
+}
+
+fn to_utxos_and_recipients(
+    owned_outputs: Vec<OwnedOutput>,
+    api_recipients: Vec<Recipient>,
+) -> Result<(Vec<WalletUtxo>, Vec<spdk_wallet::client::Recipient>)> {
+    let available_utxos = owned_outputs
+        .into_iter()
+        .map(|o| o.try_into_utxo())
+        .collect::<Result<Vec<_>>>()?;
+    let recipients = api_recipients
+        .into_iter()
+        .map(|r| r.try_into())
+        .collect::<Result<Vec<spdk_wallet::client::Recipient>>>()?;
+    Ok((available_utxos, recipients))
+}
 
 impl SpWallet {
     #[flutter_rust_bridge::frb(sync)]
@@ -23,32 +57,20 @@ impl SpWallet {
         feerate: f32,
         network: Network,
     ) -> Result<SilentPaymentUnsignedTransaction> {
-        let client = &self.client;
-        let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = owned_outputs
-            .into_iter()
-            .map(|output| {
-                let outpoint = output.outpoint.into();
-                let label = match output.label {
-                    Some(l) => Some(Scalar::from_be_bytes(l)?.into()),
-                    None => None,
-                };
-                let output = DiscoveredOutput {
-                    tweak: Scalar::from_be_bytes(output.tweak)?,
-                    value: output.amount.into(),
-                    script_pubkey: ScriptBuf::from_bytes(output.script),
-                    label,
-                };
-                Ok((outpoint, output))
-            })
-            .collect();
-        let recipients: Vec<spdk_wallet::client::Recipient> = api_recipients
-            .into_iter()
-            .map(|r| r.try_into().unwrap())
-            .collect();
-        let res = client.create_new_transaction(
-            available_utxos?,
-            recipients,
+        let (available_utxos, recipients) = to_utxos_and_recipients(owned_outputs, api_recipients)?;
+
+        let selections = propose_coin_selections(
+            &available_utxos,
+            &recipients,
             FeeRate::from_sat_per_vb(feerate),
+            N_CHANGE_OUTPUTS,
+        )?;
+        let selection = pick_default_selection(selections)?;
+
+        let res = self.client.create_transaction_from_selection(
+            &available_utxos,
+            recipients,
+            selection,
             network.into(),
         )?;
 
@@ -63,30 +85,29 @@ impl SpWallet {
         feerate: f32,
         network: Network,
     ) -> Result<SilentPaymentUnsignedTransaction> {
-        let client = &self.client;
-        let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = owned_outputs
+        let available_utxos = owned_outputs
             .into_iter()
-            .map(|output| {
-                let outpoint = output.outpoint.into();
-                let label = match output.label {
-                    Some(l) => Some(Scalar::from_be_bytes(l)?.into()),
-                    None => None,
-                };
-                let output = DiscoveredOutput {
-                    tweak: Scalar::from_be_bytes(output.tweak)?,
-                    value: output.amount.into(),
-                    script_pubkey: ScriptBuf::from_bytes(output.script),
-                    label,
-                };
-                Ok((outpoint, output))
-            })
-            .collect();
+            .map(|o| o.try_into_utxo())
+            .collect::<Result<Vec<_>>>()?;
 
         let recipient_address: RecipientAddress = RecipientAddress::try_from(wipe_address)?;
-        let res = client.create_drain_transaction(
-            available_utxos?,
-            recipient_address,
+        let selection = propose_drain_selection(
+            &available_utxos,
+            &recipient_address,
             FeeRate::from_sat_per_vb(feerate),
+        )?;
+
+        // The drain amount is only known after fee estimation: it is whatever
+        // is left after paying the fee for spending all UTXOs.
+        let recipients = vec![spdk_wallet::client::Recipient {
+            address: recipient_address,
+            amount: selection.sent,
+        }];
+
+        let res = self.client.create_transaction_from_selection(
+            &available_utxos,
+            recipients,
+            selection,
             network.into(),
         )?;
 

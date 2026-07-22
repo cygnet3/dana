@@ -5,11 +5,13 @@ use spdk_wallet::{
         hex::{DisplayHex, FromHex},
         Network,
     },
+    client::FeeRate,
     silentpayments::utils::sending::PartialSecret,
 };
 
 use crate::api::structs::amount::Amount;
 use crate::api::structs::discovered_output::DiscoveredOutput;
+use crate::api::structs::input_selection::CoinSelectionStrategy;
 use crate::api::structs::recipient::Recipient;
 
 pub struct SilentPaymentUnsignedTransaction {
@@ -18,6 +20,14 @@ pub struct SilentPaymentUnsignedTransaction {
     pub partial_secret: [u8; 32],
     pub unsigned_tx: Option<String>,
     pub network: String,
+    /// Wallet change amount (zero for drain / changeless selections).
+    pub change: Amount,
+    /// Indices into `recipients` that are change outputs.
+    pub change_indexes: Vec<u32>,
+    pub fee: Amount,
+    /// Fee rate in satoshis per virtual byte.
+    pub actual_fee_rate: f32,
+    pub strategy: CoinSelectionStrategy,
 }
 
 impl From<spdk_wallet::client::SilentPaymentUnsignedTransaction>
@@ -36,6 +46,11 @@ impl From<spdk_wallet::client::SilentPaymentUnsignedTransaction>
                 .unsigned_tx
                 .map(|tx| serialize(&tx).to_lower_hex_string()),
             network: value.network.to_core_arg().to_string(),
+            change: value.change.into(),
+            change_indexes: value.change_indexes.into_iter().map(|i| i as u32).collect(),
+            fee: value.fee.into(),
+            actual_fee_rate: value.actual_fee_rate.as_sat_vb(),
+            strategy: value.strategy.into(),
         }
     }
 }
@@ -60,59 +75,46 @@ impl From<SilentPaymentUnsignedTransaction>
                 .unsigned_tx
                 .map(|tx| deserialize(&Vec::from_hex(&tx).unwrap()).unwrap()),
             network: Network::from_core_arg(&value.network).unwrap(),
+            change: value.change.into(),
+            change_indexes: value.change_indexes.into_iter().map(|i| i as usize).collect(),
+            fee: value.fee.into(),
+            actual_fee_rate: FeeRate::from_sat_per_vb(value.actual_fee_rate),
+            strategy: value.strategy.into(),
         }
     }
 }
 
 impl SilentPaymentUnsignedTransaction {
     #[frb(sync)]
-    pub fn get_send_amount(&self, change_code: String) -> Amount {
+    pub fn get_send_amount(&self) -> Amount {
         let amount = self
             .recipients
             .iter()
-            .filter_map(|r| {
-                if r.payment_code != change_code {
-                    Some(r.amount.0)
-                } else {
-                    None
-                }
-            })
+            .enumerate()
+            .filter(|(i, _)| !self.change_indexes.contains(&(*i as u32)))
+            .map(|(_, r)| r.amount.0)
             .sum();
 
         Amount(amount)
     }
 
     #[frb(sync)]
-    pub fn get_change_amount(&self, change_code: String) -> Amount {
-        let amount = self
-            .recipients
-            .iter()
-            .filter_map(|r| {
-                if r.payment_code == change_code {
-                    Some(r.amount.0)
-                } else {
-                    None
-                }
-            })
-            .sum();
-        Amount(amount)
+    pub fn get_change_amount(&self) -> Amount {
+        self.change.clone()
     }
 
     #[frb(sync)]
     pub fn get_fee_amount(&self) -> Amount {
-        let input_sum: u64 = self.selected_utxos.iter().map(|(_, o)| o.value.0).sum();
-
-        let output_sum: u64 = self.recipients.iter().map(|r| r.amount.0).sum();
-
-        Amount(input_sum - output_sum)
+        self.fee.clone()
     }
 
     #[frb(sync)]
-    pub fn get_recipients(&self, change_code: String) -> Vec<Recipient> {
+    pub fn get_recipients(&self) -> Vec<Recipient> {
         self.recipients
             .iter()
-            .filter(|r| r.payment_code != change_code)
-            .cloned()
+            .enumerate()
+            .filter(|(i, _)| !self.change_indexes.contains(&(*i as u32)))
+            .map(|(_, r)| r.clone())
             .collect()
     }
 }
