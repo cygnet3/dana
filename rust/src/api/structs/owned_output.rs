@@ -1,7 +1,13 @@
+use std::collections::HashMap;
+
 use flutter_rust_bridge::frb;
 
 use crate::api::structs::amount::Amount;
 use crate::api::structs::outpoint::OutPoint;
+
+use anyhow::Result;
+use spdk_wallet::bitcoin::secp256k1::Scalar;
+use spdk_wallet::bitcoin::{ScriptBuf, TxOut};
 
 #[derive(Debug, Clone)]
 #[frb]
@@ -11,4 +17,41 @@ pub struct OwnedOutput {
     pub amount: Amount,
     pub script: Vec<u8>,
     pub label: Option<[u8; 32]>,
+}
+
+/// The wallet's native UTXO map, as used by the coin-selection and
+/// transaction-construction functions.
+pub(crate) type WalletUtxos =
+    HashMap<spdk_wallet::bitcoin::OutPoint, spdk_wallet::scanner::DiscoveredOutput>;
+
+impl OwnedOutput {
+    /// Convert to the wallet's native UTXO representation.
+    pub(crate) fn try_into_utxo(
+        self,
+    ) -> Result<(
+        spdk_wallet::bitcoin::OutPoint,
+        spdk_wallet::scanner::DiscoveredOutput,
+    )> {
+        let label = match self.label {
+            Some(l) => Some(Scalar::from_be_bytes(l)?.into()),
+            None => None,
+        };
+        let output = spdk_wallet::scanner::DiscoveredOutput {
+            tweak: Scalar::from_be_bytes(self.tweak)?,
+            txout: TxOut {
+                value: self.amount.into(),
+                script_pubkey: ScriptBuf::from_bytes(self.script),
+            },
+            label,
+        };
+        Ok((self.outpoint.into(), output))
+    }
+
+    /// Convert a list of owned outputs into the wallet's native UTXO map.
+    pub(crate) fn try_into_utxos(owned_outputs: Vec<Self>) -> Result<WalletUtxos> {
+        owned_outputs
+            .into_iter()
+            .map(|o| o.try_into_utxo())
+            .collect()
+    }
 }
