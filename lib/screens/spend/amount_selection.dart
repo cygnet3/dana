@@ -46,8 +46,15 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
   @override
   void initState() {
     super.initState();
+    final initial = widget.initialAmount;
+    if (initial != null) {
+      amountController.text = initial.field0.toString();
+    }
     amountController.addListener(_onAmountChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (initial != null) {
+        _onAmountChanged();
+      }
       // after intializing, force an update of the exchange rate
       final fiatExchangeRate =
           Provider.of<FiatExchangeRateState>(context, listen: false);
