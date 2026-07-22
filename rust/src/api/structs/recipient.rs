@@ -29,3 +29,12 @@ impl TryFrom<Recipient> for spdk_wallet::client::Recipient {
         Ok(res)
     }
 }
+
+impl Recipient {
+    /// Convert API recipients into the wallet's native recipient list.
+    pub(crate) fn try_into_recipients(
+        recipients: Vec<Self>,
+    ) -> anyhow::Result<Vec<spdk_wallet::client::Recipient>> {
+        recipients.into_iter().map(|r| r.try_into()).collect()
+    }
+}
