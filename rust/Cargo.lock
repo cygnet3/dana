@@ -120,7 +120,7 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 [[package]]
 name = "backend-blindbit-v1"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#8dbf11b7c63a995ca34f699fd5056a587a6c7581"
+source = "git+https://github.com/cygnet3/spdk?rev=83fc3cdabbfca366ad5a405e4d3fa5d1a0201f28#83fc3cdabbfca366ad5a405e4d3fa5d1a0201f28"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1988,7 +1988,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 [[package]]
 name = "silentpayments"
 version = "0.6.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#8dbf11b7c63a995ca34f699fd5056a587a6c7581"
+source = "git+https://github.com/cygnet3/spdk?rev=83fc3cdabbfca366ad5a405e4d3fa5d1a0201f28#83fc3cdabbfca366ad5a405e4d3fa5d1a0201f28"
 dependencies = [
  "bech32 0.9.1",
  "bitcoin_hashes 0.13.0",
@@ -2046,7 +2046,7 @@ dependencies = [
 [[package]]
 name = "spdk-core"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#8dbf11b7c63a995ca34f699fd5056a587a6c7581"
+source = "git+https://github.com/cygnet3/spdk?rev=83fc3cdabbfca366ad5a405e4d3fa5d1a0201f28#83fc3cdabbfca366ad5a405e4d3fa5d1a0201f28"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2059,7 +2059,7 @@ dependencies = [
 [[package]]
 name = "spdk-wallet"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=master#8dbf11b7c63a995ca34f699fd5056a587a6c7581"
+source = "git+https://github.com/cygnet3/spdk?rev=83fc3cdabbfca366ad5a405e4d3fa5d1a0201f28#83fc3cdabbfca366ad5a405e4d3fa5d1a0201f28"
 dependencies = [
  "anyhow",
  "backend-blindbit-v1",
@@ -2068,6 +2068,7 @@ dependencies = [
  "bitcoin 0.32.8",
  "futures",
  "log",
+ "rand 0.8.5",
  "rayon",
  "serde",
  "silentpayments",
