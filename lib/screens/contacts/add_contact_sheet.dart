@@ -447,11 +447,13 @@ class _AddContactSheetState extends State<AddContactSheet> {
               ],
             ),
           ),
-          TextButton(
-            onPressed: _clearConfirmedAddress,
-            child:
-                Text('Change', style: BitcoinTextStyle.body5(Bitcoin.orange)),
-          ),
+          // if a code has been provided, hide the edit button
+          if (widget.initialPaymentCode == null)
+            TextButton(
+              onPressed: _clearConfirmedAddress,
+              child:
+                  Text('Change', style: BitcoinTextStyle.body5(Bitcoin.orange)),
+            ),
         ],
       ),
     );
