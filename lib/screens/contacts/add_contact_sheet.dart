@@ -73,21 +73,19 @@ class _AddContactSheetState extends State<AddContactSheet> {
   void initState() {
     super.initState();
 
-    if (widget.initialPaymentCode != null &&
-        widget.initialDanaAddress != null) {
-      // Both already known (e.g. opened from transaction_sent) — confirm directly,
-      // no need to resolve over the network.
-      _confirmedPaymentCode = widget.initialPaymentCode;
+    // if a payment code has been provided, pre-fill it
+    _confirmedPaymentCode = widget.initialPaymentCode;
+
+    if (widget.initialDanaAddress != null) {
+      // if a dana address has been provided, it has been confirmed already
       _confirmedDanaAddress = widget.initialDanaAddress;
       _nameController.text = widget.initialDanaAddress!.username;
-    } else if (widget.initialPaymentCode != null) {
-      // SP address known, no Dana link yet (e.g. opened from transaction_details).
-      _confirmedPaymentCode = widget.initialPaymentCode;
     }
 
     _bip353AddressController.addListener(_onDanaAddressChanged);
     _nameController.addListener(() => setState(() {}));
 
+    // if no other information has been provided, set the initial query
     if (widget.initialDanaQuery != null &&
         widget.initialDanaAddress == null &&
         widget.initialPaymentCode == null) {
