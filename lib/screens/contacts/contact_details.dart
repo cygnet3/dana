@@ -1,7 +1,6 @@
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/constants.dart';
-import 'package:danawallet/data/enums/amount_display_unit.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/data/models/recorded_transaction.dart';
