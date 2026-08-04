@@ -45,3 +45,8 @@ pub fn is_reusable_payment_code(address: String) -> bool {
         Ok(RecipientAddress::SpCode(_))
     )
 }
+
+#[frb(sync)]
+pub fn sanitize_payment_code(address: String) -> Result<String> {
+    Ok(RecipientAddress::try_from(address)?.into())
+}
