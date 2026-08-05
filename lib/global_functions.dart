@@ -140,6 +140,8 @@ String exceptionToString(Object e) {
     message = "Invalid address";
   } else if (e is InvalidNetworkException) {
     message = "Invalid network";
+  } else if (e is AmbiguousPaymentUriException) {
+    message = "Found more that one reusable payment code";
   } else {
     final stringified = e.toString();
     if (stringified.startsWith("Exception: ")) {
