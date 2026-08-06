@@ -381,7 +381,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
     }
 
     setState(() {
-      _confirmedPaymentCode = code;
+      _confirmedPaymentCode = sanitizePaymentCode(address: code);
       _confirmedDanaAddress = null;
       _errorMessage = null;
     });
