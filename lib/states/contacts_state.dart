@@ -6,6 +6,7 @@ import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/extensions/bip321_uri.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/extensions/payment_code.dart';
+import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/repositories/contacts_repository.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:collection/collection.dart';
@@ -69,6 +70,8 @@ class ContactsState extends ChangeNotifier {
     Bip353Address? danaAddress,
     String? name,
   }) async {
+    paymentCode = sanitizePaymentCode(address: paymentCode);
+
     if (paymentCode == _youContact!.paymentCode) {
       throw Exception("Adding yourself is not allowed");
     }
@@ -86,7 +89,8 @@ class ContactsState extends ChangeNotifier {
           bip321Uri.reusablePaymentCodeForNetwork(network);
       if (resolvedPaymentCode == null) {
         throw Exception("$danaAddress doesn't contain a reusable payment code");
-      } else if (resolvedPaymentCode != paymentCode) {
+      } else if (sanitizePaymentCode(address: resolvedPaymentCode) !=
+          paymentCode) {
         throw Bip353PaymentCodeMismatchException(
             address: danaAddress,
             expected: paymentCode,
