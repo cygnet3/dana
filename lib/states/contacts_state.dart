@@ -18,6 +18,11 @@ class ContactsState extends ChangeNotifier {
   final List<Contact> _contacts = List.empty(growable: true);
   final ContactsRepository _repository = ContactsRepository.instance;
 
+  // TODO: remove once users have migrated past the uppercase SP address bug.
+  // checkUpperCases() runs once per session to canonicalize any all-uppercase
+  // payment codes that were stored before sanitizePaymentCode() was introduced.
+  bool _isCheckedForUpperCase = false;
+
   ContactsState();
 
   Future<void> initialize(
@@ -33,12 +38,55 @@ class ContactsState extends ChangeNotifier {
     await refreshContacts();
   }
 
+  Future<void> checkUpperCases(List<Contact> allContacts) async {
+    for (final contact in allContacts) {
+      final code = contact.paymentCode;
+      if (code.length >= 2 &&
+          code[0] == code[0].toUpperCase() &&
+          code[1] == code[1].toUpperCase()) {
+        try {
+          Logger().w(
+              'Canonicalizing legacy payment code for contact id=${contact.id}');
+          final canonical = sanitizePaymentCode(address: code);
+          await _repository.updateContact(Contact(
+            id: contact.id,
+            name: contact.name,
+            bip353Address: contact.bip353Address,
+            paymentCode: canonical,
+            customFields: contact.customFields,
+          ));
+          _contacts.add(Contact(
+            id: contact.id,
+            name: contact.name,
+            bip353Address: contact.bip353Address,
+            paymentCode: canonical,
+            customFields: contact.customFields,
+          ));
+          continue;
+        } catch (e) {
+          Logger().e(
+              'Failed to canonicalize payment code for contact id=${contact.id}: $e');
+        }
+      }
+      _contacts.add(contact);
+    }
+
+    _isCheckedForUpperCase = true;
+  }
+
   Future<void> refreshContacts() async {
     // make sure we save no old state
     _contacts.clear();
 
     // then populate the rest of the contacts
-    _contacts.addAll(await _repository.getAllContacts(loadCustomFields: true));
+    final allContacts =
+        await _repository.getAllContacts(loadCustomFields: true);
+
+    if (_isCheckedForUpperCase) {
+      _contacts.addAll(allContacts);
+    } else {
+      await checkUpperCases(allContacts);
+    }
 
     notifyListeners();
   }
