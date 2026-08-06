@@ -70,6 +70,8 @@ class ContactsState extends ChangeNotifier {
     Bip353Address? danaAddress,
     String? name,
   }) async {
+    paymentCode = sanitizePaymentCode(address: paymentCode);
+
     if (paymentCode == _youContact!.paymentCode) {
       throw Exception("Adding yourself is not allowed");
     }
