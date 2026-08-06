@@ -38,10 +38,6 @@ const Color danaBlue = Color.fromARGB(255, 10, 109, 214);
 const String exampleAddress =
     "sp1qq0cygnetgn3rz2kla5cp05nj5uetlsrzez0l4p8g7wehf7ldr93lcqadw65upymwzvp5ed38l8ur2rznd6934xh95msevwrdwtrpk372hyz4vr6g";
 
-// example mnemonic
-const String exampleMnemonic =
-    "gloom police month stamp viable claim hospital heart alcohol off ocean ghost";
-
 // number of decimals in 1 btc
 const int bitcoinUnits = 8;
 // String that displays when amount is hidden
