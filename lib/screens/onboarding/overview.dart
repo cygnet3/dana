@@ -32,7 +32,7 @@ class OverviewScreen extends StatefulWidget {
 
 class _OverviewScreenState extends State<OverviewScreen> {
   Future<void> onCreateNewWallet(BuildContext context) async {
-    Network network;
+    Network? network;
     // in dev environment, allow user to choose network
     if (isDevEnv) {
       network = await Navigator.push(context,
@@ -42,7 +42,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
       network = getNetworkForFlavor;
     }
 
-    if (!context.mounted) {
+    if (!context.mounted || network == null) {
       return;
     }
 
