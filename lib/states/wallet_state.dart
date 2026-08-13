@@ -277,9 +277,32 @@ class WalletState extends ChangeNotifier {
     return pickDefaultSelection(selections, forceFeeRate: forceFeeRate);
   }
 
+  /// Estimate the fee options for a payment to [recipient] at an explicitly
+  /// chosen [feerate] (sat/vB). See [FeeOptions] for the meaning of the
+  /// returned selections.
+  Future<FeeOptions> estimateFeeOptions(
+      Recipient recipient, int feerate) async {
+    if (_isDrainPayment(recipient)) {
+      final selection = await selectUtxosToDrain(
+          ownedOutputs: unspentOutputs,
+          recipientAddress: recipient.paymentCode,
+          feerate: feerate.toDouble());
+      return FeeOptions(exact: selection);
+    }
+
+    final selections = await selectUtxosToSpend(
+        ownedOutputs: unspentOutputs,
+        recipients: [recipient],
+        nChangeOutputs: BigInt.one,
+        feerate: feerate.toDouble());
+
+    return buildFeeOptions(selections, feerate);
+  }
+
   /// Build the unsigned transaction for a previously chosen [selection]
-  /// (see [proposeCoinSelection]), so the transaction signed is exactly the
-  /// one whose fee was presented to the user.
+  /// (see [proposeCoinSelection] and [estimateFeeOptions]), so the
+  /// transaction signed is exactly the one whose fee was presented to the
+  /// user.
   Future<SilentPaymentUnsignedTransaction> createUnsignedTxFromSelection(
       Recipient recipient, InputSelection selection) async {
     final wallet = await getWalletFromSecureStorage();
