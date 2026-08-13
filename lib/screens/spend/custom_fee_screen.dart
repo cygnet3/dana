@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/api_amount.dart';
@@ -25,16 +27,29 @@ class CustomFeeScreen extends StatefulWidget {
 }
 
 class _CustomFeeScreenState extends State<CustomFeeScreen> {
-  int _selectedFeeRate = 1; // Default to 1 sat/vB
-  double _sliderValue = 1.0; // Start at 1 sat/vB
+  static const int _minFeeRate = 1;
+  static const int _maxFeeRate = 512;
+
+  int _selectedFeeRate = _minFeeRate; // Default to 1 sat/vB
+  double _sliderValue = 0.0; // slider position in [0, 1]
   final Map<int, Amount> _feeAmounts = {};
   bool _isLoadingFees = true;
   String? _errorMessage;
 
+  // The slider position is mapped to the fee rate logarithmically, so that
+  // low rates (where precision matters most) get more track space.
+  double _feeRateToSlider(int feeRate) =>
+      math.log(feeRate) / math.log(_maxFeeRate);
+
+  int _sliderToFeeRate(double value) => math
+      .pow(_maxFeeRate.toDouble(), value)
+      .round()
+      .clamp(_minFeeRate, _maxFeeRate);
+
   @override
   void initState() {
     super.initState();
-    _sliderValue = _selectedFeeRate.toDouble();
+    _sliderValue = _feeRateToSlider(_selectedFeeRate);
     _computeFeeAmounts();
   }
 
@@ -164,23 +179,26 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
                 ),
                 child: Slider(
                   value: _sliderValue,
-                  min: 1,
-                  max: 512,
+                  min: 0,
+                  max: 1,
                   onChanged: (double value) {
-                    final newFeeRate = value.round();
-                    if (newFeeRate != _selectedFeeRate) {
-                      setState(() {
-                        _sliderValue = value;
+                    // only update the displayed rate while dragging;
+                    // fees are recomputed on release
+                    final newFeeRate = _sliderToFeeRate(value);
+                    setState(() {
+                      _sliderValue = value;
+                      if (newFeeRate != _selectedFeeRate) {
                         _selectedFeeRate = newFeeRate;
+                        // the cached fee amounts are for the previous rate
                         _isLoadingFees = true;
-                      });
-                      // Recompute fees when the value changes
-                      _computeFeeAmounts();
-                    } else {
-                      setState(() {
-                        _sliderValue = value;
-                      });
-                    }
+                      }
+                    });
+                  },
+                  onChangeEnd: (double value) {
+                    setState(() {
+                      _isLoadingFees = true;
+                    });
+                    _computeFeeAmounts();
                   },
                 ),
               ),
