@@ -19,7 +19,7 @@ pub fn validate_address_with_network(address: String, network: Network) -> Resul
             legacy_address.require_network(network.into())?;
             Ok(())
         }
-        Ok(RecipientAddress::SpAddress(sp_address)) => match (sp_address.get_network(), &network) {
+        Ok(RecipientAddress::SpAddress(sp_address)) => match (sp_address.network(), &network) {
             (SpNetwork::Mainnet, Network::Mainnet)
             | (SpNetwork::Testnet, Network::Testnet3)
             | (SpNetwork::Testnet, Network::Testnet4)
