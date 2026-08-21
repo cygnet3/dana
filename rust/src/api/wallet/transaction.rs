@@ -1,3 +1,4 @@
+use crate::api::structs::input_selection::InputSelection;
 use crate::api::structs::network::Network;
 use crate::api::structs::owned_output::{OwnedOutput, WalletUtxo};
 use crate::api::structs::recipient::Recipient;
@@ -8,30 +9,14 @@ use bip39::rand::{thread_rng, RngCore};
 use spdk_wallet::backend_blindbit_v1::BlindbitClient;
 use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex};
 use spdk_wallet::client::{
-    propose_coin_selections, propose_drain_selection, FeeRate, RecipientAddress, SpClient, Strategy,
+    propose_coin_selections, propose_drain_selection, FeeRate, RecipientAddress, SpClient,
 };
 
+use super::coin_selection::pick_default_selection;
 use super::SpWallet;
 
 /// We currently always create a single change output.
 const N_CHANGE_OUTPUTS: usize = 1;
-
-/// Pick the preferred selection out of the candidates produced by the
-/// coin-selection strategies: a changeless transaction first (no change
-/// output to fingerprint), then the lowest fee, then the greedy fallback.
-fn pick_default_selection(
-    mut selections: Vec<spdk_wallet::client::InputSelection>,
-) -> Result<spdk_wallet::client::InputSelection> {
-    for preferred in [Strategy::Changeless, Strategy::LowestFee, Strategy::Greedy] {
-        if let Some(pos) = selections.iter().position(|s| s.strategy == preferred) {
-            return Ok(selections.swap_remove(pos));
-        }
-    }
-    selections
-        .into_iter()
-        .next()
-        .ok_or_else(|| anyhow::Error::msg("no successful coin selection"))
-}
 
 fn to_utxos_and_recipients(
     owned_outputs: Vec<OwnedOutput>,
@@ -108,6 +93,26 @@ impl SpWallet {
             &available_utxos,
             recipients,
             selection,
+            network.into(),
+        )?;
+
+        Ok(res.into())
+    }
+
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn create_transaction_from_selection(
+        &self,
+        owned_outputs: Vec<OwnedOutput>,
+        api_recipients: Vec<Recipient>,
+        selection: InputSelection,
+        network: Network,
+    ) -> Result<SilentPaymentUnsignedTransaction> {
+        let (available_utxos, recipients) = to_utxos_and_recipients(owned_outputs, api_recipients)?;
+
+        let res = self.client.create_transaction_from_selection(
+            &available_utxos,
+            recipients,
+            selection.into(),
             network.into(),
         )?;
 
