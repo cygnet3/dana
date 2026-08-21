@@ -12,6 +12,9 @@ use spdk_wallet::client::SpClient;
 
 use super::SpWallet;
 
+/// We currently always create a single change output.
+const N_CHANGE_OUTPUTS: usize = 1;
+
 fn to_utxos_and_recipients(
     owned_outputs: Vec<OwnedOutput>,
     api_recipients: Vec<Recipient>,
