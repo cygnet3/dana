@@ -21,31 +21,9 @@ import 'package:danawallet/repositories/transactions_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/services/dana_address_service.dart';
+import 'package:danawallet/utils/coin_selection.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
-
-/// Pick the preferred selection from the candidates produced by the
-/// coin-selection strategies: a changeless transaction first (no change
-/// output to fingerprint), then the lowest fee, then the exact-rate
-/// selection, then the greedy fallback.
-InputSelection pickDefaultSelection(List<InputSelection> selections) {
-  for (final preferred in const [
-    CoinSelectionStrategy.changeless,
-    CoinSelectionStrategy.lowestFee,
-    CoinSelectionStrategy.feeRateCap,
-    CoinSelectionStrategy.greedy,
-  ]) {
-    for (final selection in selections) {
-      if (selection.strategy == preferred) {
-        return selection;
-      }
-    }
-  }
-  if (selections.isEmpty) {
-    throw Exception('No coin selection strategy succeeded');
-  }
-  return selections.first;
-}
 
 class WalletState extends ChangeNotifier {
   final walletRepository = WalletRepository.instance;
@@ -278,8 +256,12 @@ class WalletState extends ChangeNotifier {
 
   /// Propose a coin selection for a payment to [recipient] at [feerate]
   /// (sat/vB), using the default coin-selection policy.
-  Future<InputSelection> proposeCoinSelection(
-      Recipient recipient, int feerate) async {
+  ///
+  /// When [forceFeeRate] is set (the user explicitly chose a fee rate), the
+  /// selection honoring the requested rate is preferred over a changeless
+  /// one (which may exceed it).
+  Future<InputSelection> proposeCoinSelection(Recipient recipient, int feerate,
+      {bool forceFeeRate = false}) async {
     if (_isDrainPayment(recipient)) {
       return selectUtxosToDrain(
           ownedOutputs: unspentOutputs,
@@ -292,7 +274,7 @@ class WalletState extends ChangeNotifier {
         recipients: [recipient],
         nChangeOutputs: BigInt.one,
         feerate: feerate.toDouble());
-    return pickDefaultSelection(selections);
+    return pickDefaultSelection(selections, forceFeeRate: forceFeeRate);
   }
 
   /// Build the unsigned transaction for a previously chosen [selection]
