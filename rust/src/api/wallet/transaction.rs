@@ -8,15 +8,9 @@ use anyhow::Result;
 use bip39::rand::{thread_rng, RngCore};
 use spdk_wallet::backend_blindbit_v1::BlindbitClient;
 use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex};
-use spdk_wallet::client::{
-    propose_coin_selections, propose_drain_selection, FeeRate, RecipientAddress, SpClient,
-};
+use spdk_wallet::client::SpClient;
 
-use super::coin_selection::pick_default_selection;
 use super::SpWallet;
-
-/// We currently always create a single change output.
-const N_CHANGE_OUTPUTS: usize = 1;
 
 fn to_utxos_and_recipients(
     owned_outputs: Vec<OwnedOutput>,
@@ -34,71 +28,6 @@ fn to_utxos_and_recipients(
 }
 
 impl SpWallet {
-    #[flutter_rust_bridge::frb(sync)]
-    pub fn create_new_transaction(
-        &self,
-        owned_outputs: Vec<OwnedOutput>,
-        api_recipients: Vec<Recipient>,
-        feerate: f32,
-        network: Network,
-    ) -> Result<SilentPaymentUnsignedTransaction> {
-        let (available_utxos, recipients) = to_utxos_and_recipients(owned_outputs, api_recipients)?;
-
-        let selections = propose_coin_selections(
-            &available_utxos,
-            &recipients,
-            FeeRate::from_sat_per_vb(feerate),
-            N_CHANGE_OUTPUTS,
-        )?;
-        let selection = pick_default_selection(selections)?;
-
-        let res = self.client.create_transaction_from_selection(
-            &available_utxos,
-            recipients,
-            selection,
-            network.into(),
-        )?;
-
-        Ok(res.into())
-    }
-
-    #[flutter_rust_bridge::frb(sync)]
-    pub fn create_drain_transaction(
-        &self,
-        owned_outputs: Vec<OwnedOutput>,
-        wipe_address: String,
-        feerate: f32,
-        network: Network,
-    ) -> Result<SilentPaymentUnsignedTransaction> {
-        let available_utxos = owned_outputs
-            .into_iter()
-            .map(|o| o.try_into_utxo())
-            .collect::<Result<Vec<_>>>()?;
-
-        let recipient_address: RecipientAddress = RecipientAddress::try_from(wipe_address)?;
-        let selection = propose_drain_selection(
-            &available_utxos,
-            &recipient_address,
-            FeeRate::from_sat_per_vb(feerate),
-        )?;
-
-        // The drain amount is only known after fee estimation: it is whatever
-        // is left after paying the fee for spending all UTXOs.
-        let recipients = vec![spdk_wallet::client::Recipient {
-            address: recipient_address,
-            amount: selection.sent,
-        }];
-
-        let res = self.client.create_transaction_from_selection(
-            &available_utxos,
-            recipients,
-            selection,
-            network.into(),
-        )?;
-
-        Ok(res.into())
-    }
-
     #[flutter_rust_bridge::frb(sync)]
     pub fn create_transaction_from_selection(
         &self,
