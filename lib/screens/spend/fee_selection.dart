@@ -4,7 +4,7 @@ import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/recommended_fee_model.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/data/enums/selected_fee.dart';
-import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/generated/rust/api/structs/input_selection.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/spend/ready_to_send.dart';
@@ -33,7 +33,7 @@ class FeeSelectionScreen extends StatefulWidget {
 class FeeSelectionScreenState extends State<FeeSelectionScreen> {
   RecommendedFeeResponse? _currentFeeRates;
   SelectedFee _selected = SelectedFee.normal;
-  final Map<SelectedFee, Amount> _feeAmounts = {};
+  final Map<SelectedFee, InputSelection> _selections = {};
 
   @override
   void initState() {
@@ -54,17 +54,8 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
       SelectedFee.slow
     ]) {
       final feerate = fee.getFeeRate(currentFeeRates);
-      final feeEstimationTx = await walletState.createUnsignedTxToThisRecipient(
-          widget.recipient, feerate);
-      BigInt inputSum = BigInt.from(0);
-      for (var (_, utxo) in feeEstimationTx.selectedUtxos) {
-        inputSum += utxo.value.field0;
-      }
-      BigInt outputSum = BigInt.from(0);
-      for (var recipient in feeEstimationTx.recipients) {
-        outputSum += recipient.amount.field0;
-      }
-      _feeAmounts[fee] = Amount(field0: inputSum - outputSum);
+      _selections[fee] =
+          await walletState.proposeCoinSelection(widget.recipient, feerate);
     }
 
     setState(() {
@@ -74,17 +65,17 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
 
   Future<void> onContinue() async {
     final walletState = Provider.of<WalletState>(context, listen: false);
-    final changeCode = walletState.changePaymentCode;
 
-    final feerate = _selected.getFeeRate(_currentFeeRates!);
+    // build the transaction from the selection the fee was displayed for
+    final selection = _selections[_selected]!;
 
-    final unsignedTx = await walletState.createUnsignedTxToThisRecipient(
-        widget.recipient, feerate);
+    final unsignedTx = await walletState.createUnsignedTxFromSelection(
+        widget.recipient, selection);
 
     // update the send amount to the actual sent amount (can be different e.g. dust)
     final updatedRecipient = Recipient(
       paymentCode: widget.recipient.paymentCode,
-      amount: unsignedTx.getSendAmount(changeCode: changeCode),
+      amount: unsignedTx.getSendAmount(),
     );
 
     if (mounted) {
@@ -114,7 +105,7 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
           subtitleBtc = 'Loading...';
           subtitleFiat = 'Loading...';
         } else {
-          final estimatedFee = _feeAmounts[fee];
+          final estimatedFee = _selections[fee]?.fee;
           if (estimatedFee == null) {
             throw Exception('Fee amount not computed for $fee');
           }
