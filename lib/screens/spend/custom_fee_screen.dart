@@ -64,9 +64,11 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
         });
       }
 
-      // Propose a selection for the currently selected rate
+      // Propose a selection for the currently selected rate; the user
+      // explicitly chose this rate, so honor it rather than going changeless
       final selection = await walletState.proposeCoinSelection(
-          widget.recipient, _selectedFeeRate);
+          widget.recipient, _selectedFeeRate,
+          forceFeeRate: true);
 
       if (mounted) {
         setState(() {
