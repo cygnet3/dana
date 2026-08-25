@@ -12,8 +12,6 @@ lazy_static! {
     pub static ref KEEP_SYNCING: AtomicBool = AtomicBool::new(true);
 }
 
-pub type WalletFingerprint = [u8; 8];
-
 pub fn derive_keys_from_seed(seed: &[u8; 64], network: Network) -> Result<(SecretKey, SecretKey)> {
     let xprv = Xpriv::new_master(network, seed)?;
 
