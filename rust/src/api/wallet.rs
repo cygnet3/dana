@@ -4,10 +4,11 @@ mod sync;
 pub mod transaction;
 pub mod coin_selection;
 
-use crate::{api::structs::network::Network, wallet::WalletFingerprint};
+use crate::api::structs::network::Network;
 use anyhow::Result;
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
+use spdk_wallet::bitcoin::bip32;
 use spdk_wallet::bitcoin::secp256k1::SecretKey;
 use spdk_wallet::client::{SpClient, SpendKey};
 
@@ -15,20 +16,25 @@ use spdk_wallet::client::{SpClient, SpendKey};
 #[frb(opaque)]
 pub struct SpWallet {
     client: SpClient,
-    #[allow(unused)]
-    wallet_fingerprint: WalletFingerprint,
+    fingerprint: Option<bip32::Fingerprint>,
+    derivation_path: Option<bip32::DerivationPath>,
 }
 
 impl SpWallet {
     #[frb(sync)]
-    pub fn new(scan_key: ApiScanKey, spend_key: ApiSpendKey, network: Network) -> Result<Self> {
+    pub fn new(
+        scan_key: ApiScanKey,
+        spend_key: ApiSpendKey,
+        network: Network,
+        fingerprint: Option<Fingerprint>,
+        derivation_path: Option<DerivationPath>,
+    ) -> Result<Self> {
         let client = SpClient::new(scan_key.into(), spend_key.into(), network.into())?;
-
-        let wallet_fingerprint = client.get_client_fingerprint()?;
 
         Ok(Self {
             client,
-            wallet_fingerprint,
+            fingerprint: fingerprint.map(Into::into),
+            derivation_path: derivation_path.map(Into::into),
         })
     }
 
@@ -82,5 +88,35 @@ impl ApiSpendKey {
 impl From<ApiSpendKey> for SpendKey {
     fn from(spend_key: ApiSpendKey) -> Self {
         spend_key.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Fingerprint(pub String);
+
+impl From<bip32::Fingerprint> for Fingerprint {
+    fn from(value: bip32::Fingerprint) -> Self {
+        Self(value.to_string())
+    }
+}
+
+impl From<Fingerprint> for bip32::Fingerprint {
+    fn from(value: Fingerprint) -> Self {
+        value.0.parse().expect("invalid fingerprint hex")
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DerivationPath(pub String);
+
+impl From<bip32::DerivationPath> for DerivationPath {
+    fn from(value: bip32::DerivationPath) -> Self {
+        Self(value.to_string())
+    }
+}
+
+impl From<DerivationPath> for bip32::DerivationPath {
+    fn from(value: DerivationPath) -> Self {
+        value.0.parse().expect("invalid derivation path")
     }
 }
