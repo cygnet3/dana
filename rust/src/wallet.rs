@@ -22,11 +22,21 @@ pub fn derive_keys_from_seed(seed: &[u8; 64], network: Network) -> Result<(Secre
     Ok((scan_privkey, spend_privkey))
 }
 
-fn derive_keys_from_xprv(xprv: Xpriv) -> Result<(SecretKey, SecretKey)> {
-    let (scan_path, spend_path) = match xprv.network {
+fn derivation_paths(kind: NetworkKind) -> (&'static str, &'static str) {
+    match kind {
         NetworkKind::Main => ("m/352h/0h/0h/1h/0", "m/352h/0h/0h/0h/0"),
         NetworkKind::Test => ("m/352h/1h/0h/1h/0", "m/352h/1h/0h/0h/0"),
-    };
+    }
+}
+
+/// BIP-352 derivation path of the spend key.
+pub fn spend_key_derivation_path(network: Network) -> DerivationPath {
+    DerivationPath::from_str(derivation_paths(NetworkKind::from(network)).1)
+        .expect("spend key derivation path is a constant")
+}
+
+fn derive_keys_from_xprv(xprv: Xpriv) -> Result<(SecretKey, SecretKey)> {
+    let (scan_path, spend_path) = derivation_paths(xprv.network);
 
     let secp = Secp256k1::signing_only();
     let scan_path = DerivationPath::from_str(scan_path)?;
