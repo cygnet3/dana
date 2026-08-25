@@ -69,13 +69,13 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
     // build the transaction from the selection the fee was displayed for
     final selection = _selections[_selected]!;
 
-    final unsignedTx = await walletState.createUnsignedTxFromSelection(
-        widget.recipient, selection);
+    final created =
+        await walletState.createPsbtFromSelection(widget.recipient, selection);
 
     // update the send amount to the actual sent amount (can be different e.g. dust)
     final updatedRecipient = Recipient(
       paymentCode: widget.recipient.paymentCode,
-      amount: unsignedTx.getSendAmount(),
+      amount: selection.sent,
     );
 
     if (mounted) {
@@ -85,7 +85,8 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
             recipient: updatedRecipient,
             providedBip353: widget.providedBip353,
             fee: _selected,
-            unsignedTx: unsignedTx,
+            psbt: created,
+            selection: selection,
           ));
     }
   }
