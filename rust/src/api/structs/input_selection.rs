@@ -54,11 +54,7 @@ pub struct InputSelection {
 impl From<spdk_wallet::client::InputSelection> for InputSelection {
     fn from(value: spdk_wallet::client::InputSelection) -> Self {
         Self {
-            selected_utxos: value
-                .selected_utxos
-                .into_iter()
-                .map(Into::into)
-                .collect(),
+            selected_utxos: value.selected_utxos.into_iter().map(Into::into).collect(),
             sent: value.sent.into(),
             n_sent_outputs: value.n_sent_outputs,
             change: value.change.into(),
@@ -73,11 +69,7 @@ impl From<spdk_wallet::client::InputSelection> for InputSelection {
 impl From<InputSelection> for spdk_wallet::client::InputSelection {
     fn from(value: InputSelection) -> Self {
         Self {
-            selected_utxos: value
-                .selected_utxos
-                .into_iter()
-                .map(Into::into)
-                .collect(),
+            selected_utxos: value.selected_utxos.into_iter().map(Into::into).collect(),
             sent: value.sent.into(),
             n_sent_outputs: value.n_sent_outputs,
             change: value.change.into(),

@@ -17,6 +17,6 @@ impl SpWallet {
 
     #[frb(sync)]
     pub fn get_network(&self) -> Network {
-        self.client.get_network().into()
+        self.client.network().into()
     }
 }

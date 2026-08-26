@@ -1,11 +1,11 @@
+pub mod coin_selection;
 mod info;
 pub mod setup;
 mod sync;
 pub mod transaction;
-pub mod coin_selection;
 
 use crate::api::structs::network::Network;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
 use spdk_wallet::bitcoin::bip32;
@@ -33,19 +33,44 @@ impl SpWallet {
 
         Ok(Self {
             client,
-            fingerprint: fingerprint.map(Into::into),
-            derivation_path: derivation_path.map(Into::into),
+            fingerprint: fingerprint
+                .map(|f| f.0.parse())
+                .transpose()
+                .map_err(|e| anyhow!("invalid fingerprint: {e}"))?,
+            derivation_path: derivation_path
+                .map(|p| p.0.parse())
+                .transpose()
+                .map_err(|e| anyhow!("invalid derivation path: {e}"))?,
         })
     }
 
     #[frb(sync)]
     pub fn get_scan_key(&self) -> ApiScanKey {
-        ApiScanKey(self.client.get_scan_key())
+        ApiScanKey(self.client.scan_key())
     }
 
     #[frb(sync)]
     pub fn get_spend_key(&self) -> ApiSpendKey {
-        ApiSpendKey(self.client.get_spend_key())
+        ApiSpendKey(self.client.spend_key())
+    }
+
+    /// BIP-32 key origin written into PSBT inputs for this wallet.
+    ///
+    /// Unknown origin (imported keys, no seed) is encoded as a zero
+    /// fingerprint and an empty path, matching the previous PSBT flow.
+    pub(crate) fn psbt_key_source(&self) -> Result<(bip32::Fingerprint, bip32::DerivationPath)> {
+        match (&self.fingerprint, &self.derivation_path) {
+            (Some(fingerprint), Some(derivation_path)) => {
+                Ok((*fingerprint, derivation_path.clone()))
+            }
+            (None, None) => Ok((
+                bip32::Fingerprint::from([0u8; 4]),
+                bip32::DerivationPath::master(),
+            )),
+            _ => Err(anyhow!(
+                "wallet has only one of fingerprint and derivation path"
+            )),
+        }
     }
 }
 

@@ -4,9 +4,9 @@ use spdk_wallet::bitcoin::secp256k1::{PublicKey, SecretKey};
 use spdk_wallet::client::SpendKey;
 
 use crate::api::structs::network::Network;
-use crate::wallet::derive_keys_from_seed;
+use crate::wallet::{derive_keys_from_seed, DerivedKeys};
 
-use super::{ApiScanKey, ApiSpendKey, SpWallet};
+use super::{ApiScanKey, ApiSpendKey, DerivationPath, Fingerprint, SpWallet};
 use anyhow::Result;
 
 /// we don't add a passphrase to the bip39 mnemonic
@@ -28,6 +28,19 @@ pub struct WalletSetupResult {
     pub mnemonic: Option<String>,
     pub scan_key: ApiScanKey,
     pub spend_key: ApiSpendKey,
+    /// Present when keys were derived from a seed; absent for imported keys.
+    pub fingerprint: Option<Fingerprint>,
+    pub derivation_path: Option<DerivationPath>,
+}
+
+fn result_from_derived(mnemonic: Option<String>, derived: DerivedKeys) -> WalletSetupResult {
+    WalletSetupResult {
+        mnemonic,
+        scan_key: ApiScanKey(derived.scan),
+        spend_key: ApiSpendKey(SpendKey::Secret(derived.spend)),
+        fingerprint: Some(derived.fingerprint.into()),
+        derivation_path: Some(derived.spend_path.into()),
+    }
 }
 
 impl SpWallet {
@@ -43,31 +56,15 @@ impl SpWallet {
                 // We create a new wallet and return the new mnemonic
                 let m = bip39::Mnemonic::generate(12)?;
                 let seed = m.to_seed(PASSPHRASE);
-                let (scan_sk, spend_sk) = derive_keys_from_seed(&seed, network.into())?;
-
-                let scan_key = ApiScanKey(scan_sk);
-                let spend_key = ApiSpendKey(SpendKey::Secret(spend_sk));
-
-                Ok(WalletSetupResult {
-                    mnemonic: Some(m.to_string()),
-                    scan_key,
-                    spend_key,
-                })
+                let derived = derive_keys_from_seed(&seed, network.into())?;
+                Ok(result_from_derived(Some(m.to_string()), derived))
             }
             WalletSetupType::Mnemonic(mnemonic) => {
                 // We restore from seed
                 let m = bip39::Mnemonic::from_str(&mnemonic)?;
                 let seed = m.to_seed(PASSPHRASE);
-                let (scan_sk, spend_sk) = derive_keys_from_seed(&seed, network.into())?;
-
-                let scan_key = ApiScanKey(scan_sk);
-                let spend_key = ApiSpendKey(SpendKey::Secret(spend_sk));
-
-                Ok(WalletSetupResult {
-                    mnemonic: Some(mnemonic),
-                    scan_key,
-                    spend_key,
-                })
+                let derived = derive_keys_from_seed(&seed, network.into())?;
+                Ok(result_from_derived(Some(mnemonic), derived))
             }
             WalletSetupType::Full(scan_sk_hex, spend_sk_hex) => {
                 let scan_sk = SecretKey::from_str(&scan_sk_hex)?;
@@ -80,6 +77,8 @@ impl SpWallet {
                     mnemonic: None,
                     scan_key,
                     spend_key,
+                    fingerprint: None,
+                    derivation_path: None,
                 })
             }
             WalletSetupType::WatchOnly(scan_sk_hex, spend_pk_hex) => {
@@ -93,6 +92,8 @@ impl SpWallet {
                     mnemonic: None,
                     scan_key,
                     spend_key,
+                    fingerprint: None,
+                    derivation_path: None,
                 })
             }
         }
