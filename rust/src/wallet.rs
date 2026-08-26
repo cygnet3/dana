@@ -3,7 +3,7 @@ use std::sync::atomic::AtomicBool;
 
 use anyhow::Result;
 use lazy_static::lazy_static;
-use spdk_wallet::bitcoin::bip32::{DerivationPath, Xpriv};
+use spdk_wallet::bitcoin::bip32::{DerivationPath, Fingerprint, Xpriv};
 use spdk_wallet::bitcoin::key::Secp256k1;
 use spdk_wallet::bitcoin::secp256k1::SecretKey;
 use spdk_wallet::bitcoin::{Network, NetworkKind};
@@ -12,12 +12,28 @@ lazy_static! {
     pub static ref KEEP_SYNCING: AtomicBool = AtomicBool::new(true);
 }
 
-pub fn derive_keys_from_seed(seed: &[u8; 64], network: Network) -> Result<(SecretKey, SecretKey)> {
+pub struct DerivedKeys {
+    pub scan: SecretKey,
+    pub spend: SecretKey,
+    /// Master fingerprint of the seed xprv.
+    pub fingerprint: Fingerprint,
+    /// BIP-352 spend-key path under that master.
+    pub spend_path: DerivationPath,
+}
+
+pub fn derive_keys_from_seed(seed: &[u8; 64], network: Network) -> Result<DerivedKeys> {
     let xprv = Xpriv::new_master(network, seed)?;
+    let secp = Secp256k1::signing_only();
+    let fingerprint = xprv.fingerprint(&secp);
+    let spend_path = spend_key_derivation_path(network);
+    let (scan, spend) = derive_keys_from_xprv(xprv)?;
 
-    let (scan_privkey, spend_privkey) = derive_keys_from_xprv(xprv)?;
-
-    Ok((scan_privkey, spend_privkey))
+    Ok(DerivedKeys {
+        scan,
+        spend,
+        fingerprint,
+        spend_path,
+    })
 }
 
 fn derivation_paths(kind: NetworkKind) -> (&'static str, &'static str) {

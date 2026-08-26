@@ -2,13 +2,13 @@ use crate::api::structs::input_selection::InputSelection;
 use crate::api::structs::network::Network;
 use crate::api::structs::owned_output::{OwnedOutput, WalletUtxo};
 use crate::api::structs::recipient::Recipient;
-use crate::wallet::spend_key_derivation_path;
 
 use anyhow::{Error, Result};
 use bip39::rand::thread_rng;
 use flutter_rust_bridge::frb;
 use psbt_v2::v2::{GetKey, GetKeyError, KeyRequest, Output as PsbtOutput};
 use spdk_wallet::backend_blindbit_v1::BlindbitClient;
+use spdk_wallet::bitcoin::bip32;
 use spdk_wallet::bitcoin::secp256k1::{Secp256k1, SecretKey, Signing};
 use spdk_wallet::bitcoin::{
     consensus::serialize, hex::DisplayHex, script::PushBytesBuf, Amount, CompressedPublicKey,
@@ -54,20 +54,35 @@ fn to_utxos_and_recipients(
     Ok((available_utxos, recipients))
 }
 
-/// Single-key provider for the PSBT signer role: dana is a single-signer
-/// wallet, so every input resolves to the same untweaked spend key. The
+/// Spend-key provider for the PSBT signer role. Returns the untweaked spend
+/// key only when the BIP-32 key request matches this wallet's origin. The
 /// signer applies the per-input `sp_tweak` itself.
-struct SingleKeyProvider(SecretKey);
+struct SpendKeyProvider {
+    spend: SecretKey,
+    fingerprint: bip32::Fingerprint,
+    derivation_path: bip32::DerivationPath,
+    network: NetworkKind,
+}
 
-impl GetKey for SingleKeyProvider {
+impl GetKey for SpendKeyProvider {
     type Error = GetKeyError;
 
     fn get_key<C: Signing>(
         &self,
-        _key_request: KeyRequest,
+        key_request: KeyRequest,
         _secp: &Secp256k1<C>,
     ) -> Result<Option<PrivateKey>, Self::Error> {
-        Ok(Some(PrivateKey::new(self.0, NetworkKind::Main)))
+        match key_request {
+            KeyRequest::Bip32((fingerprint, path))
+                if fingerprint == self.fingerprint && path == self.derivation_path =>
+            {
+                Ok(Some(PrivateKey::new(self.spend, self.network)))
+            }
+            // Pubkey requests carry the tweaked spend key (the PSBT map key).
+            // Serving them would skip the origin check; the signer still
+            // applies `sp_tweak` to whatever we return.
+            _ => Ok(None),
+        }
     }
 }
 
@@ -89,7 +104,8 @@ impl SpWallet {
         selection: InputSelection,
         network: Network,
     ) -> Result<CreatedPsbt> {
-        let (available_utxos, mut recipients) = to_utxos_and_recipients(owned_outputs, api_recipients)?;
+        let (available_utxos, mut recipients) =
+            to_utxos_and_recipients(owned_outputs, api_recipients)?;
         let network = spdk_wallet::bitcoin::Network::from(network);
         let selection = spdk_wallet::client::InputSelection::from(selection);
 
@@ -198,8 +214,8 @@ impl SpWallet {
 
         // updater role: fill in the funding utxos and BIP-375/376 SP fields
         let secp = Secp256k1::new();
-        let b_spend = self.client.try_get_secret_spend_key()?;
-        let spend_path = spend_key_derivation_path(network);
+        let b_spend = self.client.try_secret_spend_key()?;
+        let (fingerprint, derivation_path) = self.psbt_key_source()?;
         for (input, (_, output)) in psbt.inputs.iter_mut().zip(selected_utxos.iter()) {
             input.witness_utxo = Some(TxOut {
                 value: output.value,
@@ -211,8 +227,8 @@ impl SpWallet {
             let tweaked_spend_key = b_spend.add_tweak(&output.tweak)?.public_key(&secp);
             input.set_sp_spend_bip32_derivation(
                 CompressedPublicKey(tweaked_spend_key),
-                Default::default(),
-                spend_path.clone(),
+                fingerprint,
+                derivation_path.clone(),
             );
         }
 
@@ -231,13 +247,22 @@ impl SpWallet {
             Psbt::deserialize(&psbt).map_err(|e| Error::msg(format!("invalid psbt: {}", e)))?;
 
         let secp = Secp256k1::new();
-        let b_spend = self.client.try_get_secret_spend_key()?;
+        let b_spend = self.client.try_secret_spend_key()?;
+        let (fingerprint, derivation_path) = self.psbt_key_source()?;
 
         psbt.single_signer_generate_ecdh_shares(&secp, b_spend)?;
         let sp_outputs = psbt.compute_sp_outputs(&secp)?;
         psbt.set_sp_scriptpubkey(sp_outputs)?;
-        psbt.sign_silent_payment_inputs(&SingleKeyProvider(b_spend), &secp)?;
-        psbt.finalize()?;
+        psbt.sign_silent_payment_inputs(
+            &SpendKeyProvider {
+                spend: b_spend,
+                fingerprint,
+                derivation_path,
+                network: NetworkKind::from(self.client.network()),
+            },
+            &secp,
+        )?;
+        let psbt = psbt.finalize()?;
 
         let tx = psbt.extract_tx()?;
         Ok(serialize(&tx).to_lower_hex_string())
