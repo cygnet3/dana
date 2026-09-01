@@ -10,12 +10,12 @@ import 'package:flutter/material.dart';
 
 const String pageTitle = "Settings";
 const String networkSettingsTitle = "Network settings";
-const String networkSettingsSubtitle = "Scanning, data usage, chain selection";
+const String networkSettingsSubtitle = "Set custom blindbit backend";
 const String walletSettingsTitle = "Wallet settings";
-const String walletSettingsSubtitle = "Backup, restore or wipe wallet";
+const String walletSettingsSubtitle = "Backup, reset or wipe wallet";
 const String personalizationSettingsTitle = "Personalization settings";
 const String personalizationSettingsSubtitle =
-    "Set language, bitcoin unit, fiat currency & theme";
+    "Set bitcoin unit & fiat currency";
 const String aboutSettingsTitle = "About";
 const String aboutSettingsSubtitle = "About Dana";
 
