@@ -1496,7 +1496,8 @@ dependencies = [
 [[package]]
 name = "pushtx"
 version = "0.4.0"
-source = "git+https://github.com/cygnet3/pushtx?branch=master#90ad6b924c30677115206e6911c87bea9ea706fd"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5f5f8d03ac9b2434614a06000ee4186ebfd21c0c65460791c63c1a1d29d5159"
 dependencies = [
  "bitcoin 0.31.2",
  "crossbeam-channel",
