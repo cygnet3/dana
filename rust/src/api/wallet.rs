@@ -23,7 +23,7 @@ impl SpWallet {
     pub fn new(scan_key: ApiScanKey, spend_key: ApiSpendKey, network: Network) -> Result<Self> {
         let client = SpClient::new(scan_key.into(), spend_key.into(), network.into())?;
 
-        let wallet_fingerprint = client.get_client_fingerprint()?;
+        let wallet_fingerprint = client.client_fingerprint()?;
 
         Ok(Self {
             client,
@@ -33,12 +33,12 @@ impl SpWallet {
 
     #[frb(sync)]
     pub fn get_scan_key(&self) -> ApiScanKey {
-        ApiScanKey(self.client.get_scan_key())
+        ApiScanKey(self.client.scan_key())
     }
 
     #[frb(sync)]
     pub fn get_spend_key(&self) -> ApiSpendKey {
-        ApiSpendKey(self.client.get_spend_key())
+        ApiSpendKey(self.client.spend_key())
     }
 }
 

@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use flutter_rust_bridge::frb;
 use spdk_wallet::bip321::Bip321Uri as SpdkBip321Uri;
 use spdk_wallet::client::SpUriExtension;
-use spdk_wallet::silentpayments::SilentPaymentAddressDisplay;
+use spdk_wallet::silentpayments::SilentPaymentCode;
 
 use crate::api::structs::amount::Amount;
 use crate::api::structs::bip321_uri::Bip321Uri;
@@ -25,7 +25,7 @@ pub fn parse_payment_uri(uri: String) -> Result<Bip321Uri> {
             .sp()
             .iter()
             .filter_map(|field| {
-                let sp_address = SilentPaymentAddressDisplay::try_from(field.inner().as_str());
+                let sp_address = SilentPaymentCode::try_from(field.inner().as_str());
                 match sp_address {
                     Ok(address) => Some(address.to_string()),
                     Err(_) => None,
@@ -37,7 +37,7 @@ pub fn parse_payment_uri(uri: String) -> Result<Bip321Uri> {
             .tsp()
             .iter()
             .filter_map(|field| {
-                let sp_address = SilentPaymentAddressDisplay::try_from(field.inner().as_str());
+                let sp_address = SilentPaymentCode::try_from(field.inner().as_str());
                 match sp_address {
                     Ok(address) => Some(address.to_string()),
                     Err(_) => None,
@@ -68,7 +68,7 @@ mod tests {
 
     const SP_ADDRESS: &str = "sp1qq2xewwk5u02gxxurdzr6r6jerelncw82rlyvw2kpggxt3pum4kp6yq62utdcljdtmxpy3vs7c940hvjuzedhhsf7h2y5lflk7zp2xhgz3vryqw4n";
 
-    fn testnet_sp_address() -> SilentPaymentAddressDisplay {
+    fn testnet_sp_address() -> SilentPaymentCode {
         let secp = Secp256k1::new();
         let scan = SecretKey::from_slice(&[0x01; 32])
             .unwrap()
@@ -76,7 +76,7 @@ mod tests {
         let spend = SecretKey::from_slice(&[0x02; 32])
             .unwrap()
             .public_key(&secp);
-        SilentPaymentAddressDisplay::new(scan, spend, SpNetwork::Testnet, SpVersion::ZERO)
+        SilentPaymentCode::new(SpVersion::ZERO, scan, spend, SpNetwork::Testnet)
     }
 
     #[test]
