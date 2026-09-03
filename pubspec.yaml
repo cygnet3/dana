@@ -27,10 +27,6 @@ dependencies:
   freezed_annotation: ^2.4.1
   ffi: ^2.1.0
   permission_handler: ^11.3.1
-  dart_bip353:
-    git:
-      url: https://github.com/cygnet3/dart_bip353.git
-      ref: main
   http: ^1.2.2
   mobile_scanner: ^6.0.2
   file_picker: ^9.0.2
