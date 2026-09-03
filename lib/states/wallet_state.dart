@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
+import 'package:danawallet/exceptions.dart';
+import 'package:danawallet/extensions/bip321_uri.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
@@ -366,24 +368,26 @@ class WalletState extends ChangeNotifier {
     // if a stored dana address was present, verify if it's still valid
     if (danaAddress != null) {
       try {
-        final verified = await Bip353Resolver.verifyPaymentCode(
-            danaAddress!, receivePaymentCode, network);
-
-        if (verified) {
-          // we have a stored address and it's valid, no need to register
+        final bip321Uri = await Bip353Resolver.resolveParsed(danaAddress!);
+        final resolved = bip321Uri.reusablePaymentCodeForNetwork(network);
+        if (resolved == receivePaymentCode) {
           Logger().i("Stored dana address is valid");
           return false;
-        } else {
-          Logger()
-              .w("Dana address is not pointing to our sp address, removing");
-          danaAddress = null;
-          // note: because we haven't found a valid address in memory, we don't return here
         }
-      } catch (e) {
-        // If we encounter an error while verifying the address,
-        // we probably don't have a working internet connection.
-        // We just assume the stored address is valid for now.
-        Logger().w("Received an error while verifying dana address: $e");
+        Logger()
+            .w("Stored dana address points to another payment code, removing");
+        danaAddress = null;
+      } on Bip353AddressNotRegisteredException {
+        Logger().w("Stored dana address is no longer registered, removing");
+        danaAddress = null;
+      } on AmbiguousPaymentUriException {
+        Logger()
+            .w("Stored dana address points to multiple payment code, removing");
+        danaAddress = null;
+      } on Bip353ResolveException catch (e) {
+        // We couldn't reach the DNS resolver, so we can't confirm either way.
+        // Assume the stored address is valid for now.
+        Logger().w("Could not verify dana address: $e");
         return false;
       }
     }

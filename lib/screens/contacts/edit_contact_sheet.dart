@@ -1,6 +1,8 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact.dart';
+import 'package:danawallet/exceptions.dart';
+import 'package:danawallet/extensions/bip321_uri.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/states/chain_state.dart';
@@ -101,17 +103,11 @@ class _EditContactSheetState extends State<EditContactSheet> {
       // If we have dana address but no SP address, try to resolve it
       if (newBip353Parsed != null) {
         try {
-          final resolved =
-              await Bip353Resolver.resolve(newBip353Parsed, network);
-          if (resolved == null) {
-            setState(() {
-              _isUpdating = false;
-              _errorMessage = 'Address not found';
-            });
-            return;
-          }
+          final resolved = await Bip353Resolver.resolveParsed(newBip353Parsed);
+          final reusablePaymentCode =
+              resolved.reusablePaymentCodeForNetwork(network);
           // updated bip353 address *must* point to same underlying payment code
-          else if (resolved != widget.contact.paymentCode) {
+          if (reusablePaymentCode != widget.contact.paymentCode) {
             setState(() {
               _isUpdating = false;
               _errorMessage =
@@ -119,6 +115,12 @@ class _EditContactSheetState extends State<EditContactSheet> {
             });
             return;
           }
+        } on Bip353AddressNotRegisteredException {
+          setState(() {
+            _isUpdating = false;
+            _errorMessage = 'Address not found';
+          });
+          return;
         } catch (e) {
           setState(() {
             _isUpdating = false;

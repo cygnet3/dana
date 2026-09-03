@@ -128,14 +128,15 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
           Logger().d('Resolving dana address: "$textField"');
 
           final parsed = Bip353Address.fromString(textField);
-          final resolved = await Bip353Resolver.resolve(parsed, network);
+          final resolved = await Bip353Resolver.resolveParsed(parsed);
 
-          if (resolved == null) {
-            Logger().w('Dana address "$textField" not found in DNS');
-            throw Exception('Dana address not found or not registered');
+          final reusablePaymentCode =
+              resolved.reusablePaymentCodeForNetwork(network);
+          if (reusablePaymentCode == null) {
+            throw Exception("Payment URI does not contain an address");
           }
-
-          resolvedPaymentCode = resolved;
+          resolvedPaymentCode = reusablePaymentCode;
+          parsedAmount = resolved.amount;
           resolvedBip353 = parsed;
 
           if (resolvedPaymentCode == youContact.paymentCode) {
@@ -153,7 +154,6 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
       if (resolvedPaymentCode == youContact.paymentCode) {
         throw Exception("You cannot send to yourself");
       }
-
       try {
         validateAddressWithNetwork(
             address: resolvedPaymentCode, network: network);
