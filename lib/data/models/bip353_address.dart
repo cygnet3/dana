@@ -42,6 +42,9 @@ class Bip353Address {
     return "$username@$domain";
   }
 
+  /// BIP-353 DNS name: `{user}.user._bitcoin-payment.{domain}`.
+  String get dnsQuery => '$username.user._bitcoin-payment.$domain';
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) {
