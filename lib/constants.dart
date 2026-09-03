@@ -48,6 +48,9 @@ const String nameServerDevMainnet =
 const String nameServerDevTestnet =
     "https://test.dev.nameserver.danawallet.app/v1";
 
+// Cloudflare DNS-over-HTTPS JSON API used for BIP-353 TXT lookups
+const String dnsOverHttpsEndpoint = "https://cloudflare-dns.com/dns-query";
+
 // Message keys sent to the main isolate from the foreground sync service.
 const String bgKeyStartHeight = 'startHeight';
 const String bgKeyEndHeight = 'endHeight';
