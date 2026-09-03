@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/prefix_search_response.dart';
+import 'package:danawallet/exceptions.dart';
+import 'package:danawallet/extensions/bip321_uri.dart';
 import 'package:danawallet/generated/rust/api/bip39.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/repositories/name_server_repository.dart';
@@ -90,46 +92,43 @@ class DanaAddressService {
     return null;
   }
 
-  /// Creates a dana address by calling the external name_server
+  /// Registers [username] on the dana address domain for [paymentCode].
   ///
-  /// [danaAddress] - The address to register.
-  /// [requestId] - The unique id for this request, can be useful for tracking requests.
+  /// Resolves the name first: if it already points at [paymentCode], returns
+  /// that address with no name-server call; if it points elsewhere, throws;
+  /// if it is unregistered, registers via the name server.
   ///
-  /// Returns [DanaAddressCreationResponse] with the created address or error details
+  /// Returns the registered [Bip353Address].
   Future<Bip353Address> registerUser({
     required String username,
     required String paymentCode,
   }) async {
     final requestId = _generateUniqueId();
     final domain = await danaAddressDomain;
-    final Bip353Address danaAddress;
+    final danaAddress = Bip353Address(username: username, domain: domain);
 
     // We try to resolve the address first to see if it already exists
     try {
-      danaAddress = Bip353Address(username: username, domain: domain);
+      final bip321Uri = await Bip353Resolver.resolveParsed(danaAddress);
       final resolvedPaymentCode =
-          await Bip353Resolver.resolve(danaAddress, network);
+          bip321Uri.reusablePaymentCodeForNetwork(network);
       if (resolvedPaymentCode == null) {
-        // Address not registered yet, proceed with registration
-        Logger().i(
-            'Address $username@$domain not found, proceeding with registration');
+        throw Bip353InvalidRecordException(
+            "$danaAddress exists but doesn't contain payment code");
       } else if (resolvedPaymentCode == paymentCode) {
-        // If we find our address, return success there's nothing more to do
         return danaAddress;
-      } else if (resolvedPaymentCode != paymentCode) {
-        // If we find another address, return error, user must try with a different username
-        throw Exception("Dana address already in use");
+      } else {
+        throw Bip353AddressAlreadyUsed(
+            address: danaAddress, resolved: resolvedPaymentCode);
       }
-    } catch (e) {
-      // Network or parsing error - we'll let name server try and if it exists it will return an error
-      Logger().e('Failed to resolve address for user $username: $e');
-      rethrow;
+    } on Bip353AddressNotRegisteredException {
+      Logger().i(
+          'Address $username@$domain not found, proceeding with registration');
+      return await nameServerRepository.registerDanaAddress(
+          danaAddress: danaAddress,
+          paymentCode: paymentCode,
+          requestId: requestId);
     }
-
-    return await nameServerRepository.registerDanaAddress(
-        danaAddress: danaAddress,
-        paymentCode: paymentCode,
-        requestId: requestId);
   }
 
   /// Looks up dana addresses associated with a silent payment address.
@@ -153,13 +152,21 @@ class DanaAddressService {
     Logger().i('Found ${addresses.length} dana address(es) for SP address');
 
     for (var candidate in addresses) {
-      if (await Bip353Resolver.verifyPaymentCode(
-          candidate, paymentCode, network)) {
-        // we just return the first valid candidate
+      try {
+        final bip321Uri = await Bip353Resolver.resolveParsed(candidate);
+        final resolved = bip321Uri.reusablePaymentCodeForNetwork(network);
+        if (resolved == null) {
+          throw Bip353PaymentCodeMismatchException(
+              address: candidate, expected: paymentCode, resolved: null);
+        } else if (resolved != paymentCode) {
+          // If this happen something's wrong with the nameserver
+          throw Bip353PaymentCodeMismatchException(
+              address: candidate, expected: paymentCode, resolved: resolved);
+        }
+        // No exception means the candidate resolves to our payment code.
         return candidate;
-      } else {
-        Logger()
-            .w("Name server returned an address that doesn't resolve to ours");
+      } catch (e) {
+        Logger().w("Skipping $candidate: $e");
       }
     }
     return null;
@@ -170,10 +177,16 @@ class DanaAddressService {
   Future<bool> isDanaUsernameAvailable(String username) async {
     try {
       final domain = await danaAddressDomain;
-      final parsed = Bip353Address(username: username, domain: domain);
-      return await Bip353Resolver.isBip353AddressPresent(parsed, network);
+      final bip353Address = Bip353Address(username: username, domain: domain);
+      await Bip353Resolver.resolveParsed(bip353Address);
+      // If we can resolve something then the entry exists
+      // We could check if the bip321 uri actually contains a payment code
+      // but I think that in that case it doesn't really matter
+      // We can't register the entry
+      return false;
+    } on Bip353AddressNotRegisteredException {
+      return true;
     } catch (e) {
-      // If we can't resolve due to network error, assume it's taken to be safe
       Logger().e('Error checking address availability: $e');
       return false;
     }
