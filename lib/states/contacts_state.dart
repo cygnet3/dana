@@ -2,6 +2,8 @@ import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/data/models/contact_field.dart';
+import 'package:danawallet/exceptions.dart';
+import 'package:danawallet/extensions/bip321_uri.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/extensions/payment_code.dart';
@@ -80,17 +82,18 @@ class ContactsState extends ChangeNotifier {
     // Resolve the SP address via DNS
     // Verify that the address is correct
     if (danaAddress != null) {
-      if (!await Bip353Resolver.verifyPaymentCode(
-          danaAddress, paymentCode, network)) {
-        throw Exception("Dana address does not point to expected sp address");
+      final bip321Uri = await Bip353Resolver.resolveParsed(danaAddress);
+      final resolvedPaymentCode =
+          bip321Uri.reusablePaymentCodeForNetwork(network);
+      if (resolvedPaymentCode == null) {
+        throw Exception("$danaAddress doesn't contain a reusable payment code");
+      } else if (sanitizePaymentCode(address: resolvedPaymentCode) !=
+          paymentCode) {
+        throw Bip353PaymentCodeMismatchException(
+            address: danaAddress,
+            expected: paymentCode,
+            resolved: resolvedPaymentCode);
       }
-    }
-
-    // verify that the payment code is valid
-    validateAddressWithNetwork(address: paymentCode, network: network);
-
-    if (!isReusablePaymentCode(address: paymentCode)) {
-      throw Exception("Non-reusable payment info not allowed");
     }
 
     // Store and update cached contact list
