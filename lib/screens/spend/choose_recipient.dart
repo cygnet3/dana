@@ -81,7 +81,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
         Provider.of<ContactsState>(context, listen: false).getYouContact();
 
     try {
-      final String resolvedPaymentCode;
+      String resolvedPaymentCode;
       final Bip353Address? resolvedBip353;
       Amount? parsedAmount;
 
@@ -98,8 +98,6 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
 
         if (textField.isEmpty) {
           throw Exception("Please enter a valid payment info");
-        } else if (textField == youContact.paymentCode) {
-          throw Exception("You cannot send to yourself");
         }
 
         if (textField.toLowerCase().startsWith('bitcoin:')) {
@@ -120,10 +118,6 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
           }
           parsedAmount = parsed.amount;
           resolvedBip353 = null;
-
-          if (resolvedPaymentCode == youContact.paymentCode) {
-            throw Exception("You cannot send to yourself");
-          }
         } else if (textField.contains('@')) {
           Logger().d('Resolving dana address: "$textField"');
 
@@ -139,10 +133,6 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
           parsedAmount = resolved.amount;
           resolvedBip353 = parsed;
 
-          if (resolvedPaymentCode == youContact.paymentCode) {
-            throw Exception("You cannot send to yourself");
-          }
-
           Logger().d(
               'Successfully resolved dana address to SP address: ${resolvedPaymentCode.substring(0, 20)}...');
         } else {
@@ -151,9 +141,6 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
         }
       }
 
-      if (resolvedPaymentCode == youContact.paymentCode) {
-        throw Exception("You cannot send to yourself");
-      }
       try {
         validateAddressWithNetwork(
             address: resolvedPaymentCode, network: network);
@@ -163,6 +150,13 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
         } else {
           throw InvalidAddressException();
         }
+      }
+
+      // Canonicalize casing (e.g. uppercase from QR / paste) so comparisons
+      // against stored contacts/self are consistent.
+      resolvedPaymentCode = sanitizePaymentCode(address: resolvedPaymentCode);
+      if (resolvedPaymentCode == youContact.paymentCode) {
+        throw Exception("You cannot send to yourself");
       }
 
       if (mounted) {
