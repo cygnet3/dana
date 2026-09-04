@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/date_time.dart';
@@ -336,6 +337,15 @@ class WalletState extends ChangeNotifier {
 
     final signedTx = wallet.signPsbt(psbt: created.psbt);
 
+    if (kSkipTransactionBroadcast) {
+      Logger().w(
+          'BROADCAST SKIPPED (kSkipTransactionBroadcast=true) — signed tx hex:\n$signedTx');
+      _verifyTestRecipientDetectsPayment(
+          signedTx: signedTx, created: created, spentOutpoints: spentOutpoints);
+      // Do not record as outgoing / mark UTXOs spent: nothing hit the chain.
+      return 'broadcast-skipped';
+    }
+
     Logger().d("signed tx: $signedTx");
 
     String txid;
@@ -375,6 +385,58 @@ class WalletState extends ChangeNotifier {
     notifyListeners();
 
     return txid;
+  }
+
+  /// Scan the signed tx as the [kTestRecipientSeed] wallet and throw if the
+  /// payment cannot be detected. Only used when [kSkipTransactionBroadcast].
+  void _verifyTestRecipientDetectsPayment({
+    required String signedTx,
+    required CreatedPsbt created,
+    required List<OutPoint> spentOutpoints,
+  }) {
+    final setup = SpWallet.setupWallet(
+        setupArgs: WalletSetupArgs(
+            setupType: WalletSetupType.mnemonic(kTestRecipientSeed),
+            network: network));
+    final recipientWallet = SpWallet(
+        scanKey: setup.scanKey,
+        spendKey: setup.spendKey,
+        network: network,
+        fingerprint: setup.fingerprint,
+        derivationPath: setup.derivationPath);
+    final testAddress = recipientWallet.getReceivingAddress();
+
+    final payment =
+        created.recipients.where((r) => r.paymentCode == testAddress).toList();
+    if (payment.isEmpty) {
+      throw Exception(
+          'Skip-broadcast check failed: payment is not to the test_seed recipient ($testAddress).');
+    }
+
+    final prevoutScripts = <Uint8List>[];
+    for (final op in spentOutpoints) {
+      final utxo = unspentOutputs.firstWhere((o) => o.outpoint == op);
+      prevoutScripts.add(utxo.script);
+    }
+
+    final found = recipientWallet.scanSignedTx(
+        txHex: signedTx, prevoutScripts: prevoutScripts);
+    final expected =
+        payment.fold<BigInt>(BigInt.zero, (sum, r) => sum + r.amount.field0);
+    final detected =
+        found.fold<BigInt>(BigInt.zero, (sum, o) => sum + o.amount.field0);
+
+    if (found.isEmpty) {
+      throw Exception(
+          'Skip-broadcast check failed: test_seed recipient did not detect any outputs.');
+    }
+    if (detected != expected) {
+      throw Exception(
+          'Skip-broadcast check failed: detected $detected sats, expected $expected.');
+    }
+
+    Logger().i(
+        'Skip-broadcast check: test_seed recipient detected ${found.length} output(s), $detected sats');
   }
 
   Future<String?> createSuggestedUsername() async {
