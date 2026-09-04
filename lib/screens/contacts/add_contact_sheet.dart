@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
+import 'package:danawallet/extensions/bip321_uri.dart';
 import 'package:danawallet/extensions/string_display.dart';
 import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact.dart';
+import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/services/dana_address_service.dart';
@@ -60,6 +62,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
   bool _isSearchingRemote = false;
   Timer? _searchDebounceTimer;
   Timer? _autoResolveDebounceTimer;
+  int _resolveGeneration = 0;
 
   static final _log = Logger();
 
@@ -118,8 +121,14 @@ class _AddContactSheetState extends State<AddContactSheet> {
 
     _searchDebounceTimer?.cancel();
     _autoResolveDebounceTimer?.cancel();
+    _resolveGeneration++;
 
-    setState(_resetSearchState);
+    // Any in-flight resolve is now stale; drop its spinner even if no new
+    // resolve gets scheduled below (e.g. the '@' was deleted).
+    setState(() {
+      _resetSearchState();
+      _isResolving = false;
+    });
 
     if (query.length < 3) return;
 
@@ -168,6 +177,8 @@ class _AddContactSheetState extends State<AddContactSheet> {
     final danaAddressString = _bip353AddressController.text.trim();
     if (danaAddressString.isEmpty) return;
 
+    final generation = _resolveGeneration;
+
     setState(() {
       _errorMessage = null;
       _isResolving = true;
@@ -175,33 +186,70 @@ class _AddContactSheetState extends State<AddContactSheet> {
 
     try {
       final network = Provider.of<ChainState>(context, listen: false).network;
-      final parsed = Bip353Address.fromString(danaAddressString);
-      final resolved = await Bip353Resolver.resolve(parsed, network);
+      final parsedBip353Address = Bip353Address.fromString(danaAddressString);
+      final resolved = await Bip353Resolver.resolveParsed(parsedBip353Address);
 
-      if (!mounted) return;
+      if (!mounted || generation != _resolveGeneration) return;
 
-      if (resolved != null) {
+      final reusablePaymentCode =
+          resolved.reusablePaymentCodeForNetwork(network);
+      if (reusablePaymentCode == null) {
         setState(() {
-          _confirmedDanaAddress = parsed;
-          _confirmedPaymentCode = resolved;
-          _remoteDanaAddresses = [];
-          _nameController.text = parsed.username;
+          _errorMessage = 'No reusable payment code found';
           _isResolving = false;
         });
       } else {
         setState(() {
-          _errorMessage = 'Could not resolve SP address for this Dana address';
+          _confirmedDanaAddress = parsedBip353Address;
+          _confirmedPaymentCode = reusablePaymentCode;
+          _remoteDanaAddresses = [];
+          _nameController.text = parsedBip353Address.username;
           _isResolving = false;
         });
       }
+    } on Bip353AddressNotRegisteredException {
+      _log.w('Dana address not registered: $danaAddressString');
+      if (!mounted || generation != _resolveGeneration) return;
+      setState(() {
+        _errorMessage = 'Address doesn\'t seem to exist';
+        _isResolving = false;
+      });
+    } on Bip353InvalidRecordException catch (e) {
+      _log.w('Invalid BIP-353 record for $danaAddressString: $e');
+      if (!mounted || generation != _resolveGeneration) return;
+      setState(() {
+        _errorMessage = 'Address has an invalid payment record';
+        _isResolving = false;
+      });
+    } on Bip353DnsStatusException catch (e) {
+      _log.w('DNS status error resolving $danaAddressString: $e');
+      if (!mounted || generation != _resolveGeneration) return;
+      setState(() {
+        _errorMessage = 'DNS lookup failed';
+        _isResolving = false;
+      });
+    } on Bip353TransportException catch (e) {
+      _log.w('DNS transport error resolving $danaAddressString: $e');
+      if (!mounted || generation != _resolveGeneration) return;
+      setState(() {
+        _errorMessage = 'Could not reach the DNS resolver';
+        _isResolving = false;
+      });
+    } on AmbiguousPaymentUriException {
+      _log.w('Ambiguous payment URI for $danaAddressString');
+      if (!mounted || generation != _resolveGeneration) return;
+      setState(() {
+        _errorMessage = 'Found more than one reusable payment code';
+        _isResolving = false;
+      });
     } catch (e) {
       _log.w('Failed to resolve Dana address: $e');
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Failed to resolve Dana address: $e';
-          _isResolving = false;
-        });
-      }
+      if (!mounted || generation != _resolveGeneration) return;
+      setState(() {
+        _errorMessage =
+            'Failed to resolve Dana address: ${exceptionToString(e)}';
+        _isResolving = false;
+      });
     }
   }
 
@@ -224,6 +272,9 @@ class _AddContactSheetState extends State<AddContactSheet> {
         _autoResolveDebounceTimer?.cancel();
         setState(_resetSearchState);
         _bip353AddressController.text = address;
+        // The listener fires on text assignment and schedules a debounced
+        // resolve; cancel it so only the direct call below runs.
+        _autoResolveDebounceTimer?.cancel();
         FocusScope.of(context).unfocus();
         await _resolveDanaAddress();
       },
