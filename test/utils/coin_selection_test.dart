@@ -67,4 +67,67 @@ void main() {
       expect(() => pickDefaultSelection([]), throwsException);
     });
   });
+
+  group('bestNoChangeSelection', () {
+    test('returns null when every selection creates change', () {
+      final withChange = selection(strategy: CoinSelectionStrategy.lowestFee);
+      expect(bestNoChangeSelection([withChange]), isNull);
+    });
+
+    test('prefers the changeless strategy', () {
+      final changeless = selection(
+          strategy: CoinSelectionStrategy.changeless, changeSats: 0, feeSats: 300);
+      final greedyNoChange = selection(
+          strategy: CoinSelectionStrategy.greedy, changeSats: 0, feeSats: 100);
+      expect(bestNoChangeSelection([greedyNoChange, changeless]), changeless);
+    });
+
+    test('otherwise picks the cheapest no-change selection', () {
+      final pricey = selection(
+          strategy: CoinSelectionStrategy.lowestFee, changeSats: 0, feeSats: 300);
+      final cheap = selection(
+          strategy: CoinSelectionStrategy.greedy, changeSats: 0, feeSats: 100);
+      expect(bestNoChangeSelection([pricey, cheap]), cheap);
+    });
+  });
+
+  group('buildFeeOptions', () {
+    test('offers both options when the rates differ', () {
+      // requested 1 sat/vB; changeless overshoots to 7.1
+      final feeRateCap = selection(
+          strategy: CoinSelectionStrategy.feeRateCap, actualFeeRate: 1.0);
+      final changeless = selection(
+          strategy: CoinSelectionStrategy.changeless,
+          changeSats: 0,
+          feeSats: 788,
+          actualFeeRate: 7.1);
+      final options = buildFeeOptions([feeRateCap, changeless], 1);
+      expect(options.exact, feeRateCap);
+      expect(options.noChange, changeless);
+    });
+
+    test('collapses to the no-change option when the rates round equal', () {
+      // requested 7 sat/vB; changeless actual 7.09 rounds to 7
+      final feeRateCap = selection(
+          strategy: CoinSelectionStrategy.feeRateCap, actualFeeRate: 7.0);
+      final changeless = selection(
+          strategy: CoinSelectionStrategy.changeless,
+          changeSats: 0,
+          feeSats: 788,
+          actualFeeRate: 7.09);
+      final options = buildFeeOptions([feeRateCap, changeless], 7);
+      expect(options.exact, changeless);
+      expect(options.noChange, isNull);
+    });
+
+    test('single option when the exact selection already has no change', () {
+      final feeRateCap = selection(
+          strategy: CoinSelectionStrategy.feeRateCap,
+          changeSats: 0,
+          actualFeeRate: 1.0);
+      final options = buildFeeOptions([feeRateCap], 1);
+      expect(options.exact, feeRateCap);
+      expect(options.noChange, isNull);
+    });
+  });
 }
