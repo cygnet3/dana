@@ -4,6 +4,7 @@ import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
+import 'package:danawallet/generated/rust/api/structs/input_selection.dart';
 import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/owned_output.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
@@ -11,6 +12,7 @@ import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart'
 import 'package:danawallet/data/models/recorded_transaction.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
+import 'package:danawallet/generated/rust/api/wallet/coin_selection.dart';
 import 'package:danawallet/generated/rust/api/wallet/setup.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
 import 'package:danawallet/repositories/owned_outputs_repository.dart';
@@ -19,6 +21,7 @@ import 'package:danawallet/repositories/transactions_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/services/dana_address_service.dart';
+import 'package:danawallet/utils/coin_selection.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 
@@ -246,25 +249,59 @@ class WalletState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<SilentPaymentUnsignedTransaction> createUnsignedTxToThisRecipient(
-      Recipient recipient, int feerate) async {
+  // A payment is treated as a drain when it (nearly) empties the wallet
+  bool _isDrainPayment(Recipient recipient) {
+    return recipient.amount.field0 >= amount.field0 - BigInt.from(546);
+  }
+
+  /// Propose a coin selection for a payment to [recipient] at [feerate]
+  /// (sat/vB), using the default coin-selection policy.
+  ///
+  /// When [forceFeeRate] is set (the user explicitly chose a fee rate), the
+  /// selection honoring the requested rate is preferred over a changeless
+  /// one (which may exceed it).
+  Future<InputSelection> proposeCoinSelection(Recipient recipient, int feerate,
+      {bool forceFeeRate = false}) async {
+    if (_isDrainPayment(recipient)) {
+      return selectUtxosToDrain(
+          ownedOutputs: unspentOutputs,
+          recipientAddress: recipient.paymentCode,
+          feerate: feerate.toDouble());
+    }
+
+    final selections = await selectUtxosToSpend(
+        ownedOutputs: unspentOutputs,
+        recipients: [recipient],
+        nChangeOutputs: BigInt.one,
+        feerate: feerate.toDouble());
+    return pickDefaultSelection(selections, forceFeeRate: forceFeeRate);
+  }
+
+  /// Build the unsigned transaction for a previously chosen [selection]
+  /// (see [proposeCoinSelection]), so the transaction signed is exactly the
+  /// one whose fee was presented to the user.
+  Future<SilentPaymentUnsignedTransaction> createUnsignedTxFromSelection(
+      Recipient recipient, InputSelection selection) async {
     final wallet = await getWalletFromSecureStorage();
 
-    if (recipient.amount.field0 < amount.field0 - BigInt.from(546)) {
-      return wallet.createNewTransaction(
+    if (_isDrainPayment(recipient)) {
+      // The drain amount is only known after fee estimation: it is whatever
+      // is left after paying the fee for spending all UTXOs.
+      final drainRecipient =
+          Recipient(paymentCode: recipient.paymentCode, amount: selection.sent);
+
+      return wallet.createTransactionFromSelection(
           ownedOutputs: unspentOutputs,
-          apiRecipients: [
-            recipient,
-          ],
-          feerate: feerate.toDouble(),
-          network: network);
-    } else {
-      return wallet.createDrainTransaction(
-          ownedOutputs: unspentOutputs,
-          wipeAddress: recipient.paymentCode,
-          feerate: feerate.toDouble(),
+          apiRecipients: [drainRecipient],
+          selection: selection,
           network: network);
     }
+
+    return wallet.createTransactionFromSelection(
+        ownedOutputs: unspentOutputs,
+        apiRecipients: [recipient],
+        selection: selection,
+        network: network);
   }
 
   Future<String> signAndBroadcastUnsignedTx(

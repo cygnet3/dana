@@ -1,92 +1,47 @@
+use crate::api::structs::input_selection::InputSelection;
 use crate::api::structs::network::Network;
-use crate::api::structs::owned_output::OwnedOutput;
+use crate::api::structs::owned_output::{OwnedOutput, WalletUtxo};
 use crate::api::structs::recipient::Recipient;
 use crate::api::structs::unsigned_transaction::SilentPaymentUnsignedTransaction;
 
 use anyhow::Result;
 use bip39::rand::{thread_rng, RngCore};
 use spdk_wallet::backend_blindbit_v1::BlindbitClient;
-use spdk_wallet::bitcoin::secp256k1::Scalar;
-use spdk_wallet::bitcoin::ScriptBuf;
-use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex, OutPoint};
-use spdk_wallet::client::{FeeRate, RecipientAddress, SpClient};
-use spdk_wallet::updater::DiscoveredOutput;
+use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex};
+use spdk_wallet::client::SpClient;
 
 use super::SpWallet;
 
+fn to_utxos_and_recipients(
+    owned_outputs: Vec<OwnedOutput>,
+    api_recipients: Vec<Recipient>,
+) -> Result<(Vec<WalletUtxo>, Vec<spdk_wallet::client::Recipient>)> {
+    let available_utxos = owned_outputs
+        .into_iter()
+        .map(|o| o.try_into_utxo())
+        .collect::<Result<Vec<_>>>()?;
+    let recipients = api_recipients
+        .into_iter()
+        .map(|r| r.try_into())
+        .collect::<Result<Vec<spdk_wallet::client::Recipient>>>()?;
+    Ok((available_utxos, recipients))
+}
+
 impl SpWallet {
     #[flutter_rust_bridge::frb(sync)]
-    pub fn create_new_transaction(
+    pub fn create_transaction_from_selection(
         &self,
         owned_outputs: Vec<OwnedOutput>,
         api_recipients: Vec<Recipient>,
-        feerate: f32,
+        selection: InputSelection,
         network: Network,
     ) -> Result<SilentPaymentUnsignedTransaction> {
-        let client = &self.client;
-        let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = owned_outputs
-            .into_iter()
-            .map(|output| {
-                let outpoint = output.outpoint.into();
-                let label = match output.label {
-                    Some(l) => Some(Scalar::from_be_bytes(l)?.into()),
-                    None => None,
-                };
-                let output = DiscoveredOutput {
-                    tweak: Scalar::from_be_bytes(output.tweak)?,
-                    value: output.amount.into(),
-                    script_pubkey: ScriptBuf::from_bytes(output.script),
-                    label,
-                };
-                Ok((outpoint, output))
-            })
-            .collect();
-        let recipients: Vec<spdk_wallet::client::Recipient> = api_recipients
-            .into_iter()
-            .map(|r| r.try_into().unwrap())
-            .collect();
-        let res = client.create_new_transaction(
-            available_utxos?,
+        let (available_utxos, recipients) = to_utxos_and_recipients(owned_outputs, api_recipients)?;
+
+        let res = self.client.create_transaction_from_selection(
+            &available_utxos,
             recipients,
-            FeeRate::from_sat_per_vb(feerate),
-            network.into(),
-        )?;
-
-        Ok(res.into())
-    }
-
-    #[flutter_rust_bridge::frb(sync)]
-    pub fn create_drain_transaction(
-        &self,
-        owned_outputs: Vec<OwnedOutput>,
-        wipe_address: String,
-        feerate: f32,
-        network: Network,
-    ) -> Result<SilentPaymentUnsignedTransaction> {
-        let client = &self.client;
-        let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = owned_outputs
-            .into_iter()
-            .map(|output| {
-                let outpoint = output.outpoint.into();
-                let label = match output.label {
-                    Some(l) => Some(Scalar::from_be_bytes(l)?.into()),
-                    None => None,
-                };
-                let output = DiscoveredOutput {
-                    tweak: Scalar::from_be_bytes(output.tweak)?,
-                    value: output.amount.into(),
-                    script_pubkey: ScriptBuf::from_bytes(output.script),
-                    label,
-                };
-                Ok((outpoint, output))
-            })
-            .collect();
-
-        let recipient_address: RecipientAddress = RecipientAddress::try_from(wipe_address)?;
-        let res = client.create_drain_transaction(
-            available_utxos?,
-            recipient_address,
-            FeeRate::from_sat_per_vb(feerate),
+            selection.into(),
             network.into(),
         )?;
 
