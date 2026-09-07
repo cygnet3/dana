@@ -120,7 +120,7 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 [[package]]
 name = "backend-blindbit-v1"
 version = "0.7.0"
-source = "git+https://github.com/cygnet3/spdk?branch=feat%2Fsilentpayments-dleq-multisigner#ce841fec7e576d63d9850061a7bbcdf2e2c18a2b"
+source = "git+https://github.com/cygnet3/spdk?rev=328c57e4d0028f13258ebd51ebd89b8eba1d23c3#328c57e4d0028f13258ebd51ebd89b8eba1d23c3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1579,7 +1579,7 @@ dependencies = [
 [[package]]
 name = "psbt"
 version = "0.1.0"
-source = "git+https://github.com/cygnet3/spdk?branch=feat%2Fsilentpayments-dleq-multisigner#ce841fec7e576d63d9850061a7bbcdf2e2c18a2b"
+source = "git+https://github.com/cygnet3/spdk?rev=328c57e4d0028f13258ebd51ebd89b8eba1d23c3#328c57e4d0028f13258ebd51ebd89b8eba1d23c3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2195,7 +2195,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 [[package]]
 name = "silentpayments"
 version = "0.7.0"
-source = "git+https://github.com/cygnet3/spdk?branch=feat%2Fsilentpayments-dleq-multisigner#ce841fec7e576d63d9850061a7bbcdf2e2c18a2b"
+source = "git+https://github.com/cygnet3/spdk?rev=328c57e4d0028f13258ebd51ebd89b8eba1d23c3#328c57e4d0028f13258ebd51ebd89b8eba1d23c3"
 dependencies = [
  "bech32 0.9.1",
  "bitcoin_hashes 0.13.0",
@@ -2264,7 +2264,7 @@ dependencies = [
 [[package]]
 name = "spdk-core"
 version = "0.7.0"
-source = "git+https://github.com/cygnet3/spdk?branch=feat%2Fsilentpayments-dleq-multisigner#ce841fec7e576d63d9850061a7bbcdf2e2c18a2b"
+source = "git+https://github.com/cygnet3/spdk?rev=328c57e4d0028f13258ebd51ebd89b8eba1d23c3#328c57e4d0028f13258ebd51ebd89b8eba1d23c3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2277,7 +2277,7 @@ dependencies = [
 [[package]]
 name = "spdk-wallet"
 version = "0.7.0"
-source = "git+https://github.com/cygnet3/spdk?branch=feat%2Fsilentpayments-dleq-multisigner#ce841fec7e576d63d9850061a7bbcdf2e2c18a2b"
+source = "git+https://github.com/cygnet3/spdk?rev=328c57e4d0028f13258ebd51ebd89b8eba1d23c3#328c57e4d0028f13258ebd51ebd89b8eba1d23c3"
 dependencies = [
  "anyhow",
  "backend-blindbit-v1",

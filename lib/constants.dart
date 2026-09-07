@@ -76,11 +76,13 @@ const AmountDisplayUnit defaultAmountDisplayUnit = AmountDisplayUnit.btc;
 
 /// When true, [WalletState.signAndBroadcastPsbt] signs but does not broadcast.
 /// After signing it scans the tx as the [kTestRecipientSeed] wallet and throws
-/// if that recipient cannot detect the payment. Set back to false before any
-/// real send — easy to leave on and ship a wallet that never broadcasts.
-const bool kSkipTransactionBroadcast = true;
+/// if that recipient cannot detect the payment. Set to true only while testing
+/// sends — easy to leave on and ship a wallet that never broadcasts.
+const bool kSkipTransactionBroadcast = false;
 
-/// BIP-39 mnemonic of the skip-broadcast test recipient. Must match the
-/// `test_seed` file at the repo root.
+/// BIP-39 mnemonic of the skip-broadcast test recipient.
+/// Must stay in sync with `TEST_RECIPIENT_SEED` in
+/// `rust/src/api/wallet/transaction.rs` (duplicated: Rust unit tests cannot
+/// read Dart constants).
 const String kTestRecipientSeed =
     'biology farm interest hub pull unique butter kangaroo spread demand tomato exercise';

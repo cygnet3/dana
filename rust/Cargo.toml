@@ -8,7 +8,7 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 flutter_rust_bridge = "=2.13.0"
-spdk-wallet = { git = "https://github.com/cygnet3/spdk", branch = "feat/silentpayments-dleq-multisigner" }
+spdk-wallet = { git = "https://github.com/cygnet3/spdk", rev = "328c57e4d0028f13258ebd51ebd89b8eba1d23c3" }
 psbt-v2 = { git = "https://gitea.bitcoin.ninja/sosthene/rust-psbt.git", rev = "ace5d5bd8307ce93c81dd2a606dcb8cc9aaa1a85", features = ["silent-payments", "rand"] }
 lazy_static = "1.4"
 anyhow = "1.0"
