@@ -6,9 +6,11 @@ use crate::api::structs::owned_output::{OwnedOutput, WalletUtxo};
 use crate::api::structs::recipient::Recipient;
 
 use anyhow::{Error, Result};
+use bip39::rand::seq::SliceRandom;
 use bip39::rand::thread_rng;
 use flutter_rust_bridge::frb;
-use psbt_v2::v2::{GetKey, GetKeyError, KeyRequest, Output as PsbtOutput};
+use psbt_v2::psbt::{Creator, Finalizer, GetKey, GetKeyError, KeyRequest, Psbt};
+use psbt_v2::{Extractor, Input, Output as PsbtOutput, SpV0Info};
 use spdk_wallet::backend_blindbit_v1::BlindbitClient;
 use spdk_wallet::bitcoin::bip32;
 use spdk_wallet::bitcoin::consensus::encode::{deserialize_hex, serialize};
@@ -19,11 +21,7 @@ use spdk_wallet::bitcoin::{
     Transaction, TxOut, XOnlyPublicKey,
 };
 use spdk_wallet::client::{random_split, RecipientAddress, Strategy};
-use spdk_wallet::psbt::roles::{
-    Bip375UpdaterExt, ConstructorPsbtExt, ExtractorPsbtExt, InputWitnessFinalizerPsbtExt,
-    SignerPsbtExt,
-};
-use spdk_wallet::psbt::Psbt;
+use spdk_wallet::psbt::roles::{Bip375UpdaterExt, ShareMode, SpSignerExt};
 use spdk_wallet::silentpayments::utils::receiving::{get_pubkey_from_input, PublicTweakData};
 use spdk_wallet::silentpayments::utils::OutPoint as SpOutPoint;
 use spdk_wallet::silentpayments::{
@@ -169,7 +167,7 @@ impl SpWallet {
             )));
         }
 
-        let outputs = recipients
+        let mut outputs = recipients
             .iter()
             .map(|recipient| match &recipient.address {
                 RecipientAddress::LegacyAddress(address) => Ok(PsbtOutput::new(TxOut {
@@ -179,9 +177,7 @@ impl SpWallet {
                 RecipientAddress::SpCode(sp_code) => {
                     // BIP-375: the scriptPubKey stays empty at this stage, it is
                     // derived from the ECDH shares at signing time.
-                    let mut sp_info = [0u8; 66];
-                    sp_info[..33].copy_from_slice(&sp_code.scan_key().serialize());
-                    sp_info[33..].copy_from_slice(&sp_code.m_pubkey().serialize());
+                    let sp_info = SpV0Info::new(CompressedPublicKey(sp_code.scan_key()), CompressedPublicKey(sp_code.m_pubkey()));
                     let output = PsbtOutput {
                         sp_v0_info: Some(sp_info),
                         amount: recipient.amount,
@@ -224,14 +220,21 @@ impl SpWallet {
             })
             .collect::<Result<_>>()?;
 
-        let mut psbt = Psbt::create_new_transaction(outputs)?
-            .add_inputs(selected_utxos.iter().map(|(o, _)| *o).collect())?;
+        outputs.shuffle(&mut thread_rng());
 
-        // updater role: fill in the funding utxos and BIP-375/376 SP fields
         let secp = Secp256k1::new();
         let b_spend = self.client.try_secret_spend_key()?;
         let (fingerprint, derivation_path) = self.psbt_key_source()?;
-        for (input, (_, output)) in psbt.inputs.iter_mut().zip(selected_utxos.iter()) {
+        let (spend_xonly, _) = b_spend.x_only_public_key(&secp);
+
+        let mut constructor = Creator::new().constructor_modifiable();
+        for output in outputs {
+            constructor = constructor
+                .output(output)
+                .map_err(|e| Error::msg(e.to_string()))?;
+        }
+        for (outpoint, output) in &selected_utxos {
+            let mut input = Input::new(outpoint);
             input.witness_utxo = Some(TxOut {
                 value: output.value,
                 script_pubkey: output.script_pubkey.clone(),
@@ -244,7 +247,17 @@ impl SpWallet {
                 fingerprint,
                 derivation_path.clone(),
             );
+            // BIP-375 signer checks look at tap_key_origins (not the BIP-376 map)
+            // for P2TR inputs that carry a DLEQ proof. SP inputs have no internal
+            // key, so declare the untweaked spend key's origin here.
+            input
+                .tap_key_origins
+                .insert(spend_xonly, (Vec::new(), (fingerprint, derivation_path.clone())));
+            constructor = constructor.input(input);
         }
+        let psbt = constructor
+            .psbt()
+            .map_err(|e| Error::msg(e.to_string()))?;
 
         Ok(CreatedPsbt {
             psbt: psbt.serialize(),
@@ -264,21 +277,26 @@ impl SpWallet {
         let b_spend = self.client.try_secret_spend_key()?;
         let (fingerprint, derivation_path) = self.psbt_key_source()?;
 
-        psbt.single_signer_generate_ecdh_shares(&secp, b_spend)?;
-        let sp_outputs = psbt.compute_sp_outputs(&secp)?;
-        psbt.set_sp_scriptpubkey(sp_outputs)?;
-        psbt.sign_silent_payment_inputs(
-            &SpendKeyProvider {
-                spend: b_spend,
-                fingerprint,
-                derivation_path,
-                network: NetworkKind::from(self.client.network()),
-            },
-            &secp,
-        )?;
-        let psbt = psbt.finalize()?;
-
-        let tx = psbt.extract_tx()?;
+        let keys = SpendKeyProvider {
+            spend: b_spend,
+            fingerprint,
+            derivation_path,
+            network: NetworkKind::from(self.client.network()),
+        };
+        psbt.add_ecdh_shares(&secp, &mut thread_rng(), &keys, ShareMode::Global)
+            .map_err(|e| Error::msg(e.to_string()))?;
+        psbt.commit_sp_outputs(&secp)
+            .map_err(|e| Error::msg(e.to_string()))?;
+        psbt.sign_silent_payment_inputs(&keys, &secp)
+            .map_err(|e| Error::msg(e.to_string()))?;
+        let psbt = Finalizer::new(psbt)
+            .map_err(|e| Error::msg(e.to_string()))?
+            .finalize(&secp)
+            .map_err(|e| Error::msg(e.to_string()))?;
+        let tx = Extractor::new(psbt)
+            .map_err(|e| Error::msg(e.to_string()))?
+            .extract_tx()
+            .map_err(|e| Error::msg(e.to_string()))?;
         Ok(serialize(&tx).to_lower_hex_string())
     }
 
@@ -434,6 +452,7 @@ mod tests {
     use crate::api::structs::input_selection::CoinSelectionStrategy;
     use crate::api::wallet::setup::{WalletSetupArgs, WalletSetupType};
     use psbt_v2::bitcoin::key::TapTweak;
+    use psbt_v2::SpV0Info;
     use spdk_wallet::bitcoin::secp256k1::Scalar;
     use spdk_wallet::client::RecipientAddress;
 
@@ -553,7 +572,7 @@ mod tests {
 
     /// The BIP-375 PSBT_OUT_SP_V0_INFO payload for a payment code: scan key
     /// concatenated with spend key.
-    fn sp_info(code: &str) -> [u8; 66] {
+    fn sp_info(code: &str) -> SpV0Info {
         let code = match RecipientAddress::try_from(code.to_string()).expect("sp code") {
             RecipientAddress::SpCode(code) => code,
             _ => panic!("expected silent payment code"),
@@ -561,7 +580,7 @@ mod tests {
         let mut info = [0u8; 66];
         info[..33].copy_from_slice(&code.scan_key().serialize());
         info[33..].copy_from_slice(&code.m_pubkey().serialize());
-        info
+        info.into()
     }
 
     #[test]
