@@ -4,7 +4,9 @@ import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/data/models/recorded_transaction.dart';
+import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/extensions/api_amount.dart';
+import 'package:danawallet/extensions/bip321_uri.dart';
 import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/data/models/contact_field.dart';
@@ -203,15 +205,30 @@ class ContactDetailsScreen extends StatelessWidget {
       // If contact has a bip353-address, the contact was probably added using bip353.
       // We have to verify if the underlying payment code is the same.
       try {
-        final verified = await Bip353Resolver.verifyPaymentCode(
-            bip353, paymentCode, network);
-        if (!verified) {
-          displayWarning(
-              "Man-in-the-middle attack might be occurring! Sending not possible");
-          return;
+        final bip321Uri = await Bip353Resolver.resolveParsed(bip353);
+        final resolvedPaymentCode =
+            bip321Uri.reusablePaymentCodeForNetwork(network);
+        if (resolvedPaymentCode == null) {
+          throw Bip353AddressNotRegisteredException(bip353);
+        } else if (resolvedPaymentCode != paymentCode) {
+          throw Bip353PaymentCodeMismatchException(
+              address: bip353,
+              expected: paymentCode,
+              resolved: resolvedPaymentCode);
         }
+      } on Bip353PaymentCodeMismatchException {
+        displayWarning(
+            "$bip353 contains a different payment code than the one you registered, "
+            "confirm with your contact first!");
+        return;
+      } on Bip353AddressNotRegisteredException {
+        displayWarning("$bip353 doesn't exist");
+        return;
+      } on AmbiguousPaymentUriException {
+        displayWarning("$bip353 contains more than one payment codes");
+        return;
       } catch (e) {
-        displayError("Sending failed", e);
+        displayError("Failed to validate $bip353", e);
         return;
       }
     }
