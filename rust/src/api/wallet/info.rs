@@ -12,7 +12,7 @@ impl SpWallet {
 
     #[frb(sync)]
     pub fn get_change_address(&self) -> String {
-        self.client.sp_receiver.change_code().to_string()
+        self.client.change_code().to_string()
     }
 
     #[frb(sync)]
