@@ -99,6 +99,14 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
     String displayEstimatedFee =
         widget.unsignedTx.getFeeAmount().display(bitcoinUnit);
 
+    // show the actual fee rate, which may exceed the requested one
+    // (e.g. when a changeless selection was used)
+    final displayFeeRate = widget.unsignedTx.actualFeeRate
+        .toStringAsFixed(2)
+        .replaceAll(RegExp(r'0+$'), '')
+        .replaceAll(RegExp(r'\.$'), '');
+    displayEstimatedFee = '$displayEstimatedFee ($displayFeeRate sat/vB)';
+
     return ScreenSkeleton(
         showBackButton: true,
         title: 'Ready to send?',
