@@ -46,7 +46,7 @@ impl SpWallet {
             .map(|r| r.try_into().unwrap())
             .collect();
         let res = client.create_new_transaction(
-            available_utxos?,
+            &available_utxos?,
             recipients,
             FeeRate::from_sat_per_vb(feerate),
             network.into(),
@@ -104,7 +104,7 @@ impl SpWallet {
         rng.fill_bytes(&mut aux_rand);
 
         let client = &self.client;
-        let tx = client.sign_transaction(unsigned_transaction.into(), &aux_rand)?;
+        let tx = client.sign_transaction(&unsigned_transaction.into(), &aux_rand)?;
         Ok(serialize(&tx).to_lower_hex_string())
     }
 
