@@ -8,7 +8,7 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 flutter_rust_bridge = "=2.13.0"
-spdk-wallet = { git = "https://github.com/cygnet3/spdk", rev = "d8dcfd04b33623f85a9752a151f4c15b82aa732f" }
+spdk-wallet = { git = "https://github.com/cygnet3/spdk", rev = "318d70730b96e5a084b588ab9ec11af4583cb6ad" }
 lazy_static = "1.4"
 anyhow = "1.0"
 serde = { version = "1.0.188", features = ["derive"] }
@@ -17,7 +17,9 @@ once_cell = "1.18.0"
 bip39 = { version = "2.0.0", features = ["rand"] }
 serde_with = "3.6.0"
 log = "0.4.20"
-simplelog = { version = "0.12.1", default-features = false, features = ["local-offset"] }
+simplelog = { version = "0.12.1", default-features = false, features = [
+  "local-offset",
+] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 pushtx = "0.4.0"
 futures = "0.3"
