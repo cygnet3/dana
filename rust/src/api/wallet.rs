@@ -2,7 +2,7 @@ pub mod coin_selection;
 mod info;
 pub mod setup;
 mod sync;
-mod transaction;
+pub mod transaction;
 
 use crate::api::structs::network::Network;
 use anyhow::{anyhow, Result};

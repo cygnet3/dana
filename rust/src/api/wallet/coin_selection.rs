@@ -11,11 +11,14 @@ use spdk_wallet::client::{
 
 pub fn select_utxos_to_spend(
     owned_outputs: Vec<OwnedOutput>,
-    recipient: &Recipient,
+    recipients: Vec<Recipient>,
+    // Kept for FFI wire compatibility; spdk always assumes a single change output.
+    _n_change_outputs: usize,
     feerate: f32,
 ) -> Result<Vec<InputSelection>> {
     let available_utxos = OwnedOutput::try_into_utxos(owned_outputs)?;
-    let recipients = vec![recipient.clone().into()];
+    let recipients: Vec<spdk_wallet::client::Recipient> =
+        recipients.into_iter().map(Into::into).collect();
 
     let selections = propose_coin_selections(
         &available_utxos,

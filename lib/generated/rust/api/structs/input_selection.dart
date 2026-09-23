@@ -5,26 +5,10 @@
 
 import '../../frb_generated.dart';
 import 'amount.dart';
+import 'outpoint.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_receiver_is_total_eq`, `clone`, `eq`, `fmt`, `fmt`, `from`, `from`, `from`, `from`
-
-// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<InputSelection>>
-abstract class InputSelection implements RustOpaqueInterface {
-  /// Fee rate in satoshis per virtual byte.
-  double get actualFeeRate;
-
-  Amount get change;
-
-  Amount get fee;
-
-  BigInt get nSentOutputs;
-
-  Amount get sent;
-
-  /// Strategy used for this selection. `None` for drain selections.
-  CoinSelectionStrategy? get strategy;
-}
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_receiver_is_total_eq`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `from`, `from`, `from`
 
 enum CoinSelectionStrategy {
   changeless,
@@ -32,4 +16,47 @@ enum CoinSelectionStrategy {
   feeRateCap,
   greedy,
   ;
+}
+
+class InputSelection {
+  final List<OutPoint> selectedUtxos;
+  final Amount sent;
+  final BigInt nSentOutputs;
+  final Amount change;
+  final Amount fee;
+  final double actualFeeRate;
+  final CoinSelectionStrategy? strategy;
+
+  const InputSelection({
+    required this.selectedUtxos,
+    required this.sent,
+    required this.nSentOutputs,
+    required this.change,
+    required this.fee,
+    required this.actualFeeRate,
+    this.strategy,
+  });
+
+  @override
+  int get hashCode =>
+      selectedUtxos.hashCode ^
+      sent.hashCode ^
+      nSentOutputs.hashCode ^
+      change.hashCode ^
+      fee.hashCode ^
+      actualFeeRate.hashCode ^
+      strategy.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is InputSelection &&
+          runtimeType == other.runtimeType &&
+          selectedUtxos == other.selectedUtxos &&
+          sent == other.sent &&
+          nSentOutputs == other.nSentOutputs &&
+          change == other.change &&
+          fee == other.fee &&
+          actualFeeRate == other.actualFeeRate &&
+          strategy == other.strategy;
 }

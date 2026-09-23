@@ -1,72 +1,477 @@
+use crate::api::structs::amount::Amount as ApiAmount;
 use crate::api::structs::input_selection::InputSelection;
 use crate::api::structs::network::Network;
+use crate::api::structs::outpoint::OutPoint as ApiOutPoint;
 use crate::api::structs::owned_output::OwnedOutput;
 use crate::api::structs::recipient::Recipient;
-use crate::api::structs::unsigned_transaction::SilentPaymentUnsignedTransaction;
 use crate::stream::send_tx_broadcast_update;
 
-use anyhow::Result;
-use bip39::rand::{thread_rng, RngCore};
+use anyhow::{Error, Result};
+use bip39::rand::seq::SliceRandom;
+use bip39::rand::thread_rng;
+use flutter_rust_bridge::frb;
 use spdk_wallet::backend_blindbit_v1::BlindbitBackend;
-use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex};
-use spdk_wallet::client::SpClient;
+use spdk_wallet::bitcoin::bip32;
+use spdk_wallet::bitcoin::consensus::encode::{deserialize_hex, serialize};
+use spdk_wallet::bitcoin::hex::DisplayHex;
+use spdk_wallet::bitcoin::secp256k1::{Secp256k1, SecretKey, Signing};
+use spdk_wallet::bitcoin::{
+    Amount, CompressedPublicKey, NetworkKind, PrivateKey, ScriptBuf, Transaction, TxOut,
+    XOnlyPublicKey,
+};
+use spdk_wallet::client::RecipientAddress;
+use spdk_wallet::psbt_v2::{
+    Creator, Extractor, Finalizer, GetKey, GetKeyError, Input, KeyRequest, Output as PsbtOutput,
+    Psbt, Signer, SpV0Info,
+};
+use spdk_wallet::signer::{ShareMode, SpSignerExt};
+use spdk_wallet::silentpayments::receiving::{Label, Receiver};
+use spdk_wallet::silentpayments::utils::receiving::{get_pubkey_from_input, PublicTweakData};
+use spdk_wallet::silentpayments::utils::OutPoint as SpOutPoint;
+use spdk_wallet::silentpayments::{
+    Network as SpNetwork, SpVersion, TransactionInputs, TransactionSharedSecret,
+};
 
 use super::SpWallet;
 
+/// The PSBT built for a payment, together with the final recipient list
+/// (payment recipient plus any change outputs), used to record the outgoing
+/// transaction once it is broadcast.
+#[derive(Debug, Clone)]
+#[frb]
+pub struct CreatedPsbt {
+    pub psbt: Vec<u8>,
+    pub recipients: Vec<Recipient>,
+}
+
+/// Spend-key provider for the PSBT signer role. Returns the untweaked spend
+/// key only when the BIP-32 key request matches this wallet's origin. The
+/// signer applies the per-input `sp_tweak` itself.
+struct SpendKeyProvider {
+    spend: SecretKey,
+    fingerprint: bip32::Fingerprint,
+    derivation_path: bip32::DerivationPath,
+    network: NetworkKind,
+}
+
+impl GetKey for SpendKeyProvider {
+    type Error = GetKeyError;
+
+    fn get_key<C: Signing>(
+        &self,
+        key_request: &KeyRequest,
+        _secp: &Secp256k1<C>,
+    ) -> Result<Option<PrivateKey>, Self::Error> {
+        match key_request {
+            KeyRequest::Bip32((fingerprint, path))
+                if *fingerprint == self.fingerprint && *path == self.derivation_path =>
+            {
+                Ok(Some(PrivateKey::new(self.spend, self.network)))
+            }
+            // Pubkey requests carry the tweaked spend key (the PSBT map key).
+            // Serving them would skip the origin check; the signer still
+            // applies `sp_tweak` to whatever we return.
+            _ => Ok(None),
+        }
+    }
+}
+
 impl SpWallet {
+    /// Signs every silent-payment input this wallet can sign.
+    ///
+    /// The signer looks the spend key up through [`SpendKeyProvider`], so a
+    /// BIP-32 request has to match this wallet's origin. Output scripts must
+    /// already be committed.
+    fn sign_owned_inputs(&self, psbt: Psbt) -> Result<Psbt> {
+        let secp = Secp256k1::new();
+        let b_spend = self.client.try_secret_spend_key()?;
+        let (fingerprint, derivation_path) = self.psbt_key_source()?;
+        let keys = SpendKeyProvider {
+            spend: b_spend,
+            fingerprint,
+            derivation_path,
+            network: NetworkKind::from(self.client.network()),
+        };
+        let input_count = psbt.inputs.len();
+        let mut signer = Signer::new(psbt).map_err(|e| Error::msg(e.to_string()))?;
+        let sigs = signer.session(|mut session| -> Result<Vec<_>, Error> {
+            let inputs = session.signable_inputs().map_err(|errors| {
+                Error::msg(
+                    errors
+                        .iter()
+                        .map(|(index, error)| format!("input {index}: {error}"))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                )
+            })?;
+            (0..input_count)
+                .map(|index| {
+                    session
+                        .get_silent_payment_sigs(&inputs, index, &keys, &secp)
+                        .map_err(|e| Error::msg(e.to_string()))
+                })
+                .collect()
+        })?;
+        signer.apply(sigs).map_err(|e| Error::msg(e.to_string()))
+    }
+}
+
+impl SpWallet {
+    /// Builds a BIP-375 PSBT (v2) for a previously chosen [InputSelection].
+    ///
+    /// The returned PSBT has all inputs and outputs set, with silent payment
+    /// outputs still carrying placeholder scriptPubKeys (the SP output keys
+    /// are only derived at signing time, see [SpWallet::sign_inputs] or
+    /// [SpWallet::sign_finalize_and_extract]).
+    ///
+    /// Also returns the final recipient list (payment recipient plus any
+    /// change outputs), so the outgoing transaction can be recorded once the
+    /// signed transaction is broadcast.
     #[flutter_rust_bridge::frb(sync)]
-    pub fn create_transaction_from_selection(
+    pub fn create_psbt(
         &self,
         owned_outputs: Vec<OwnedOutput>,
-        recipient: &Recipient,
+        api_recipients: Vec<Recipient>,
         selection: &InputSelection,
         network: Network,
-    ) -> Result<SilentPaymentUnsignedTransaction> {
+    ) -> Result<CreatedPsbt> {
         let available_utxos = OwnedOutput::try_into_utxos(owned_outputs)?;
-        let recipients = vec![recipient.clone().into()];
-        let network = network.into();
+        let mut recipients: Vec<spdk_wallet::client::Recipient> =
+            api_recipients.into_iter().map(Into::into).collect();
+        let network = spdk_wallet::bitcoin::Network::from(network);
 
-        let res = match selection {
-            InputSelection::Payment(selection) => self.client.create_transaction_from_proposal(
-                &available_utxos,
-                recipients,
-                &selection,
-                network,
-            )?,
-            InputSelection::Drain(selection) => {
-                self.client.create_drain_transaction_from_selection(
-                    &available_utxos,
-                    recipients,
-                    &selection,
-                    network,
-                )?
+        let sp_network = match network {
+            spdk_wallet::bitcoin::Network::Bitcoin => SpNetwork::Mainnet,
+            spdk_wallet::bitcoin::Network::Testnet | spdk_wallet::bitcoin::Network::Signet => {
+                SpNetwork::Testnet
             }
+            spdk_wallet::bitcoin::Network::Regtest => SpNetwork::Regtest,
+            _ => unreachable!(),
         };
 
-        Ok(res.into())
+        for r in &recipients {
+            if let RecipientAddress::SpCode(sp_code) = &r.address {
+                if sp_code.network() != sp_network {
+                    return Err(Error::msg(format!(
+                        "Wrong network for silent payment code {}",
+                        sp_code
+                    )));
+                }
+            }
+        }
+
+        if recipients.len() != selection.n_sent_outputs {
+            return Err(Error::msg(format!(
+                "Number of outputs mismatch between recipients and selection: recipients {}, expected n_sent {}",
+                recipients.len(), selection.n_sent_outputs,
+            )));
+        }
+
+        let change = Amount::from(selection.change.clone());
+
+        // append change outputs (drain selections never have change)
+        if change > Amount::ZERO {
+            recipients.push(spdk_wallet::client::Recipient {
+                address: RecipientAddress::SpCode(self.client.change_code()),
+                amount: change,
+            });
+        }
+
+        let total_outputs_amt: Amount = recipients.iter().map(|r| r.amount).sum();
+        let expected_outputs_amt = Amount::from(selection.sent.clone()) + change;
+        if total_outputs_amt != expected_outputs_amt {
+            return Err(Error::msg(format!(
+                "Amount mismatch between recipients and selection: recipients total {}, expected sent+change {}",
+                total_outputs_amt, expected_outputs_amt,
+            )));
+        }
+
+        let mut outputs = recipients
+            .iter()
+            .map(|recipient| match &recipient.address {
+                RecipientAddress::LegacyAddress(address) => Ok(PsbtOutput::new(TxOut {
+                    value: recipient.amount,
+                    script_pubkey: address.clone().require_network(network)?.script_pubkey(),
+                })),
+                RecipientAddress::SpCode(sp_code) => {
+                    // BIP-375: the scriptPubKey stays empty at this stage, it is
+                    // derived from the ECDH shares at signing time.
+                    let sp_info = SpV0Info::new(
+                        CompressedPublicKey(sp_code.scan_key()),
+                        CompressedPublicKey(sp_code.m_pubkey()),
+                    );
+                    let output = PsbtOutput {
+                        sp_v0_info: Some(sp_info),
+                        amount: recipient.amount,
+                        ..Default::default()
+                    };
+                    Ok(output)
+                }
+                RecipientAddress::Data(data) => {
+                    if recipient.amount > Amount::ZERO {
+                        return Err(Error::msg("Data output must have an amount of 0!"));
+                    }
+                    Ok(PsbtOutput::new(TxOut {
+                        value: recipient.amount,
+                        script_pubkey: ScriptBuf::new_op_return(data),
+                    }))
+                }
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let selected_utxos: Vec<_> = selection
+            .selected_utxos
+            .iter()
+            .map(|op| {
+                let op = spdk_wallet::bitcoin::OutPoint::from(op.clone());
+                available_utxos
+                    .get(&op)
+                    .map(|d| (op, d.clone()))
+                    .ok_or_else(|| {
+                        Error::msg(format!("outpoint {} not found in available_utxos", op))
+                    })
+            })
+            .collect::<Result<_>>()?;
+
+        outputs.shuffle(&mut thread_rng());
+
+        let secp = Secp256k1::new();
+        let b_spend = self.client.try_secret_spend_key()?;
+        let (fingerprint, derivation_path) = self.psbt_key_source()?;
+        let (spend_xonly, _) = b_spend.x_only_public_key(&secp);
+
+        let mut constructor = Creator::new().constructor_modifiable();
+        for output in outputs {
+            constructor = constructor
+                .output(output)
+                .map_err(|e| Error::msg(e.to_string()))?;
+        }
+        for (outpoint, output) in &selected_utxos {
+            let mut input = Input::new(outpoint);
+            input.witness_utxo = Some(TxOut {
+                value: output.txout.value,
+                script_pubkey: output.txout.script_pubkey.clone(),
+            });
+            input.sp_tweak = Some(output.tweak.to_be_bytes());
+            // BIP-376: the map key is the untweaked spend key B_spend; the signer
+            // applies sp_tweak and negates d if odd (see psbt_v2 sign_with_tweaked_key).
+            input.sp_spend_bip32_derivations.insert(
+                CompressedPublicKey(b_spend.public_key(&secp)),
+                (fingerprint, derivation_path.clone()),
+            );
+            // BIP-375 signer checks look at tap_key_origins (not the BIP-376 map)
+            // for P2TR inputs that carry a DLEQ proof. SP inputs have no internal
+            // key, so declare the untweaked spend key's origin here.
+            input.tap_key_origins.insert(
+                spend_xonly,
+                (Vec::new(), (fingerprint, derivation_path.clone())),
+            );
+            constructor = constructor.input(input);
+        }
+        let psbt = constructor.psbt().map_err(|e| Error::msg(e.to_string()))?;
+
+        Ok(CreatedPsbt {
+            psbt: psbt.serialize(),
+            recipients: recipients.into_iter().map(Into::into).collect(),
+        })
     }
 
     #[flutter_rust_bridge::frb(sync)]
-    pub fn sign_transaction(
-        &self,
-        unsigned_transaction: &SilentPaymentUnsignedTransaction,
-    ) -> Result<String> {
-        let mut aux_rand = [0u8; 32];
+    pub fn add_ecdh_shares(&self, psbt: Vec<u8>) -> Result<Vec<u8>> {
+        let mut psbt =
+            Psbt::deserialize(&psbt).map_err(|e| Error::msg(format!("invalid psbt: {}", e)))?;
+        let secp = Secp256k1::new();
+        let b_spend = self.client.try_secret_spend_key()?;
+        let (fingerprint, derivation_path) = self.psbt_key_source()?;
 
-        let mut rng = thread_rng();
-        rng.fill_bytes(&mut aux_rand);
+        let keys = SpendKeyProvider {
+            spend: b_spend,
+            fingerprint,
+            derivation_path,
+            network: NetworkKind::from(self.client.network()),
+        };
+        psbt.add_ecdh_shares(&secp, &mut thread_rng(), &keys, ShareMode::Global)
+            .map_err(|e| Error::msg(e.to_string()))?;
+        Ok(psbt.serialize())
+    }
 
-        let client = &self.client;
-        let tx = client.sign_transaction(&unsigned_transaction.clone().into(), &aux_rand)?;
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn commit_sp_outputs(&self, psbt: Vec<u8>) -> Result<Vec<u8>> {
+        let mut psbt =
+            Psbt::deserialize(&psbt).map_err(|e| Error::msg(format!("invalid psbt: {}", e)))?;
+        let secp = Secp256k1::new();
+        psbt.commit_sp_outputs(&secp)
+            .map_err(|e| Error::msg(e.to_string()))?;
+        Ok(psbt.serialize())
+    }
+
+    /// Signs every silent-payment input this wallet can sign. Does not finalize
+    /// witnesses. Silent-payment output scripts must already be set.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn sign_inputs(&self, psbt: Vec<u8>) -> Result<Vec<u8>> {
+        let psbt =
+            Psbt::deserialize(&psbt).map_err(|e| Error::msg(format!("invalid psbt: {}", e)))?;
+        let psbt = self.sign_owned_inputs(psbt)?;
+        Ok(psbt.serialize())
+    }
+
+    /// Builds each input's final scriptSig and witness from its signatures.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn finalize_inputs(&self, psbt: Vec<u8>) -> Result<Vec<u8>> {
+        let psbt =
+            Psbt::deserialize(&psbt).map_err(|e| Error::msg(format!("invalid psbt: {}", e)))?;
+        let secp = Secp256k1::new();
+        let psbt = Finalizer::new(psbt)
+            .map_err(|e| Error::msg(e.to_string()))?
+            .finalize(&secp)
+            .map_err(|e| Error::msg(e.to_string()))?;
+        Ok(psbt.serialize())
+    }
+
+    /// Extracts the finalized transaction as hex.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn extract_transaction(&self, psbt: Vec<u8>) -> Result<String> {
+        let psbt =
+            Psbt::deserialize(&psbt).map_err(|e| Error::msg(format!("invalid psbt: {}", e)))?;
+        let tx = Extractor::new(psbt)
+            .map_err(|e| Error::msg(e.to_string()))?
+            .extract_tx()
+            .map_err(|e| Error::msg(e.to_string()))?;
         Ok(serialize(&tx).to_lower_hex_string())
     }
 
+    /// Convenience: ECDH shares, commit SP outputs, sign, finalize, and extract.
     #[flutter_rust_bridge::frb(sync)]
-    pub fn finalize_transaction(
-        unsigned_transaction: &SilentPaymentUnsignedTransaction,
-    ) -> Result<SilentPaymentUnsignedTransaction> {
-        let res = SpClient::finalize_transaction(unsigned_transaction.clone().into())?;
-        Ok(res.into())
+    pub fn sign_finalize_and_extract(&self, psbt: Vec<u8>) -> Result<String> {
+        let mut psbt =
+            Psbt::deserialize(&psbt).map_err(|e| Error::msg(format!("invalid psbt: {}", e)))?;
+        let secp = Secp256k1::new();
+        let b_spend = self.client.try_secret_spend_key()?;
+        let (fingerprint, derivation_path) = self.psbt_key_source()?;
+        let keys = SpendKeyProvider {
+            spend: b_spend,
+            fingerprint,
+            derivation_path,
+            network: NetworkKind::from(self.client.network()),
+        };
+
+        psbt.add_ecdh_shares(&secp, &mut thread_rng(), &keys, ShareMode::Global)
+            .map_err(|e| Error::msg(e.to_string()))?;
+        psbt.commit_sp_outputs(&secp)
+            .map_err(|e| Error::msg(e.to_string()))?;
+        let psbt = self.sign_owned_inputs(psbt)?;
+        let psbt = Finalizer::new(psbt)
+            .map_err(|e| Error::msg(e.to_string()))?
+            .finalize(&secp)
+            .map_err(|e| Error::msg(e.to_string()))?;
+        let tx = Extractor::new(psbt)
+            .map_err(|e| Error::msg(e.to_string()))?
+            .extract_tx()
+            .map_err(|e| Error::msg(e.to_string()))?;
+        Ok(serialize(&tx).to_lower_hex_string())
+    }
+
+    /// Scan a signed transaction for silent-payment outputs belonging to this wallet.
+    ///
+    /// [prevout_scripts] must be the funding scriptPubKeys of each input, in vin order.
+    /// Those scripts are not in the raw transaction; they come from the spent UTXOs.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn scan_signed_tx(
+        &self,
+        tx_hex: String,
+        prevout_scripts: Vec<Vec<u8>>,
+    ) -> Result<Vec<OwnedOutput>> {
+        let tx: Transaction = deserialize_hex(&tx_hex)
+            .map_err(|e| Error::msg(format!("invalid transaction hex: {e}")))?;
+
+        if prevout_scripts.len() != tx.input.len() {
+            return Err(Error::msg(format!(
+                "prevout_scripts length {} does not match input count {}",
+                prevout_scripts.len(),
+                tx.input.len()
+            )));
+        }
+
+        let secp = Secp256k1::new();
+        let mut inputs = TransactionInputs::new();
+        for (vin, (txin, script)) in tx.input.iter().zip(prevout_scripts.iter()).enumerate() {
+            let outpoint = SpOutPoint::from_txid_and_vout(
+                &txin.previous_output.txid.to_string(),
+                txin.previous_output.vout,
+            )
+            .map_err(|e| Error::msg(format!("input {vin} outpoint: {e}")))?;
+            let witness: Vec<Vec<u8>> = txin.witness.to_vec();
+            let pubkey = get_pubkey_from_input(txin.script_sig.as_bytes(), &witness, script)
+                .map_err(|e| Error::msg(format!("input {vin} pubkey: {e}")))?;
+            inputs.push(outpoint, script.clone(), pubkey);
+        }
+
+        let tweak_data = PublicTweakData::new(&secp, &inputs)
+            .map_err(|e| Error::msg(format!("tweak data: {e}")))?;
+        let shared_secret = TransactionSharedSecret::new_from_public_tweak_data(
+            &secp,
+            &tweak_data,
+            &self.client.scan_key(),
+        )
+        .map_err(|e| Error::msg(format!("shared secret: {e}")))?;
+
+        let output_keys: Vec<XOnlyPublicKey> = tx
+            .output
+            .iter()
+            .filter(|o| o.script_pubkey.is_p2tr())
+            .map(|o| {
+                XOnlyPublicKey::from_slice(&o.script_pubkey.as_bytes()[2..])
+                    .map_err(|e| Error::msg(format!("invalid p2tr output key: {e}")))
+            })
+            .collect::<Result<_>>()?;
+
+        // SpClient::sp_receiver is crate-private; rebuild the same default Receiver.
+        let scan_sk = self.client.scan_key();
+        let sp_network = match self.client.network() {
+            spdk_wallet::bitcoin::Network::Bitcoin => SpNetwork::Mainnet,
+            spdk_wallet::bitcoin::Network::Testnet | spdk_wallet::bitcoin::Network::Signet => {
+                SpNetwork::Testnet
+            }
+            spdk_wallet::bitcoin::Network::Regtest => SpNetwork::Regtest,
+            _ => unreachable!(),
+        };
+        let receiver = Receiver::new(
+            SpVersion::ZERO,
+            scan_sk.public_key(&secp),
+            (&self.client.spend_key()).into(),
+            Label::new(scan_sk, 0),
+            sp_network,
+        )
+        .map_err(|e| Error::msg(format!("receiver: {e}")))?;
+        let ours = receiver
+            .scan_transaction(&shared_secret, &output_keys)
+            .map_err(|e| Error::msg(format!("scan_transaction: {e}")))?;
+
+        let txid = tx.compute_txid();
+        let mut found = Vec::new();
+        for (vout, txout) in tx.output.iter().enumerate() {
+            if !txout.script_pubkey.is_p2tr() {
+                continue;
+            }
+            let xonly = XOnlyPublicKey::from_slice(&txout.script_pubkey.as_bytes()[2..])?;
+            for (label, map) in &ours {
+                if let Some(tweak) = map.get(&xonly) {
+                    found.push(OwnedOutput {
+                        outpoint: ApiOutPoint {
+                            txid: txid.to_string(),
+                            vout: vout as u32,
+                        },
+                        tweak: tweak.to_be_bytes(),
+                        amount: ApiAmount(txout.value.to_sat()),
+                        script: txout.script_pubkey.to_bytes(),
+                        label: label.as_ref().map(|l| l.as_inner().to_be_bytes()),
+                    });
+                    break;
+                }
+            }
+        }
+
+        Ok(found)
     }
 
     // note: should only be used when using regtest, else there is privacy loss!
@@ -118,7 +523,7 @@ impl SpWallet {
                     Err(recv_err) => {
                         log::error!("Channel recv error: {:?}", recv_err);
                         return Err(anyhow::Error::msg(format!(
-                            "Channel closed unexpectedly while waiting for broadcast result: {:?}", 
+                            "Channel closed unexpectedly while waiting for broadcast result: {:?}",
                             recv_err
                         )));
                     }
