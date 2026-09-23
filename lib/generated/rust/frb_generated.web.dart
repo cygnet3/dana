@@ -12,7 +12,6 @@ import 'api/chain.dart';
 import 'api/stream.dart';
 import 'api/structs/amount.dart';
 import 'api/structs/bip321_uri.dart';
-import 'api/structs/discovered_output.dart';
 import 'api/structs/input_selection.dart';
 import 'api/structs/network.dart';
 import 'api/structs/outpoint.dart';
@@ -20,10 +19,10 @@ import 'api/structs/owned_output.dart';
 import 'api/structs/recipient.dart';
 import 'api/structs/silent_payment_code.dart';
 import 'api/structs/state_update.dart';
-import 'api/structs/unsigned_transaction.dart';
 import 'api/wallet.dart';
 import 'api/wallet/coin_selection.dart';
 import 'api/wallet/setup.dart';
+import 'api/wallet/transaction.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'frb_generated.dart';
@@ -47,10 +46,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
           .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerApiSpendKey;
 
   CrossPlatformFinalizerArg
-      get rust_arc_decrement_strong_count_InputSelectionPtr => wire
-          .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection;
-
-  CrossPlatformFinalizerArg
       get rust_arc_decrement_strong_count_PaymentCodePtr => wire
           .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPaymentCode;
 
@@ -60,10 +55,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CrossPlatformFinalizerArg
       get rust_arc_decrement_strong_count_SilentPaymentCodePtr => wire
           .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentCode;
-
-  CrossPlatformFinalizerArg
-      get rust_arc_decrement_strong_count_SilentPaymentUnsignedTransactionPtr =>
-          wire.rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentUnsignedTransaction;
 
   CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_SpWalletPtr => wire
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSpWallet;
@@ -86,11 +77,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
           dynamic raw);
 
   @protected
-  InputSelection
-      dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-          dynamic raw);
-
-  @protected
   PaymentCode
       dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPaymentCode(
           dynamic raw);
@@ -103,11 +89,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   SilentPaymentCode
       dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentCode(
-          dynamic raw);
-
-  @protected
-  SilentPaymentUnsignedTransaction
-      dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentUnsignedTransaction(
           dynamic raw);
 
   @protected
@@ -136,11 +117,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
           dynamic raw);
 
   @protected
-  InputSelection
-      dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-          dynamic raw);
-
-  @protected
   PaymentCode
       dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPaymentCode(
           dynamic raw);
@@ -153,11 +129,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   SilentPaymentCode
       dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentCode(
-          dynamic raw);
-
-  @protected
-  SilentPaymentUnsignedTransaction
-      dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentUnsignedTransaction(
           dynamic raw);
 
   @protected
@@ -181,11 +152,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
           dynamic raw);
 
   @protected
-  InputSelection
-      dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-          dynamic raw);
-
-  @protected
   PaymentCode
       dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPaymentCode(
           dynamic raw);
@@ -198,11 +164,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   SilentPaymentCode
       dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentCode(
-          dynamic raw);
-
-  @protected
-  SilentPaymentUnsignedTransaction
-      dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentUnsignedTransaction(
           dynamic raw);
 
   @protected
@@ -262,16 +223,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Fingerprint dco_decode_box_autoadd_fingerprint(dynamic raw);
 
   @protected
+  InputSelection dco_decode_box_autoadd_input_selection(dynamic raw);
+
+  @protected
   WalletSetupArgs dco_decode_box_autoadd_wallet_setup_args(dynamic raw);
 
   @protected
   CoinSelectionStrategy dco_decode_coin_selection_strategy(dynamic raw);
 
   @protected
-  DerivationPath dco_decode_derivation_path(dynamic raw);
+  CreatedPsbt dco_decode_created_psbt(dynamic raw);
 
   @protected
-  DiscoveredOutput dco_decode_discovered_output(dynamic raw);
+  DerivationPath dco_decode_derivation_path(dynamic raw);
 
   @protected
   double dco_decode_f_32(dynamic raw);
@@ -286,9 +250,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_i_64(dynamic raw);
 
   @protected
-  List<InputSelection>
-      dco_decode_list_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-          dynamic raw);
+  InputSelection dco_decode_input_selection(dynamic raw);
 
   @protected
   List<Recipient>
@@ -299,17 +261,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String> dco_decode_list_String(dynamic raw);
 
   @protected
+  List<InputSelection> dco_decode_list_input_selection(dynamic raw);
+
+  @protected
+  List<Uint8List> dco_decode_list_list_prim_u_8_strict(dynamic raw);
+
+  @protected
   List<OutPoint> dco_decode_list_out_point(dynamic raw);
 
   @protected
   List<OwnedOutput> dco_decode_list_owned_output(dynamic raw);
 
   @protected
-  Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+  List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
 
   @protected
-  List<(OutPoint, DiscoveredOutput)>
-      dco_decode_list_record_out_point_discovered_output(dynamic raw);
+  Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
   LogEntry dco_decode_log_entry(dynamic raw);
@@ -354,10 +321,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PaymentCodeKind dco_decode_payment_code_kind(dynamic raw);
 
   @protected
-  (OutPoint, DiscoveredOutput) dco_decode_record_out_point_discovered_output(
-      dynamic raw);
-
-  @protected
   StateUpdate dco_decode_state_update(dynamic raw);
 
   @protected
@@ -398,11 +361,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
           SseDeserializer deserializer);
 
   @protected
-  InputSelection
-      sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-          SseDeserializer deserializer);
-
-  @protected
   PaymentCode
       sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPaymentCode(
           SseDeserializer deserializer);
@@ -415,11 +373,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   SilentPaymentCode
       sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentCode(
-          SseDeserializer deserializer);
-
-  @protected
-  SilentPaymentUnsignedTransaction
-      sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentUnsignedTransaction(
           SseDeserializer deserializer);
 
   @protected
@@ -448,11 +401,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
           SseDeserializer deserializer);
 
   @protected
-  InputSelection
-      sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-          SseDeserializer deserializer);
-
-  @protected
   PaymentCode
       sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPaymentCode(
           SseDeserializer deserializer);
@@ -465,11 +413,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   SilentPaymentCode
       sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentCode(
-          SseDeserializer deserializer);
-
-  @protected
-  SilentPaymentUnsignedTransaction
-      sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentUnsignedTransaction(
           SseDeserializer deserializer);
 
   @protected
@@ -493,11 +436,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
           SseDeserializer deserializer);
 
   @protected
-  InputSelection
-      sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-          SseDeserializer deserializer);
-
-  @protected
   PaymentCode
       sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPaymentCode(
           SseDeserializer deserializer);
@@ -510,11 +448,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   SilentPaymentCode
       sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentCode(
-          SseDeserializer deserializer);
-
-  @protected
-  SilentPaymentUnsignedTransaction
-      sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentUnsignedTransaction(
           SseDeserializer deserializer);
 
   @protected
@@ -578,6 +511,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Fingerprint sse_decode_box_autoadd_fingerprint(SseDeserializer deserializer);
 
   @protected
+  InputSelection sse_decode_box_autoadd_input_selection(
+      SseDeserializer deserializer);
+
+  @protected
   WalletSetupArgs sse_decode_box_autoadd_wallet_setup_args(
       SseDeserializer deserializer);
 
@@ -586,10 +523,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       SseDeserializer deserializer);
 
   @protected
-  DerivationPath sse_decode_derivation_path(SseDeserializer deserializer);
+  CreatedPsbt sse_decode_created_psbt(SseDeserializer deserializer);
 
   @protected
-  DiscoveredOutput sse_decode_discovered_output(SseDeserializer deserializer);
+  DerivationPath sse_decode_derivation_path(SseDeserializer deserializer);
 
   @protected
   double sse_decode_f_32(SseDeserializer deserializer);
@@ -604,9 +541,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
 
   @protected
-  List<InputSelection>
-      sse_decode_list_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-          SseDeserializer deserializer);
+  InputSelection sse_decode_input_selection(SseDeserializer deserializer);
 
   @protected
   List<Recipient>
@@ -617,18 +552,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
+  List<InputSelection> sse_decode_list_input_selection(
+      SseDeserializer deserializer);
+
+  @protected
+  List<Uint8List> sse_decode_list_list_prim_u_8_strict(
+      SseDeserializer deserializer);
+
+  @protected
   List<OutPoint> sse_decode_list_out_point(SseDeserializer deserializer);
 
   @protected
   List<OwnedOutput> sse_decode_list_owned_output(SseDeserializer deserializer);
 
   @protected
-  Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+  List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
 
   @protected
-  List<(OutPoint, DiscoveredOutput)>
-      sse_decode_list_record_out_point_discovered_output(
-          SseDeserializer deserializer);
+  Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
   LogEntry sse_decode_log_entry(SseDeserializer deserializer);
@@ -675,10 +616,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PaymentCodeKind sse_decode_payment_code_kind(SseDeserializer deserializer);
 
   @protected
-  (OutPoint, DiscoveredOutput) sse_decode_record_out_point_discovered_output(
-      SseDeserializer deserializer);
-
-  @protected
   StateUpdate sse_decode_state_update(SseDeserializer deserializer);
 
   @protected
@@ -721,11 +658,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
-      sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-          InputSelection self, SseSerializer serializer);
-
-  @protected
-  void
       sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPaymentCode(
           PaymentCode self, SseSerializer serializer);
 
@@ -738,11 +670,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void
       sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentCode(
           SilentPaymentCode self, SseSerializer serializer);
-
-  @protected
-  void
-      sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentUnsignedTransaction(
-          SilentPaymentUnsignedTransaction self, SseSerializer serializer);
 
   @protected
   void
@@ -771,11 +698,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
-      sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-          InputSelection self, SseSerializer serializer);
-
-  @protected
-  void
       sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPaymentCode(
           PaymentCode self, SseSerializer serializer);
 
@@ -788,11 +710,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void
       sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentCode(
           SilentPaymentCode self, SseSerializer serializer);
-
-  @protected
-  void
-      sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentUnsignedTransaction(
-          SilentPaymentUnsignedTransaction self, SseSerializer serializer);
 
   @protected
   void
@@ -816,11 +733,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
-      sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-          InputSelection self, SseSerializer serializer);
-
-  @protected
-  void
       sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPaymentCode(
           PaymentCode self, SseSerializer serializer);
 
@@ -833,11 +745,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void
       sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentCode(
           SilentPaymentCode self, SseSerializer serializer);
-
-  @protected
-  void
-      sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentUnsignedTransaction(
-          SilentPaymentUnsignedTransaction self, SseSerializer serializer);
 
   @protected
   void
@@ -902,6 +809,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       Fingerprint self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_input_selection(
+      InputSelection self, SseSerializer serializer);
+
+  @protected
   void sse_encode_box_autoadd_wallet_setup_args(
       WalletSetupArgs self, SseSerializer serializer);
 
@@ -910,12 +821,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       CoinSelectionStrategy self, SseSerializer serializer);
 
   @protected
-  void sse_encode_derivation_path(
-      DerivationPath self, SseSerializer serializer);
+  void sse_encode_created_psbt(CreatedPsbt self, SseSerializer serializer);
 
   @protected
-  void sse_encode_discovered_output(
-      DiscoveredOutput self, SseSerializer serializer);
+  void sse_encode_derivation_path(
+      DerivationPath self, SseSerializer serializer);
 
   @protected
   void sse_encode_f_32(double self, SseSerializer serializer);
@@ -930,9 +840,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
-  void
-      sse_encode_list_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-          List<InputSelection> self, SseSerializer serializer);
+  void sse_encode_input_selection(
+      InputSelection self, SseSerializer serializer);
 
   @protected
   void
@@ -943,6 +852,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_input_selection(
+      List<InputSelection> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_list_prim_u_8_strict(
+      List<Uint8List> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_out_point(List<OutPoint> self, SseSerializer serializer);
 
   @protected
@@ -950,12 +867,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       List<OwnedOutput> self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_prim_u_8_strict(
-      Uint8List self, SseSerializer serializer);
+  void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_record_out_point_discovered_output(
-      List<(OutPoint, DiscoveredOutput)> self, SseSerializer serializer);
+  void sse_encode_list_prim_u_8_strict(
+      Uint8List self, SseSerializer serializer);
 
   @protected
   void sse_encode_log_entry(LogEntry self, SseSerializer serializer);
@@ -1002,10 +918,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_payment_code_kind(
       PaymentCodeKind self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_record_out_point_discovered_output(
-      (OutPoint, DiscoveredOutput) self, SseSerializer serializer);
 
   @protected
   void sse_encode_state_update(StateUpdate self, SseSerializer serializer);
@@ -1066,18 +978,6 @@ class RustLibWire implements BaseWire {
           .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerApiSpendKey(
               ptr);
 
-  void rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-          int ptr) =>
-      wasmModule
-          .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-              ptr);
-
-  void rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-          int ptr) =>
-      wasmModule
-          .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-              ptr);
-
   void rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPaymentCode(
           int ptr) =>
       wasmModule
@@ -1112,18 +1012,6 @@ class RustLibWire implements BaseWire {
           int ptr) =>
       wasmModule
           .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentCode(
-              ptr);
-
-  void rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentUnsignedTransaction(
-          int ptr) =>
-      wasmModule
-          .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentUnsignedTransaction(
-              ptr);
-
-  void rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentUnsignedTransaction(
-          int ptr) =>
-      wasmModule
-          .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentUnsignedTransaction(
               ptr);
 
   void rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSpWallet(
@@ -1174,14 +1062,6 @@ extension type RustLibWasmModule._(JSObject _) implements JSObject {
           int ptr);
 
   external void
-      rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-          int ptr);
-
-  external void
-      rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerInputSelection(
-          int ptr);
-
-  external void
       rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPaymentCode(
           int ptr);
 
@@ -1203,14 +1083,6 @@ extension type RustLibWasmModule._(JSObject _) implements JSObject {
 
   external void
       rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentCode(
-          int ptr);
-
-  external void
-      rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentUnsignedTransaction(
-          int ptr);
-
-  external void
-      rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentUnsignedTransaction(
           int ptr);
 
   external void
