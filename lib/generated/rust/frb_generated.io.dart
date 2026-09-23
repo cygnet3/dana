@@ -254,16 +254,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       dynamic raw);
 
   @protected
+  DerivationPath dco_decode_box_autoadd_derivation_path(dynamic raw);
+
+  @protected
+  Fingerprint dco_decode_box_autoadd_fingerprint(dynamic raw);
+
+  @protected
   WalletSetupArgs dco_decode_box_autoadd_wallet_setup_args(dynamic raw);
 
   @protected
   CoinSelectionStrategy dco_decode_coin_selection_strategy(dynamic raw);
 
   @protected
+  DerivationPath dco_decode_derivation_path(dynamic raw);
+
+  @protected
   DiscoveredOutput dco_decode_discovered_output(dynamic raw);
 
   @protected
   double dco_decode_f_32(dynamic raw);
+
+  @protected
+  Fingerprint dco_decode_fingerprint(dynamic raw);
 
   @protected
   int dco_decode_i_32(dynamic raw);
@@ -320,6 +332,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   CoinSelectionStrategy? dco_decode_opt_box_autoadd_coin_selection_strategy(
       dynamic raw);
+
+  @protected
+  DerivationPath? dco_decode_opt_box_autoadd_derivation_path(dynamic raw);
+
+  @protected
+  Fingerprint? dco_decode_opt_box_autoadd_fingerprint(dynamic raw);
 
   @protected
   U8Array32? dco_decode_opt_u_8_array_32(dynamic raw);
@@ -551,6 +569,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       SseDeserializer deserializer);
 
   @protected
+  DerivationPath sse_decode_box_autoadd_derivation_path(
+      SseDeserializer deserializer);
+
+  @protected
+  Fingerprint sse_decode_box_autoadd_fingerprint(SseDeserializer deserializer);
+
+  @protected
   WalletSetupArgs sse_decode_box_autoadd_wallet_setup_args(
       SseDeserializer deserializer);
 
@@ -559,10 +584,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       SseDeserializer deserializer);
 
   @protected
+  DerivationPath sse_decode_derivation_path(SseDeserializer deserializer);
+
+  @protected
   DiscoveredOutput sse_decode_discovered_output(SseDeserializer deserializer);
 
   @protected
   double sse_decode_f_32(SseDeserializer deserializer);
+
+  @protected
+  Fingerprint sse_decode_fingerprint(SseDeserializer deserializer);
 
   @protected
   int sse_decode_i_32(SseDeserializer deserializer);
@@ -619,6 +650,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   CoinSelectionStrategy? sse_decode_opt_box_autoadd_coin_selection_strategy(
+      SseDeserializer deserializer);
+
+  @protected
+  DerivationPath? sse_decode_opt_box_autoadd_derivation_path(
+      SseDeserializer deserializer);
+
+  @protected
+  Fingerprint? sse_decode_opt_box_autoadd_fingerprint(
       SseDeserializer deserializer);
 
   @protected
@@ -853,6 +892,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       CoinSelectionStrategy self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_derivation_path(
+      DerivationPath self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_fingerprint(
+      Fingerprint self, SseSerializer serializer);
+
+  @protected
   void sse_encode_box_autoadd_wallet_setup_args(
       WalletSetupArgs self, SseSerializer serializer);
 
@@ -861,11 +908,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       CoinSelectionStrategy self, SseSerializer serializer);
 
   @protected
+  void sse_encode_derivation_path(
+      DerivationPath self, SseSerializer serializer);
+
+  @protected
   void sse_encode_discovered_output(
       DiscoveredOutput self, SseSerializer serializer);
 
   @protected
   void sse_encode_f_32(double self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_fingerprint(Fingerprint self, SseSerializer serializer);
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
@@ -925,6 +979,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_coin_selection_strategy(
       CoinSelectionStrategy? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_derivation_path(
+      DerivationPath? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_fingerprint(
+      Fingerprint? self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_u_8_array_32(U8Array32? self, SseSerializer serializer);

@@ -10,13 +10,23 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
 part 'setup.freezed.dart';
 
+// These functions are ignored because they are not marked as `pub`: `result_from_derived`
+
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<WalletSetupResult>>
 abstract class WalletSetupResult implements RustOpaqueInterface {
+  DerivationPath? get derivationPath;
+
+  Fingerprint? get fingerprint;
+
   String? get mnemonic;
 
   ApiScanKey get scanKey;
 
   ApiSpendKey get spendKey;
+
+  set derivationPath(DerivationPath? derivationPath);
+
+  set fingerprint(Fingerprint? fingerprint);
 
   set mnemonic(String? mnemonic);
 
