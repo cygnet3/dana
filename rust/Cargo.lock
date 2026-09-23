@@ -119,7 +119,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 [[package]]
 name = "backend-blindbit-v1"
 version = "0.0.0"
-source = "git+https://github.com/cygnet3/spdk?rev=d8dcfd04b33623f85a9752a151f4c15b82aa732f#d8dcfd04b33623f85a9752a151f4c15b82aa732f"
+source = "git+https://github.com/cygnet3/spdk?branch=feat%2Fadd-scanner-trait#c95247e80cc0b791d543bf6a314dc072bd7135c3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1974,6 +1974,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
+name = "scanner-local"
+version = "0.0.0"
+source = "git+https://github.com/cygnet3/spdk?branch=feat%2Fadd-scanner-trait#c95247e80cc0b791d543bf6a314dc072bd7135c3"
+dependencies = [
+ "anyhow",
+ "bitcoin 0.32.102",
+ "futures",
+ "log",
+ "rayon",
+ "silentpayments",
+ "spdk-core",
+ "tokio",
+]
+
+[[package]]
 name = "schemars"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2150,7 +2165,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 [[package]]
 name = "silentpayments"
 version = "0.8.0"
-source = "git+https://github.com/cygnet3/spdk?rev=d8dcfd04b33623f85a9752a151f4c15b82aa732f#d8dcfd04b33623f85a9752a151f4c15b82aa732f"
+source = "git+https://github.com/cygnet3/spdk?branch=feat%2Fadd-scanner-trait#c95247e80cc0b791d543bf6a314dc072bd7135c3"
 dependencies = [
  "bech32 0.9.1",
  "bitcoin_hashes 0.13.1",
@@ -2210,7 +2225,7 @@ dependencies = [
 [[package]]
 name = "spdk-core"
 version = "0.0.0"
-source = "git+https://github.com/cygnet3/spdk?rev=d8dcfd04b33623f85a9752a151f4c15b82aa732f#d8dcfd04b33623f85a9752a151f4c15b82aa732f"
+source = "git+https://github.com/cygnet3/spdk?branch=feat%2Fadd-scanner-trait#c95247e80cc0b791d543bf6a314dc072bd7135c3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2223,7 +2238,7 @@ dependencies = [
 [[package]]
 name = "spdk-wallet"
 version = "0.0.0"
-source = "git+https://github.com/cygnet3/spdk?rev=d8dcfd04b33623f85a9752a151f4c15b82aa732f#d8dcfd04b33623f85a9752a151f4c15b82aa732f"
+source = "git+https://github.com/cygnet3/spdk?branch=feat%2Fadd-scanner-trait#c95247e80cc0b791d543bf6a314dc072bd7135c3"
 dependencies = [
  "anyhow",
  "backend-blindbit-v1",
@@ -2232,7 +2247,7 @@ dependencies = [
  "bitcoin 0.32.102",
  "futures",
  "log",
- "rayon",
+ "scanner-local",
  "serde",
  "silentpayments",
  "spdk-core",
