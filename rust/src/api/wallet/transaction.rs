@@ -10,7 +10,7 @@ use spdk_wallet::bitcoin::secp256k1::Scalar;
 use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex, OutPoint};
 use spdk_wallet::bitcoin::{ScriptBuf, TxOut};
 use spdk_wallet::client::{FeeRate, RecipientAddress, SpClient};
-use spdk_wallet::updater::DiscoveredOutput;
+use spdk_wallet::scanner::DiscoveredOutput;
 
 use super::SpWallet;
 
