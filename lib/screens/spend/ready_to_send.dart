@@ -6,8 +6,9 @@ import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/extensions/payment_code.dart';
 import 'package:danawallet/generated/rust/api/stream.dart';
+import 'package:danawallet/generated/rust/api/structs/input_selection.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
-import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart';
+import 'package:danawallet/generated/rust/api/wallet/transaction.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/display_preferences_state.dart';
@@ -24,10 +25,12 @@ class ReadyToSendScreen extends StatefulWidget {
   final Recipient recipient;
   final Bip353Address? providedBip353;
   final SelectedFee fee;
-  final SilentPaymentUnsignedTransaction unsignedTx;
+  final CreatedPsbt psbt;
+  final InputSelection selection;
   const ReadyToSendScreen(
       {super.key,
-      required this.unsignedTx,
+      required this.psbt,
+      required this.selection,
       required this.fee,
       required this.recipient,
       this.providedBip353});
@@ -67,8 +70,8 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
     try {
       final walletState = Provider.of<WalletState>(context, listen: false);
 
-      final txid =
-          await walletState.signAndBroadcastUnsignedTx(widget.unsignedTx);
+      final txid = await walletState.signAndBroadcastPsbt(
+          created: widget.psbt, spentOutpoints: widget.selection.selectedUtxos);
 
       if (mounted) {
         Navigator.pushAndRemoveUntil(
@@ -124,14 +127,14 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
 
     String displayArrivalTime = widget.fee.toEstimatedTime;
 
-    String displayEstimatedFee =
-        widget.unsignedTx.getFeeAmount().display(bitcoinUnit);
+    final selectionFee = widget.selection.fee;
+    String displayEstimatedFee = selectionFee.display(bitcoinUnit);
     String displayEstimatedFeeFiat = exchangeRate.displayFiat(
-        widget.unsignedTx.getFeeAmount(), displayPreference.fiatCurrency);
+        selectionFee, displayPreference.fiatCurrency);
 
     // show the actual fee rate, which may exceed the requested one
     // (e.g. when a changeless selection was used)
-    final displayFeeRate = widget.unsignedTx.actualFeeRate
+    final displayFeeRate = widget.selection.actualFeeRate
         .toStringAsFixed(2)
         .replaceAll(RegExp(r'0+$'), '')
         .replaceAll(RegExp(r'\.$'), '');
