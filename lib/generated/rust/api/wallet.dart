@@ -16,7 +16,8 @@ import 'structs/silent_payment_code.dart';
 import 'structs/unsigned_transaction.dart';
 import 'wallet/setup.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `psbt_key_source`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ApiScanKey>>
 abstract class ApiScanKey implements RustOpaqueInterface {
@@ -73,9 +74,15 @@ abstract class SpWallet implements RustOpaqueInterface {
   factory SpWallet(
           {required ApiScanKey scanKey,
           required ApiSpendKey spendKey,
-          required Network network}) =>
+          required Network network,
+          Fingerprint? fingerprint,
+          DerivationPath? derivationPath}) =>
       RustLib.instance.api.crateApiWalletSpWalletNew(
-          scanKey: scanKey, spendKey: spendKey, network: network);
+          scanKey: scanKey,
+          spendKey: spendKey,
+          network: network,
+          fingerprint: fingerprint,
+          derivationPath: derivationPath);
 
   static WalletSetupResult setupWallet({required WalletSetupArgs setupArgs}) =>
       RustLib.instance.api
@@ -90,4 +97,40 @@ abstract class SpWallet implements RustOpaqueInterface {
       required String blindbitUrl,
       required BigInt dustLimit,
       required List<OutPoint> ownedOutpoints});
+}
+
+class DerivationPath {
+  final String field0;
+
+  const DerivationPath({
+    required this.field0,
+  });
+
+  @override
+  int get hashCode => field0.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DerivationPath &&
+          runtimeType == other.runtimeType &&
+          field0 == other.field0;
+}
+
+class Fingerprint {
+  final String field0;
+
+  const Fingerprint({
+    required this.field0,
+  });
+
+  @override
+  int get hashCode => field0.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Fingerprint &&
+          runtimeType == other.runtimeType &&
+          field0 == other.field0;
 }
