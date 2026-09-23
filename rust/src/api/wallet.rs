@@ -1,3 +1,4 @@
+pub mod challenge;
 pub mod coin_selection;
 mod info;
 pub mod setup;
