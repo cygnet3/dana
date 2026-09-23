@@ -13,8 +13,8 @@ import 'structs/outpoint.dart';
 import 'structs/owned_output.dart';
 import 'structs/recipient.dart';
 import 'structs/silent_payment_code.dart';
-import 'structs/unsigned_transaction.dart';
 import 'wallet/setup.dart';
+import 'wallet/transaction.dart';
 
 // These functions are ignored because they are not marked as `pub`: `psbt_key_source`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`
@@ -37,6 +37,8 @@ abstract class ApiSpendKey implements RustOpaqueInterface {
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SpWallet>>
 abstract class SpWallet implements RustOpaqueInterface {
+  Uint8List addEcdhShares({required List<int> psbt});
+
   static Future<String> broadcastTx(
           {required String tx, required Network network}) =>
       RustLib.instance.api
@@ -47,16 +49,29 @@ abstract class SpWallet implements RustOpaqueInterface {
       RustLib.instance.api.crateApiWalletSpWalletBroadcastUsingBlindbit(
           blindbitUrl: blindbitUrl, tx: tx);
 
-  SilentPaymentUnsignedTransaction createTransactionFromSelection(
+  Uint8List commitSpOutputs({required List<int> psbt});
+
+  /// Builds a BIP-375 PSBT (v2) for a previously chosen [InputSelection].
+  ///
+  /// The returned PSBT has all inputs and outputs set, with silent payment
+  /// outputs still carrying placeholder scriptPubKeys (the SP output keys
+  /// are only derived at signing time, see [SpWallet::sign_inputs] or
+  /// [SpWallet::sign_finalize_and_extract]).
+  ///
+  /// Also returns the final recipient list (payment recipient plus any
+  /// change outputs), so the outgoing transaction can be recorded once the
+  /// signed transaction is broadcast.
+  CreatedPsbt createPsbt(
       {required List<OwnedOutput> ownedOutputs,
-      required Recipient recipient,
+      required List<Recipient> apiRecipients,
       required InputSelection selection,
       required Network network});
 
-  static SilentPaymentUnsignedTransaction finalizeTransaction(
-          {required SilentPaymentUnsignedTransaction unsignedTransaction}) =>
-      RustLib.instance.api.crateApiWalletSpWalletFinalizeTransaction(
-          unsignedTransaction: unsignedTransaction);
+  /// Extracts the finalized transaction as hex.
+  String extractTransaction({required List<int> psbt});
+
+  /// Builds each input's final scriptSig and witness from its signatures.
+  Uint8List finalizeInputs({required List<int> psbt});
 
   SilentPaymentCode getChangeAddress();
 
@@ -84,12 +99,23 @@ abstract class SpWallet implements RustOpaqueInterface {
           fingerprint: fingerprint,
           derivationPath: derivationPath);
 
+  /// Scan a signed transaction for silent-payment outputs belonging to this wallet.
+  ///
+  /// [prevout_scripts] must be the funding scriptPubKeys of each input, in vin order.
+  /// Those scripts are not in the raw transaction; they come from the spent UTXOs.
+  List<OwnedOutput> scanSignedTx(
+      {required String txHex, required List<Uint8List> prevoutScripts});
+
   static WalletSetupResult setupWallet({required WalletSetupArgs setupArgs}) =>
       RustLib.instance.api
           .crateApiWalletSpWalletSetupWallet(setupArgs: setupArgs);
 
-  String signTransaction(
-      {required SilentPaymentUnsignedTransaction unsignedTransaction});
+  /// Convenience: ECDH shares, commit SP outputs, sign, finalize, and extract.
+  String signFinalizeAndExtract({required List<int> psbt});
+
+  /// Signs every silent-payment input this wallet can sign. Does not finalize
+  /// witnesses. Silent-payment output scripts must already be set.
+  Uint8List signInputs({required List<int> psbt});
 
   Future<void> syncToHeight(
       {required int fromHeight,
