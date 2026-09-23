@@ -16,6 +16,8 @@ const String _keyBirthday = "birthday";
 const String _keyNetwork = "network";
 const String _keyLastSync = "lastscan";
 const String _keyDanaAddress = "danaaddress";
+const String _keyFingerprint = "fingerprint";
+const String _keyDerivationPath = "derivationpath";
 
 class WalletRepository {
   final secureStorage = const FlutterSecureStorage();
@@ -37,6 +39,8 @@ class WalletRepository {
       _keyLastSync,
       _keyBirthday,
       _keyDanaAddress,
+      _keyFingerprint,
+      _keyDerivationPath,
     });
   }
 
@@ -64,6 +68,16 @@ class WalletRepository {
       await secureStorage.write(key: _keySeedPhrase, value: seedPhrase);
     }
 
+    final fingerprint = walletSetup.fingerprint;
+    if (fingerprint != null) {
+      await nonSecureStorage.setString(_keyFingerprint, fingerprint.field0);
+    }
+    final derivationPath = walletSetup.derivationPath;
+    if (derivationPath != null) {
+      await nonSecureStorage.setString(
+          _keyDerivationPath, derivationPath.field0);
+    }
+
     // set default values for new wallet
     await saveLastSync(lastSync);
 
@@ -78,7 +92,19 @@ class WalletRepository {
 
     if (scanKey != null && spendKey != null) {
       final network = await readNetwork();
-      return SpWallet(scanKey: scanKey, spendKey: spendKey, network: network);
+      final fingerprintStr = await nonSecureStorage.getString(_keyFingerprint);
+      final derivationPathStr =
+          await nonSecureStorage.getString(_keyDerivationPath);
+      return SpWallet(
+        scanKey: scanKey,
+        spendKey: spendKey,
+        network: network,
+        fingerprint:
+            fingerprintStr != null ? Fingerprint(field0: fingerprintStr) : null,
+        derivationPath: derivationPathStr != null
+            ? DerivationPath(field0: derivationPathStr)
+            : null,
+      );
     } else {
       return null;
     }
