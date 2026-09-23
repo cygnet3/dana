@@ -11,12 +11,12 @@ import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/owned_output.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/generated/rust/api/structs/silent_payment_code.dart';
-import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart';
 import 'package:danawallet/data/models/recorded_transaction.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:danawallet/generated/rust/api/wallet/coin_selection.dart';
 import 'package:danawallet/generated/rust/api/wallet/setup.dart';
+import 'package:danawallet/generated/rust/api/wallet/transaction.dart';
 import 'package:danawallet/repositories/mempool_api_repository.dart';
 import 'package:danawallet/repositories/owned_outputs_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
@@ -274,7 +274,8 @@ class WalletState extends ChangeNotifier {
 
     final selections = await selectUtxosToSpend(
         ownedOutputs: unspentOutputs,
-        recipient: recipient,
+        recipients: [recipient],
+        nChangeOutputs: BigInt.one,
         feerate: feerate.toDouble());
     return pickDefaultSelection(selections, forceFeeRate: forceFeeRate);
   }
@@ -295,16 +296,19 @@ class WalletState extends ChangeNotifier {
     final selections = await selectUtxosToSpend(
         ownedOutputs: unspentOutputs,
         recipients: [recipient],
+        nChangeOutputs: BigInt.one,
         feerate: feerate.toDouble());
 
     return buildFeeOptions(selections, feerate);
   }
 
-  /// Build the unsigned transaction for a previously chosen [selection]
-  /// (see [proposeCoinSelection] and [estimateFeeOptions]), so the
-  /// transaction signed is exactly the one whose fee was presented to the
-  /// user.
-  Future<SilentPaymentUnsignedTransaction> createUnsignedTxFromSelection(
+  /// Build the PSBT for a previously chosen [selection] (see
+  /// [proposeCoinSelection] and [estimateFeeOptions]), so the transaction
+  /// signed is exactly the one whose fee was presented to the user.
+  ///
+  /// Returns the PSBT together with the final recipient list (including any
+  /// change outputs), needed to record the outgoing transaction later.
+  Future<CreatedPsbt> createPsbtFromSelection(
       Recipient recipient, InputSelection selection) async {
     final wallet = await getWalletFromSecureStorage();
 
@@ -314,35 +318,26 @@ class WalletState extends ChangeNotifier {
       final drainRecipient =
           Recipient(paymentCode: recipient.paymentCode, amount: selection.sent);
 
-      return wallet.createTransactionFromSelection(
+      return wallet.createPsbt(
           ownedOutputs: unspentOutputs,
-          recipient: drainRecipient,
+          apiRecipients: [drainRecipient],
           selection: selection,
           network: network);
     }
 
-    return wallet.createTransactionFromSelection(
+    return wallet.createPsbt(
         ownedOutputs: unspentOutputs,
-        recipient: recipient,
+        apiRecipients: [recipient],
         selection: selection,
         network: network);
   }
 
-  Future<String> signAndBroadcastUnsignedTx(
-      SilentPaymentUnsignedTransaction unsignedTx) async {
-    final selectedOutputs = unsignedTx.selectedUtxos;
-
-    List<OutPoint> selectedOutpoints =
-        selectedOutputs.map((tuple) => tuple.$1).toList();
-
-    final recipients = unsignedTx.recipients;
-
-    final finalizedTx =
-        SpWallet.finalizeTransaction(unsignedTransaction: unsignedTx);
-
+  Future<String> signAndBroadcastPsbt(
+      {required CreatedPsbt created,
+      required List<OutPoint> spentOutpoints}) async {
     final wallet = await getWalletFromSecureStorage();
 
-    final signedTx = wallet.signTransaction(unsignedTransaction: finalizedTx);
+    final signedTx = wallet.signFinalizeAndExtract(psbt: created.psbt);
 
     Logger().d("signed tx: $signedTx");
 
@@ -374,8 +369,8 @@ class WalletState extends ChangeNotifier {
 
     await transactionsRepository.addOutgoingTransaction(
       txid: txid,
-      spentOutpoints: selectedOutpoints,
-      recipients: recipients,
+      spentOutpoints: spentOutpoints,
+      recipients: created.recipients,
     );
 
     // refresh variables and notify listeners
