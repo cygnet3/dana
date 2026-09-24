@@ -44,9 +44,14 @@ pub fn sign_challenge(spend_secret: &str, message: &str) -> Result<String> {
 
 /// Core of [`sign_challenge`], factored out so tests can assert the digest
 /// path directly against raw-preimage signatures.
-fn sign_challenge_inner(sk: &SecretKey, message: &str) -> Result<secp256k1::schnorr::Signature> {
+pub(crate) fn sign_challenge_inner(
+    sk: &SecretKey,
+    message: &str,
+) -> Result<secp256k1::schnorr::Signature> {
     if !message.starts_with(CHALLENGE_PREFIX) {
-        return Err(anyhow!("challenge message must start with '{CHALLENGE_PREFIX}'"));
+        return Err(anyhow!(
+            "challenge message must start with '{CHALLENGE_PREFIX}'"
+        ));
     }
 
     let secp = secp256k1::Secp256k1::signing_only();
@@ -67,7 +72,8 @@ mod tests {
     /// Fixed spend secret (sk = 1) so the produced signature is a
     /// reproducible vector.
     const SK_HEX: &str = "0000000000000000000000000000000000000000000000000000000000000001";
-    const MSG: &str = "dana-register:9f2c7a4e1b8d3f6a05c2e8b47d1a9f3c6e0b2a8d4f17c3e9a2b5d8f0c1e4a7b9";
+    const MSG: &str =
+        "dana-register:9f2c7a4e1b8d3f6a05c2e8b47d1a9f3c6e0b2a8d4f17c3e9a2b5d8f0c1e4a7b9";
 
     /// The (x-only, even-parity-normalised) verification key belonging to
     /// `sk`, via the 0.29 `SecretKey::x_only_public_key` path.
@@ -186,5 +192,33 @@ mod tests {
                 verify(&sig, &msg, &sk).unwrap();
             }
         }
+    }
+
+    /// The wallet-held signer (`SpWallet::sign_registration_challenge`,
+    /// wallet.rs) and the standalone oracle `sign_challenge` must be
+    /// byte-identical: both are thin calls into the shared
+    /// `sign_challenge_inner` core with the same `SecretKey` and message.
+    /// `SpClient::new` is a pure local key-derivation constructor (no
+    /// network I/O — pinned spdk c1262f0 client.rs:24-49), so the real
+    /// call site is exercised directly; testing only the shared core was
+    /// not needed.
+    #[test]
+    fn wallet_call_site_is_byte_identical_to_oracle() {
+        use crate::api::structs::network::Network;
+        use crate::api::wallet::{ApiScanKey, ApiSpendKey, SpWallet};
+        use spdk_wallet::client::SpendKey;
+
+        let sk = SecretKey::from_str(SK_HEX).unwrap();
+        let wallet = SpWallet::new(
+            ApiScanKey(sk),
+            ApiSpendKey(SpendKey::Secret(sk)),
+            Network::Regtest,
+        )
+        .unwrap();
+
+        let via_wallet = wallet.sign_registration_challenge(MSG.into()).unwrap();
+        let via_oracle = sign_challenge(SK_HEX, MSG).unwrap();
+        assert_eq!(via_wallet, via_oracle);
+        assert_eq!(via_wallet.len(), 128); // 64-byte schnorr sig, lowercase hex
     }
 }
