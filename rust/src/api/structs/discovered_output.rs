@@ -11,8 +11,8 @@ pub struct DiscoveredOutput {
     pub label: Option<String>,
 }
 
-impl From<spdk_wallet::updater::DiscoveredOutput> for DiscoveredOutput {
-    fn from(value: spdk_wallet::updater::DiscoveredOutput) -> Self {
+impl From<spdk_wallet::scanner::DiscoveredOutput> for DiscoveredOutput {
+    fn from(value: spdk_wallet::scanner::DiscoveredOutput) -> Self {
         Self {
             tweak: value.tweak.to_be_bytes(),
             value: value.txout.value.into(),
@@ -22,7 +22,7 @@ impl From<spdk_wallet::updater::DiscoveredOutput> for DiscoveredOutput {
     }
 }
 
-impl From<DiscoveredOutput> for spdk_wallet::updater::DiscoveredOutput {
+impl From<DiscoveredOutput> for spdk_wallet::scanner::DiscoveredOutput {
     fn from(value: DiscoveredOutput) -> Self {
         Self {
             txout: TxOut {
