@@ -7,8 +7,8 @@ use anyhow::Result;
 use bip39::rand::{thread_rng, RngCore};
 use spdk_wallet::backend_blindbit_v1::BlindbitClient;
 use spdk_wallet::bitcoin::secp256k1::Scalar;
-use spdk_wallet::bitcoin::ScriptBuf;
 use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex, OutPoint};
+use spdk_wallet::bitcoin::{ScriptBuf, TxOut};
 use spdk_wallet::client::{FeeRate, RecipientAddress, SpClient};
 use spdk_wallet::updater::DiscoveredOutput;
 
@@ -33,9 +33,11 @@ impl SpWallet {
                     None => None,
                 };
                 let output = DiscoveredOutput {
+                    txout: TxOut {
+                        value: output.amount.into(),
+                        script_pubkey: ScriptBuf::from_bytes(output.script),
+                    },
                     tweak: Scalar::from_be_bytes(output.tweak)?,
-                    value: output.amount.into(),
-                    script_pubkey: ScriptBuf::from_bytes(output.script),
                     label,
                 };
                 Ok((outpoint, output))
@@ -73,9 +75,11 @@ impl SpWallet {
                     None => None,
                 };
                 let output = DiscoveredOutput {
+                    txout: TxOut {
+                        value: output.amount.into(),
+                        script_pubkey: ScriptBuf::from_bytes(output.script),
+                    },
                     tweak: Scalar::from_be_bytes(output.tweak)?,
-                    value: output.amount.into(),
-                    script_pubkey: ScriptBuf::from_bytes(output.script),
                     label,
                 };
                 Ok((outpoint, output))

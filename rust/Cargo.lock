@@ -118,8 +118,8 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "backend-blindbit-v1"
-version = "0.7.1"
-source = "git+https://github.com/cygnet3/spdk?rev=c1262f046074cbdbcc9a461e2537a194c8a1a22a#c1262f046074cbdbcc9a461e2537a194c8a1a22a"
+version = "0.0.0"
+source = "git+https://github.com/cygnet3/spdk?rev=d8dcfd04b33623f85a9752a151f4c15b82aa732f#d8dcfd04b33623f85a9752a151f4c15b82aa732f"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1652,7 +1652,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2150,7 +2150,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 [[package]]
 name = "silentpayments"
 version = "0.8.0"
-source = "git+https://github.com/cygnet3/spdk?rev=c1262f046074cbdbcc9a461e2537a194c8a1a22a#c1262f046074cbdbcc9a461e2537a194c8a1a22a"
+source = "git+https://github.com/cygnet3/spdk?rev=d8dcfd04b33623f85a9752a151f4c15b82aa732f#d8dcfd04b33623f85a9752a151f4c15b82aa732f"
 dependencies = [
  "bech32 0.9.1",
  "bitcoin_hashes 0.13.1",
@@ -2193,7 +2193,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2209,8 +2209,8 @@ dependencies = [
 
 [[package]]
 name = "spdk-core"
-version = "0.7.1"
-source = "git+https://github.com/cygnet3/spdk?rev=c1262f046074cbdbcc9a461e2537a194c8a1a22a#c1262f046074cbdbcc9a461e2537a194c8a1a22a"
+version = "0.0.0"
+source = "git+https://github.com/cygnet3/spdk?rev=d8dcfd04b33623f85a9752a151f4c15b82aa732f#d8dcfd04b33623f85a9752a151f4c15b82aa732f"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2222,8 +2222,8 @@ dependencies = [
 
 [[package]]
 name = "spdk-wallet"
-version = "0.7.1"
-source = "git+https://github.com/cygnet3/spdk?rev=c1262f046074cbdbcc9a461e2537a194c8a1a22a#c1262f046074cbdbcc9a461e2537a194c8a1a22a"
+version = "0.0.0"
+source = "git+https://github.com/cygnet3/spdk?rev=d8dcfd04b33623f85a9752a151f4c15b82aa732f#d8dcfd04b33623f85a9752a151f4c15b82aa732f"
 dependencies = [
  "anyhow",
  "backend-blindbit-v1",
