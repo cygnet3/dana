@@ -57,8 +57,8 @@ impl Updater for StateUpdater {
                     .map(|(outpoint, output)| OwnedOutput {
                         outpoint: outpoint.into(),
                         tweak: output.tweak.to_be_bytes(),
-                        amount: output.value.into(),
-                        script: output.script_pubkey.to_bytes(),
+                        amount: output.txout.value.into(),
+                        script: output.txout.script_pubkey.to_bytes(),
                         label: output.label.map(|l| l.as_inner().to_be_bytes()),
                     })
                     .collect(),
