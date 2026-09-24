@@ -64,6 +64,10 @@ class NameServerRepository {
       userName: danaAddress.username,
       domain: danaAddress.domain,
       spAddress: paymentCode.encode(),
+      // TODO(challenge-auth): replace placeholders with real values from the
+      // challenge flow (nonce + signature); arity required by model changes.
+      nonce: '',
+      signature: '',
     );
 
     Logger().d(
