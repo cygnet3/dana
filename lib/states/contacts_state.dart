@@ -39,15 +39,20 @@ class ContactsState extends ChangeNotifier {
   }
 
   Future<void> checkUpperCases(List<Contact> allContacts) async {
+    var collisionFree = true;
     for (final contact in allContacts) {
       final code = contact.paymentCode;
-      if (code.length >= 2 &&
-          code[0] == code[0].toUpperCase() &&
-          code[1] == code[1].toUpperCase()) {
+      // Same population as migration 002 (`payment_code = upper(payment_code)`):
+      // a whole-string all-uppercase check. The previous code[0]/code[1] probe
+      // was only a "starts with two capitals" proxy, so a valid bech32 spelling
+      // that carries a lowercase letter beyond position 1 escaped here entirely
+      // and coexisted with its lowercase twin as two distinct contacts.
+      if (code.length >= 2 && code == code.toUpperCase()) {
+        String? canonical;
         try {
           Logger().w(
               'Canonicalizing legacy payment code for contact id=${contact.id}');
-          final canonical = sanitizePaymentCode(address: code);
+          canonical = sanitizePaymentCode(address: code);
           await _repository.updateContact(Contact(
             id: contact.id,
             name: contact.name,
@@ -63,7 +68,14 @@ class ContactsState extends ChangeNotifier {
             customFields: contact.customFields,
           ));
           continue;
-        } catch (e) {
+        } on Exception catch (e) {
+          // The canonical spelling is already taken by the contact that owns it:
+          // the repository reports that as a UNIQUE constraint violation. Merge
+          // the pair instead of logging the clash and keeping both rows.
+          if (await _mergeIntoTwin(contact, canonical)) {
+            continue;
+          }
+          collisionFree = false;
           Logger().e(
               'Failed to canonicalize payment code for contact id=${contact.id}: $e');
         }
@@ -71,7 +83,49 @@ class ContactsState extends ChangeNotifier {
       _contacts.add(contact);
     }
 
-    _isCheckedForUpperCase = true;
+    // Latch only after a pass that left no collision behind. It is an
+    // in-memory field, so a failed pass is retried on the next refresh and
+    // no duplicate pair can become permanent unnoticed — persisting the latch
+    // is not needed for that, per-session retry is correct-by-retry.
+    _isCheckedForUpperCase = collisionFree;
+  }
+
+  /// Reconciles a contact whose canonical payment code is already owned by a
+  /// second contact: the custom fields are re-attached to the survivor and the
+  /// duplicate row is deleted, so one payment destination maps to one contact.
+  ///
+  /// Returns true when the pair was merged. Under migration 003
+  /// (`paymentCode UNIQUE COLLATE NOCASE`) the database itself refuses a
+  /// case-variant pair, so this path only ever runs on data written before it —
+  /// defence-in-depth rather than the primary guarantee.
+  Future<bool> _mergeIntoTwin(Contact contact, String? canonical) async {
+    if (canonical == null) return false;
+    try {
+      final twin = await _repository.getContactByPaymentCode(canonical);
+      if (twin?.id == null || twin!.id == contact.id) return false;
+
+      for (final field in await _repository.getContactFields(contact.id!)) {
+        await _repository.updateContactField(ContactField(
+          id: field.id,
+          contactId: twin.id!,
+          fieldType: field.fieldType,
+          fieldValue: field.fieldValue,
+        ));
+      }
+      await _repository.deleteContact(contact.id!);
+      Logger().i(
+          'Merged duplicate contact id=${contact.id} into canonical owner id=${twin.id}');
+
+      // Read the survivor back so the in-memory list tells the same story as
+      // the database, custom fields and all.
+      final survivor =
+          await _repository.getContact(twin.id!, loadCustomFields: true);
+      _contacts.add(survivor ?? twin);
+      return true;
+    } catch (e) {
+      Logger().e('Could not reconcile duplicate contact id=${contact.id}: $e');
+      return false;
+    }
   }
 
   Future<void> refreshContacts() async {

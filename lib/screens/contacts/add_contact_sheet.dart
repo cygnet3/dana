@@ -201,7 +201,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
       } else {
         setState(() {
           _confirmedDanaAddress = parsedBip353Address;
-          _confirmedPaymentCode = reusablePaymentCode;
+          _confirmedPaymentCode = sanitizePaymentCode(address: reusablePaymentCode);
           _remoteDanaAddresses = [];
           _nameController.text = parsedBip353Address.username;
           _isResolving = false;
