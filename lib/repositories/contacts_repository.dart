@@ -1,5 +1,6 @@
 import 'package:danawallet/data/models/contact_field.dart';
 import 'package:danawallet/data/models/contact.dart';
+import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/repositories/database_helper.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -11,6 +12,12 @@ class ContactsRepository {
 
   // singleton instance
   static final instance = ContactsRepository._();
+
+  /// Visible for tests only. The canonicalization pass of ContactsState
+  /// is the one piece of it that speaks to the database, and driving that
+  /// pass against a recording stand in of this repository is what makes
+  /// the merge of a colliding pair testable at all without the bridge.
+  ContactsRepository.forTesting();
 
   // Helper method to load custom fields for a contact
   Future<Contact> _loadCustomFields(Contact contact) async {
@@ -36,7 +43,7 @@ class ContactsRepository {
       );
     } on DatabaseException catch (e) {
       if (e.isUniqueConstraintError()) {
-        throw Exception(
+        throw const DuplicateContactException(
             'Contact already exists with this dana address or silent payment address');
       }
       rethrow;
@@ -134,7 +141,7 @@ class ContactsRepository {
       );
     } on DatabaseException catch (e) {
       if (e.isUniqueConstraintError()) {
-        throw Exception(
+        throw const DuplicateContactException(
             'Another contact already exists with this dana address or silent payment address');
       }
       rethrow;

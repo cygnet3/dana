@@ -73,3 +73,21 @@ class Bip353AddressAlreadyUsed extends Bip353ResolveException {
       : super('$address is already used for payment code '
             '${resolved.truncated(prefix: 3, suffix: 4)}.');
 }
+
+/// A write to the contacts table was refused because another row already
+/// owns the unique key: some other contact holds the Dana address or the
+/// silent payment address the new one would take.
+///
+/// Typed, so that the callers who must tell a collision from any other
+/// failure -- a fold that rejects, an I/O error of the open -- can merge on
+/// the strength of the first alone and report the rest, instead of treating
+/// every Exception as the same duplicate.
+class DuplicateContactException implements Exception {
+  final String message;
+  final Object? cause;
+
+  const DuplicateContactException(this.message, {this.cause});
+
+  @override
+  String toString() => cause == null ? message : '$message ($cause)';
+}
