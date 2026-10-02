@@ -8,6 +8,7 @@ use lazy_static::lazy_static;
 lazy_static! {
     static ref SCAN_PROGRESS_STREAM_SINK: Mutex<Option<StreamSink<u32>>> = Mutex::new(None);
     static ref STATE_UPDATE_STREAM_SINK: Mutex<Option<StreamSink<StateUpdate>>> = Mutex::new(None);
+    static ref TX_BROADCAST_STREAM_SINK: Mutex<Option<StreamSink<String>>> = Mutex::new(None);
 }
 
 pub fn create_sync_progress_stream(s: StreamSink<u32>) {
@@ -17,6 +18,11 @@ pub fn create_sync_progress_stream(s: StreamSink<u32>) {
 
 pub fn create_sync_update_stream(s: StreamSink<StateUpdate>) {
     let mut stream_sink = STATE_UPDATE_STREAM_SINK.lock().unwrap();
+    *stream_sink = Some(s);
+}
+
+pub fn create_tx_broadcast_stream(s: StreamSink<String>) {
+    let mut stream_sink = TX_BROADCAST_STREAM_SINK.lock().unwrap();
     *stream_sink = Some(s);
 }
 
@@ -39,6 +45,18 @@ pub(crate) fn send_sync_update(update: StateUpdate) -> anyhow::Result<()> {
         Some(sink) => sink
             .add(update)
             .map_err(|_| anyhow::Error::msg("error while sending sync update".to_string())),
+        None => Err(anyhow::Error::msg("Stream sink not available".to_string())),
+    }
+}
+
+pub(crate) fn send_tx_broadcast_update(update: String) -> anyhow::Result<()> {
+    let stream_sink = TX_BROADCAST_STREAM_SINK
+        .try_lock()
+        .map_err(|_| anyhow::Error::msg("Stream sink not available"))?;
+    match stream_sink.as_ref() {
+        Some(sink) => sink
+            .add(update)
+            .map_err(|_| anyhow::Error::msg("error while sending broadcast update".to_string())),
         None => Err(anyhow::Error::msg("Stream sink not available".to_string())),
     }
 }
