@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/enums/selected_fee.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/extensions/payment_code.dart';
+import 'package:danawallet/generated/rust/api/stream.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart';
 import 'package:danawallet/global_functions.dart';
@@ -34,12 +37,30 @@ class ReadyToSendScreen extends StatefulWidget {
 
 class ReadyToSendScreenState extends State<ReadyToSendScreen> {
   bool _isSending = false;
-  String? _sendErrorText;
+  String? _sendInfoText;
+
+  late StreamSubscription txBroadcastStreamSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    txBroadcastStreamSubscription = createBroadcastStream().listen((event) {
+      setState(() {
+        _sendInfoText = event;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    txBroadcastStreamSubscription.cancel();
+    super.dispose();
+  }
 
   Future<void> onPressSend() async {
     setState(() {
       _isSending = true;
-      _sendErrorText = null;
+      _sendInfoText = null;
     });
 
     try {
@@ -64,7 +85,7 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
     } catch (e) {
       setState(() {
         _isSending = false;
-        _sendErrorText = exceptionToString(e);
+        _sendInfoText = exceptionToString(e);
       });
     }
   }
@@ -119,7 +140,7 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
         ),
         footer: Column(
           children: [
-            if (_sendErrorText != null) Text(_sendErrorText!),
+            if (_sendInfoText != null) Text(_sendInfoText!),
             const SizedBox(
               height: 10.0,
             ),
