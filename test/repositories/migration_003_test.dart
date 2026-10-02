@@ -17,17 +17,18 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 /// The SQL is read from the real asset file and never inlined, so the
 /// shipped migration and its test cannot silently diverge.
 
-final Directory _migrationsDir = Directory(p.join('assets', 'sql', 'migrations'));
+final Directory _migrationsDir =
+    Directory(p.join('assets', 'sql', 'migrations'));
 
 const String _migration003 = '003_contacts_nocase_collation.sql';
 
 /// Same discovery + ordering rule as `DatabaseHelper._initDB`.
 List<String> discoverMigrations() => (_migrationsDir
-            .listSync(followLinks: false)
-            .map((e) => p.basename(e.path))
-            .where((name) => RegExp(r'^\d{3}_.+\.sql$').hasMatch(name))
-            .toList()
-          ..sort());
+    .listSync(followLinks: false)
+    .map((e) => p.basename(e.path))
+    .where((name) => RegExp(r'^\d{3}_.+\.sql$').hasMatch(name))
+    .toList()
+  ..sort());
 
 /// Same execution as `DatabaseHelper._performMigrations`: split on ';' and
 /// execute each trimmed non-empty statement. Accepts a Database or the
@@ -73,10 +74,22 @@ int get _headVersion => discoverMigrations().length;
 /// The book as it stood at pin 636d1e6d, i.e. before 003 landed.
 int get _pinVersion => _headVersion - 1;
 
-/// Unique in-memory paths, so the FFI connection cache cannot hand one group
-/// the schema another group left behind.
+/// One named in-memory database per call.
+///
+/// A relative name is not in memory: `fixPath` joins it onto
+/// `.dart_tool/sqflite_common_ffi/databases/`. A counter that restarts at 0
+/// is not unique across runs either — the next `flutter test` process mints
+/// the same names and reopens those files. A `file:` URI skips that join.
+/// `mode=memory&cache=shared` is a named in-memory database (the form
+/// sqflite's own connection tracker uses); `cache=shared` is what makes a
+/// later open of the same path, which the per-path connection cache may do,
+/// see this database instead of an empty private one. [_runNonce] keeps a
+/// later process from minting the same names.
+final String _runNonce =
+    '$pid-${DateTime.now().microsecondsSinceEpoch.toRadixString(16)}';
 int _pathSeq = 0;
-String _freshPath(String tag) => '$tag-${++_pathSeq}';
+String _freshPath(String tag) =>
+    'file:$tag-$_runNonce-${++_pathSeq}?mode=memory&cache=shared';
 
 // One seed, and every "case variant" below is DERIVED from it. A hand-typed
 // twin silently drifts into an unrelated code, and then a case-insensitive
@@ -100,8 +113,8 @@ class _UniqueConstraintErrorMatcher extends Matcher {
       item is DatabaseException && item.isUniqueConstraintError();
 
   @override
-  Description describe(Description description) =>
-      description.add('a DatabaseException reporting a UNIQUE constraint violation');
+  Description describe(Description description) => description
+      .add('a DatabaseException reporting a UNIQUE constraint violation');
 }
 
 void main() {
@@ -124,6 +137,18 @@ void main() {
         reason: 'yet fold onto the same canonical code');
   });
 
+  test('a fresh path is an in-memory database under a per-run name', () async {
+    final path = _freshPath('dana-003-mem');
+    expect(path, startsWith('file:'));
+    expect(path, contains('mode=memory'));
+    expect(path, contains('$pid-'),
+        reason: 'a counter that restarts at 0 repeats the same names next run');
+    final db = await openVersioned(path, _pinVersion);
+    addTearDown(() => db.close());
+    // An on-disk database reports its file here; an in-memory one reports ''.
+    expect((await db.rawQuery('PRAGMA database_list')).single['file'], '');
+  });
+
   group('migration discovery and runner contract', () {
     test('003 is discovered by the 00N_ rule and sorts last (version book)',
         () {
@@ -138,8 +163,8 @@ void main() {
         'the 003 file declares its keys with COLLATE NOCASE and keeps every '
         'statement free of a ";" outside a terminator (the runner splits on it)',
         () {
-      final sql = File(p.join(_migrationsDir.path, _migration003))
-          .readAsStringSync();
+      final sql =
+          File(p.join(_migrationsDir.path, _migration003)).readAsStringSync();
       expect(sql, contains('COLLATE NOCASE'),
           reason: 'bare `UNIQUE NOCASE` is a SQLite syntax error; NOCASE is '
               'legal only after the COLLATE keyword');
@@ -161,7 +186,8 @@ void main() {
     // Each test gets its OWN database: the FFI factory caches a connection per
     // path, so a shared in-memory path would hand a later group the schema an
     // earlier one left behind.
-    setUp(() async => db = await openVersioned(_freshPath('dana-003-repro'), _pinVersion));
+    setUp(() async =>
+        db = await openVersioned(_freshPath('dana-003-repro'), _pinVersion));
     tearDown(() => db.close());
 
     Future<void> seedLegacyCaseTwins() async {
@@ -227,7 +253,8 @@ void main() {
           'contacts', {'id': 51, 'name': 'bob', 'paymentCode': _codeLower});
       await db.insert('contacts',
           {'id': 52, 'name': 'bob upper', 'paymentCode': _codeUpper});
-      final rows = await db.query('contacts', where: 'id >= ?', whereArgs: [51]);
+      final rows =
+          await db.query('contacts', where: 'id >= ?', whereArgs: [51]);
       expect(rows.length, 2,
           reason: 'RED pre-fix: BINARY UNIQUE lets the case twin through');
     });
@@ -281,25 +308,27 @@ void main() {
       } on FileSystemException catch (_) {/* already gone */}
     });
 
-    test('inserting the uppercase twin of an existing lowercase code is rejected',
+    test(
+        'inserting the uppercase twin of an existing lowercase code is rejected',
         () async {
-      await db.insert('contacts',
-          {'id': 61, 'name': 'carol', 'paymentCode': _codeLower});
+      await db.insert(
+          'contacts', {'id': 61, 'name': 'carol', 'paymentCode': _codeLower});
       await expectLater(
           db.insert('contacts',
               {'id': 62, 'name': 'carol again', 'paymentCode': _codeUpper},
               conflictAlgorithm: ConflictAlgorithm.fail),
           throwsA(_isUniqueConstraintError));
 
-      final rows = await db.query('contacts', where: 'id >= ?', whereArgs: [61]);
+      final rows =
+          await db.query('contacts', where: 'id >= ?', whereArgs: [61]);
       expect(rows.length, 1, reason: 'the twin never reaches storage');
       expect(rows.single['paymentCode'], _codeLower,
           reason: 'first writer wins and keeps its spelling');
     });
 
     test('getContactByPaymentCode matches case-insensitively', () async {
-      await db.insert('contacts',
-          {'id': 71, 'name': 'dave', 'paymentCode': _codeLower});
+      await db.insert(
+          'contacts', {'id': 71, 'name': 'dave', 'paymentCode': _codeLower});
       for (final probe in [_codeLower, _codeUpper]) {
         final rows = await db
             .query('contacts', where: 'paymentCode = ?', whereArgs: [probe]);
@@ -312,8 +341,8 @@ void main() {
     test('a legacy case-variant pair is merged onto its oldest row', () async {
       await db.close();
       final seeded = await freshBasePin();
-      await seeded.base.insert('contacts',
-          {'id': 41, 'name': 'alice', 'paymentCode': _codeUpper});
+      await seeded.base.insert(
+          'contacts', {'id': 41, 'name': 'alice', 'paymentCode': _codeUpper});
       await seeded.base.insert('contacts',
           {'id': 42, 'name': 'alice too', 'paymentCode': _codeLower});
       await seeded.base.insert('contact_fields',
@@ -334,7 +363,8 @@ void main() {
           reason: 'EXPLICIT DECISION: the loser fields are re-attached to the '
               'winner, they are never cascade-deleted with the loser');
       expect(fields.map((f) => f['contact_id']), everyElement(equals(41)));
-      expect(fields.map((f) => f['field_value']), containsAll(['a@b.c', '123']));
+      expect(
+          fields.map((f) => f['field_value']), containsAll(['a@b.c', '123']));
 
       final orphans = await db.rawQuery('''
           SELECT COUNT(*) AS n FROM contact_fields
@@ -348,8 +378,8 @@ void main() {
         () async {
       await db.close();
       final seeded = await freshBasePin();
-      await seeded.base.insert('contacts',
-          {'id': 1, 'name': 'erin', 'paymentCode': _codeLower});
+      await seeded.base.insert(
+          'contacts', {'id': 1, 'name': 'erin', 'paymentCode': _codeLower});
       await seeded.base.insert('contacts',
           {'id': 2, 'name': 'frank', 'paymentCode': 'sp1anotherdifferentcode'});
       await seeded.base.insert('contact_fields',
@@ -381,7 +411,8 @@ void main() {
           reason: 'the rebuilt child must keep the cascade definition of 000');
     });
 
-    test('the schema declares both keys COLLATE NOCASE and the 000 indexes return',
+    test(
+        'the schema declares both keys COLLATE NOCASE and the 000 indexes return',
         () async {
       final ddl = await db.query('sqlite_master',
           columns: ['name', 'sql'],
@@ -423,8 +454,10 @@ void main() {
 
       expect((await db.query('contacts', orderBy: 'id')).map((c) => c['name']),
           ['gina']);
-      expect((await db.query('contact_fields', orderBy: 'id'))
-          .map((f) => f['field_value']), ['g@h.i']);
+      expect(
+          (await db.query('contact_fields', orderBy: 'id'))
+              .map((f) => f['field_value']),
+          ['g@h.i']);
       expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
     });
   });
@@ -437,28 +470,30 @@ void main() {
     // files: asking for a stale literal here would replay one migration short
     // and the "the schema itself refuses the twin" assertions below would then
     // run against the pre-003 BINARY table and mean nothing.
-    setUp(() async => db = await openVersioned(_freshPath('dana-003-head'), _headVersion));
+    setUp(() async =>
+        db = await openVersioned(_freshPath('dana-003-head'), _headVersion));
     tearDown(() => db.close());
 
     test('a case-variant pair can never be inserted, in either spelling',
         () async {
-      await db.insert('contacts',
-          {'id': 1, 'name': 'hal', 'paymentCode': _codeLower});
+      await db.insert(
+          'contacts', {'id': 1, 'name': 'hal', 'paymentCode': _codeLower});
       for (final twin in [_codeUpper, _codeMixed]) {
         await expectLater(
-            db.insert('contacts',
-                {'id': 2, 'name': 'hal twin', 'paymentCode': twin},
+            db.insert(
+                'contacts', {'id': 2, 'name': 'hal twin', 'paymentCode': twin},
                 conflictAlgorithm: ConflictAlgorithm.fail),
             throwsA(_isUniqueConstraintError),
             reason: 'the schema itself must refuse the case twin: $twin');
       }
     });
 
-    test('AUTOINCREMENT keeps handing out fresh ids after the rebuild', () async {
-      await db.insert('contacts',
-          {'id': 41, 'name': 'ia', 'paymentCode': 'sp1iatestcode'});
-      final id = await db.insert('contacts',
-          {'name': 'ib', 'paymentCode': 'sp1bobtestcode'});
+    test('AUTOINCREMENT keeps handing out fresh ids after the rebuild',
+        () async {
+      await db.insert(
+          'contacts', {'id': 41, 'name': 'ia', 'paymentCode': 'sp1iatestcode'});
+      final id = await db
+          .insert('contacts', {'name': 'ib', 'paymentCode': 'sp1bobtestcode'});
       expect(id, greaterThan(41),
           reason: 'the copied explicit ids must not make the counter collide');
     });
@@ -470,8 +505,8 @@ void main() {
         'custom field — guarded against', () async {
       final db = await openVersioned(_freshPath('dana-003-draft'), _pinVersion);
       addTearDown(() => db.close());
-      await db.insert('contacts',
-          {'id': 91, 'name': 'henrik', 'paymentCode': _codeLower});
+      await db.insert(
+          'contacts', {'id': 91, 'name': 'henrik', 'paymentCode': _codeLower});
       await db.insert('contact_fields',
           {'contact_id': 91, 'field_type': 'email', 'field_value': 'h@i.j'});
 
@@ -497,6 +532,238 @@ void main() {
           reason: 'DROP TABLE of the parent fires ON DELETE CASCADE into the '
               'untouched child — this is why the shipped migration rebuilds '
               'contact_fields as well and re-attaches before removing duplicates');
+    });
+  });
+  group(
+      '(e) the survivor is canonicalized and its identity rescued — the '
+      'scenario of cygnet3/dana#480 as stated by the reviewer: a v0.8.x install '
+      'registered the same destination twice, once lower and once upper, in an '
+      'UNKNOWN order', () {
+    Future<Database> migrateSeeded(List<List<Object?>> contacts,
+        [List<List<Object?>> fields = const []]) async {
+      final dir = Directory.systemTemp.createTempSync('dana-003-fold');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final path = p.join(dir.path, 'dana.db');
+      final base = await openVersioned(path, _pinVersion);
+      for (final c in contacts) {
+        await base.insert(
+            'contacts',
+            {
+              'id': c[0],
+              'name': c[1],
+              'bip353Address': c[2],
+              'paymentCode': c[3],
+            },
+            conflictAlgorithm: ConflictAlgorithm.fail);
+      }
+      for (final f in fields) {
+        await base.insert('contact_fields',
+            {'contact_id': f[0], 'field_type': f[1], 'field_value': f[2]});
+      }
+      await base.close();
+      return openDatabase(path,
+          version: _headVersion,
+          onConfigure: _configure,
+          onUpgrade: (db, oldV, newV) =>
+              runMigrationFiles(db, [_migration003]));
+    }
+
+    Future<List<List<Object?>>> contactsOf(Database db) => db
+        .query('contacts',
+            columns: ['id', 'name', 'bip353Address', 'paymentCode'],
+            orderBy: 'id')
+        .then((rs) => rs
+            .map((r) =>
+                [r['id'], r['name'], r['bip353Address'], r['paymentCode']])
+            .toList());
+
+    // The fold is what makes the survivor usable WHATEVER the seeding order, so
+    // both orders must be asserted: MIN(id) elects by AGE and the two spellings
+    // were entered in an order nobody knows, so the row that stays is just as
+    // likely to be the bare legacy one as the canonical one.
+    test(
+        'the LOWERCASE contact was saved first: survivor 41 is already canonical',
+        () async {
+      final db = await migrateSeeded([
+        [41, 'alice', 'alice@dana.example', _codeLower],
+        [42, 'alice too', null, _codeUpper],
+      ]);
+      expect(
+          await contactsOf(db),
+          [
+            [41, 'alice', 'alice@dana.example', _codeLower],
+          ],
+          reason: 'one row kept, and its key needs no fold');
+    });
+
+    test(
+        'the UPPERCASE contact was saved first: survivor 41 is folded to lowercase',
+        () async {
+      final db = await migrateSeeded([
+        [41, 'alice', null, _codeUpper],
+        [42, 'alice too', 'alice@dana.example', _codeLower],
+      ]);
+      expect(
+          await contactsOf(db),
+          [
+            [41, 'alice', 'alice@dana.example', _codeLower],
+          ],
+          reason: 'MIN(id) keeps the legacy row, so the fold to the canonical '
+              'spelling is the ONLY thing standing between this contact and an '
+              'anonymous one: every lookup is case sensitive '
+              '(ContactsRepository.getContactByPaymentCode queries paymentCode = ? '
+              'and the wallet joins its history onto a contact through it)');
+      expect(
+          await db.rawQuery(
+              'SELECT COUNT(*) AS n FROM contacts WHERE paymentCode <> lower(paymentCode)'),
+          [
+            {'n': 0}
+          ],
+          reason: 'no dirty key may survive the rebuild in any row');
+    });
+
+    test(
+        'a survivor that is bare adopts the name and the address of the doomed twin',
+        () async {
+      final db = await migrateSeeded([
+        [41, null, null, _codeUpper],
+        [42, 'alice too', 'alice@dana.example', _codeLower],
+      ], [
+        [41, 'email', 'a@b.c'],
+        [42, 'phone', '123'],
+      ]);
+      expect(
+          await contactsOf(db),
+          [
+            [41, 'alice too', 'alice@dana.example', _codeLower],
+          ],
+          reason:
+              'the row the user actually saved is the NEWER one; dropping its '
+              'identity with the duplicate is the leak the review of the first '
+              'draft caught. The custom fields already survived, name and '
+              'bip353Address did not');
+      final fields = await db.query('contact_fields',
+          columns: ['contact_id', 'field_value'], orderBy: 'id');
+      expect(fields.map((f) => f['contact_id']), everyElement(equals(41)));
+      expect(
+          fields.map((f) => f['field_value']), containsAll(['a@b.c', '123']));
+    });
+
+    test(
+        'values the survivor already owns are never overwritten by the doomed twin',
+        () async {
+      final db = await migrateSeeded([
+        [41, 'alice', 'alice@dana.example', _codeUpper],
+        [42, 'alice too', 'someone.else@dana.example', _codeLower],
+      ]);
+      expect(
+          await contactsOf(db),
+          [
+            [41, 'alice', 'alice@dana.example', _codeLower],
+          ],
+          reason:
+              'the tie-break stays the one this file uses everywhere: oldest '
+              'wins, holes are filled. This is why the rescue reads '
+              'survivor.name ?: newest.name and not the other way around, which '
+              'would also break the (b) group asserting the merged name is alice');
+    });
+
+    test(
+        'the mixed-case spelling that escapes the all-uppercase probe is folded too',
+        () async {
+      expect(_codeMixed, isNot(equals(_codeMixed.toUpperCase())),
+          reason:
+              'checkUpperCases() probes code == code.toUpperCase(), so this '
+              'row is never even offered to the sanitizer at runtime');
+      final db = await migrateSeeded([
+        [41, null, null, _codeMixed],
+        [42, 'm', null, _codeLower],
+      ]);
+      expect(
+          await contactsOf(db),
+          [
+            [41, 'm', null, _codeLower],
+          ],
+          reason: 'the predicate is paymentCode <> lower(paymentCode), so a '
+              'mixed-case spelling is folded the same way as an all-uppercase '
+              'one');
+    });
+
+    test('an address worn by two DIFFERENT codes does not abort the rebuild',
+        () async {
+      final db = await migrateSeeded([
+        [41, 'x', null, 'sp1aaaa'],
+        [42, 'y', 'dup@dana.example', 'sp1bbbb'],
+        [43, 'z', 'DUP@dana.example', 'sp1cccc'],
+      ]);
+      final rows = await contactsOf(db);
+      expect(rows.length, 3,
+          reason:
+              'these are not twins: the deduplication groups on paymentCode, so '
+              'nothing collapses them. The rebuilt UNIQUE COLLATE NOCASE on '
+              'bip353Address would however refuse two of them, and an abort here '
+              'would leave the whole base on the old BINARY schema with every '
+              'contact unfindable — so the oldest carrier keeps the label');
+      expect(rows[1][2], 'dup@dana.example');
+      expect(rows[2][2], isNull, reason: 'the younger carrier gives it up');
+    });
+
+    test(
+        'an adopted address that clashes with an unrelated contact is released',
+        () async {
+      final db = await migrateSeeded([
+        [41, 'a', null, _codeUpper],
+        [42, 'b', 'rescued@dana.example', _codeLower],
+        [43, 'c', 'RESCUED@dana.example', 'sp1zzzq'],
+      ]);
+      final rows = await contactsOf(db);
+      expect(rows.length, 2,
+          reason: 'the twins collapsed, the stranger stayed');
+      expect(rows[0][0], 41);
+      expect(rows[0][2], 'rescued@dana.example',
+          reason: 'the rescue itself succeeded');
+      expect(rows[1][0], 43);
+      expect(rows[1][2], isNull,
+          reason: 'and the clash it caused is resolved by age, not by abort');
+      expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+    });
+
+    test(
+        'a survivor that already holds the colliding address drops the twin\'s '
+        'free one', () async {
+      final db = await migrateSeeded([
+        [10, 'older', 'keep@x', 'sp1other'],
+        [41, 'survivor', 'KEEP@x', 'SP1AAA'],
+        [42, 'twin', 'unique@x', 'sp1aaa'],
+      ]);
+      expect(
+          await contactsOf(db),
+          [
+            [10, 'older', 'keep@x', 'sp1other'],
+            [41, 'survivor', null, 'sp1aaa'],
+          ],
+          reason: 'COALESCE keeps KEEP@x because the survivor\'s own address '
+              'is non-null, so unique@x is never a candidate. The CASE then '
+              'sees id 10 already holds keep@x and stores null');
+    });
+
+    test(
+        'the newest twin\'s colliding address is chosen over an older twin\'s '
+        'free one', () async {
+      final db = await migrateSeeded([
+        [10, 'older', 'keep@x', 'sp1other'],
+        [41, 'survivor', null, 'SP1AAA'],
+        [42, 'mid', 'unique@x', 'sp1aaa'],
+        [43, 'newest', 'KEEP@x', 'Sp1AAA'],
+      ]);
+      expect(
+          await contactsOf(db),
+          [
+            [10, 'older', 'keep@x', 'sp1other'],
+            [41, 'survivor', null, 'sp1aaa'],
+          ],
+          reason: 'ORDER BY id DESC LIMIT 1 picks KEEP@x. The CASE nulls it, '
+              'and unique@x is never tried');
     });
   });
 }

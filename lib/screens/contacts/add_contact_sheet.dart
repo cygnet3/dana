@@ -76,8 +76,27 @@ class _AddContactSheetState extends State<AddContactSheet> {
   void initState() {
     super.initState();
 
-    // if a payment code has been provided, pre-fill it
-    _confirmedPaymentCode = widget.initialPaymentCode;
+    // If a payment code has been provided, pre-fill it in the canonical
+    // spelling. The handoff of the transaction screens carries the string the
+    // chain recorded, and the chain recorded what the counterparty sent -- a
+    // QR code, say, in all upper. Both the duplicate probe of
+    // _onSaveContact() and the write of addContact() read and store the
+    // folded form, so a raw value here misses the contact that is already
+    // saved and lets the bare 'already exists' error of the repository escape
+    // instead of the friendly dialog. A value that does not parse is kept as
+    // it arrived: it can not match a stored contact either, and addContact()
+    // validates again before it writes.
+    final initialPaymentCode = widget.initialPaymentCode;
+    if (initialPaymentCode == null) {
+      _confirmedPaymentCode = null;
+    } else {
+      try {
+        _confirmedPaymentCode =
+            sanitizePaymentCode(address: initialPaymentCode);
+      } on Exception {
+        _confirmedPaymentCode = initialPaymentCode;
+      }
+    }
 
     if (widget.initialDanaAddress != null) {
       // if a dana address has been provided, it has been confirmed already
@@ -201,7 +220,8 @@ class _AddContactSheetState extends State<AddContactSheet> {
       } else {
         setState(() {
           _confirmedDanaAddress = parsedBip353Address;
-          _confirmedPaymentCode = sanitizePaymentCode(address: reusablePaymentCode);
+          _confirmedPaymentCode =
+              sanitizePaymentCode(address: reusablePaymentCode);
           _remoteDanaAddresses = [];
           _nameController.text = parsedBip353Address.username;
           _isResolving = false;
@@ -370,18 +390,30 @@ class _AddContactSheetState extends State<AddContactSheet> {
     if (code.isEmpty) return;
 
     final network = Provider.of<ChainState>(context, listen: false).network;
+    String canonical;
     try {
       validateAddressWithNetwork(address: code, network: network);
       if (!isReusablePaymentCode(address: code)) {
         throw Exception('Non-reusable payment info not allowed');
       }
-    } catch (e) {
-      setState(() => _errorMessage = 'Not a valid silent payment address');
+      // The fold belongs INSIDE the validation guard. It reads the bytes of
+      // the raw value and can reject as well, and it used to run outside --
+      // down in the setState() below -- where a throw of it escaped this
+      // handler altogether and left the confirmation card reflecting whatever
+      // the previous scan had confirmed, or nothing at all, which
+      // _onSaveContact() would then have saved.
+      canonical = sanitizePaymentCode(address: code);
+    } catch (_) {
+      setState(() {
+        _confirmedPaymentCode = null;
+        _confirmedDanaAddress = null;
+        _errorMessage = 'Not a valid silent payment address';
+      });
       return;
     }
 
     setState(() {
-      _confirmedPaymentCode = sanitizePaymentCode(address: code);
+      _confirmedPaymentCode = canonical;
       _confirmedDanaAddress = null;
       _errorMessage = null;
     });
