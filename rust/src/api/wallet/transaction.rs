@@ -163,17 +163,10 @@ impl SpWallet {
                         }
                     }
                     Ok(pushtx::Info::Done(Err(err))) => return Err(anyhow::Error::msg(err.to_string())),
-                    Ok(msg) =>  {
-                        let message= match msg {
-                            pushtx::Info::ResolvingPeers |
-                            pushtx::Info::ResolvedPeers(_) => "Looking for peers...",
-                            pushtx::Info::ConnectingToNetwork { .. } => "Connecting to bitcoin p2p network...",
-                            pushtx::Info::Broadcast { .. } => "Broadcasting to peer...",
-
-                            pushtx::Info::Done(_) => unreachable!(),
-                        };
-                        send_tx_broadcast_update(message.into())?;
-                    } // Continue for other Info variants
+                    Ok(pushtx::Info::ResolvingPeers) |
+                    Ok(pushtx::Info::ResolvedPeers(_)) => send_tx_broadcast_update("Looking for peers...".into())?,
+                    Ok(pushtx::Info::ConnectingToNetwork { .. }) => send_tx_broadcast_update("Connecting to bitcoin p2p network...".into())?,
+                    Ok(pushtx::Info::Broadcast { .. }) => send_tx_broadcast_update("Broadcasting to peer...".into())?,
                     Err(recv_err) => {
                         log::error!("Channel recv error: {:?}", recv_err);
                         return Err(anyhow::Error::msg(format!(
