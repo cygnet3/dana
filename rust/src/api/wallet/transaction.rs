@@ -159,7 +159,7 @@ impl SpWallet {
                             send_tx_broadcast_update("Broadcast successful".into())?;
                             break;
                         } else {
-                            return Err(anyhow::Error::msg("Failed to broadcast transaction, probably unable to connect to Tor peers"));
+                            return Err(anyhow::Error::msg("Failed to broadcast transaction, probably unable to connect to peers"));
                         }
                     }
                     Ok(pushtx::Info::Done(Err(err))) => return Err(anyhow::Error::msg(err.to_string())),
