@@ -153,7 +153,7 @@ impl SpWallet {
             loop {
                 match receiver.recv() {
                     Ok(pushtx::Info::Done(Ok(report))) => {
-                        if report.success.len() > 0 {
+                        if !report.success.is_empty() {
                             log::info!("broadcasted {} transactions", report.success.len());
                             break;
                         } else {
