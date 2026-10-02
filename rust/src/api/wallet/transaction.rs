@@ -2,6 +2,7 @@ use crate::api::structs::network::Network;
 use crate::api::structs::owned_output::OwnedOutput;
 use crate::api::structs::recipient::Recipient;
 use crate::api::structs::unsigned_transaction::SilentPaymentUnsignedTransaction;
+use crate::stream::send_tx_broadcast_update;
 
 use anyhow::Result;
 use bip39::rand::{thread_rng, RngCore};
@@ -149,19 +150,30 @@ impl SpWallet {
 
         tokio::task::spawn_blocking(move || {
             let receiver = pushtx::broadcast(vec![tx], opts);
-
+            send_tx_broadcast_update("Started broadcast".into())?;
             loop {
                 match receiver.recv() {
                     Ok(pushtx::Info::Done(Ok(report))) => {
                         if !report.success.is_empty() {
                             log::info!("broadcasted {} transactions", report.success.len());
+                            send_tx_broadcast_update("Broadcast successful".into())?;
                             break;
                         } else {
                             return Err(anyhow::Error::msg("Failed to broadcast transaction, probably unable to connect to Tor peers"));
                         }
                     }
                     Ok(pushtx::Info::Done(Err(err))) => return Err(anyhow::Error::msg(err.to_string())),
-                    Ok(_) => {} // Continue for other Info variants
+                    Ok(msg) =>  {
+                        let message= match msg {
+                            pushtx::Info::ResolvingPeers |
+                            pushtx::Info::ResolvedPeers(_) => "Looking for peers...",
+                            pushtx::Info::ConnectingToNetwork { .. } => "Connecting to bitcoin p2p network...",
+                            pushtx::Info::Broadcast { .. } => "Broadcasting to peer...",
+
+                            pushtx::Info::Done(_) => unreachable!(),
+                        };
+                        send_tx_broadcast_update(message.into())?;
+                    } // Continue for other Info variants
                     Err(recv_err) => {
                         log::error!("Channel recv error: {:?}", recv_err);
                         return Err(anyhow::Error::msg(format!(

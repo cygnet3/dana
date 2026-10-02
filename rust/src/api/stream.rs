@@ -17,3 +17,8 @@ pub fn create_sync_progress_stream(s: StreamSink<u32>) {
 pub fn create_sync_result_stream(s: StreamSink<StateUpdate>) {
     stream::create_sync_update_stream(s);
 }
+
+#[flutter_rust_bridge::frb(sync)]
+pub fn create_broadcast_stream(s: StreamSink<String>) {
+    stream::create_tx_broadcast_stream(s);
+}
