@@ -1,13 +1,13 @@
 import 'package:danawallet/services/sync_task_handler.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:logger/logger.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class ForegroundSyncService {
   static const String _notificationChannelId = 'dana_sync';
   static const String _notificationChannelName = 'Dana background sync';
   static const String _notificationChannelDescription =
       'Keeps your wallet up to date in the background';
-  static const String _foregroundNotificationTitle = 'Dana wallet';
   static const String _foregroundNotificationText =
       'Keeping your wallet up to date';
 
@@ -34,9 +34,11 @@ class ForegroundSyncService {
       return;
     }
 
+    final appInfo = await PackageInfo.fromPlatform();
+
     final result = await FlutterForegroundTask.startService(
       serviceId: 1000,
-      notificationTitle: _foregroundNotificationTitle,
+      notificationTitle: appInfo.appName,
       notificationText: _foregroundNotificationText,
       callback: startCallback,
     );
