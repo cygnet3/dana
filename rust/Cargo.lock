@@ -119,7 +119,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 [[package]]
 name = "backend-blindbit-v1"
 version = "0.0.0"
-source = "git+https://github.com/cygnet3/spdk?rev=318d70730b96e5a084b588ab9ec11af4583cb6ad#318d70730b96e5a084b588ab9ec11af4583cb6ad"
+source = "git+https://github.com/cygnet3/spdk?rev=143bbaaf0a0e192cf143bdb85d890dfa24c052ea#143bbaaf0a0e192cf143bdb85d890dfa24c052ea"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1353,7 +1353,7 @@ checksum = "47d9d19d1d6efa0109d2f65ff4c85cddd50bd572e5a00127ab10987290bcefae"
 [[package]]
 name = "local-scanner"
 version = "0.0.0"
-source = "git+https://github.com/cygnet3/spdk?rev=318d70730b96e5a084b588ab9ec11af4583cb6ad#318d70730b96e5a084b588ab9ec11af4583cb6ad"
+source = "git+https://github.com/cygnet3/spdk?rev=143bbaaf0a0e192cf143bdb85d890dfa24c052ea#143bbaaf0a0e192cf143bdb85d890dfa24c052ea"
 dependencies = [
  "anyhow",
  "bitcoin 0.32.102",
@@ -2165,7 +2165,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 [[package]]
 name = "silentpayments"
 version = "0.8.0"
-source = "git+https://github.com/cygnet3/spdk?rev=318d70730b96e5a084b588ab9ec11af4583cb6ad#318d70730b96e5a084b588ab9ec11af4583cb6ad"
+source = "git+https://github.com/cygnet3/spdk?rev=143bbaaf0a0e192cf143bdb85d890dfa24c052ea#143bbaaf0a0e192cf143bdb85d890dfa24c052ea"
 dependencies = [
  "bech32 0.9.1",
  "bitcoin_hashes 0.13.1",
@@ -2225,7 +2225,7 @@ dependencies = [
 [[package]]
 name = "spdk-core"
 version = "0.0.0"
-source = "git+https://github.com/cygnet3/spdk?rev=318d70730b96e5a084b588ab9ec11af4583cb6ad#318d70730b96e5a084b588ab9ec11af4583cb6ad"
+source = "git+https://github.com/cygnet3/spdk?rev=143bbaaf0a0e192cf143bdb85d890dfa24c052ea#143bbaaf0a0e192cf143bdb85d890dfa24c052ea"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2238,7 +2238,7 @@ dependencies = [
 [[package]]
 name = "spdk-wallet"
 version = "0.0.0"
-source = "git+https://github.com/cygnet3/spdk?rev=318d70730b96e5a084b588ab9ec11af4583cb6ad#318d70730b96e5a084b588ab9ec11af4583cb6ad"
+source = "git+https://github.com/cygnet3/spdk?rev=143bbaaf0a0e192cf143bdb85d890dfa24c052ea#143bbaaf0a0e192cf143bdb85d890dfa24c052ea"
 dependencies = [
  "anyhow",
  "backend-blindbit-v1",

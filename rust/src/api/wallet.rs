@@ -2,6 +2,7 @@ mod info;
 pub mod setup;
 mod sync;
 mod transaction;
+pub mod coin_selection;
 
 use crate::{api::structs::network::Network, wallet::WalletFingerprint};
 use anyhow::Result;
