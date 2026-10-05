@@ -3,6 +3,7 @@ import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/recovery/view_mnemonic_screen.dart';
 import 'package:danawallet/screens/settings/wallet/confirm_reset_wallet.dart';
 import 'package:danawallet/screens/settings/wallet/confirm_wallet_deletion.dart';
+import 'package:danawallet/screens/settings/wallet/view_descriptors_screen.dart';
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/wallet_state.dart';
@@ -19,6 +20,12 @@ class WalletSettingsScreen extends StatelessWidget {
         title: 'Show seed phrase',
         subtitle: 'View your recovery phrase',
         onTap: () => _onShowMnemonic(context),
+      ),
+      _WalletSettingsItem(
+        icon: Icons.description_outlined,
+        title: 'Show descriptors',
+        subtitle: 'View wallet descriptors',
+        onTap: () => _onShowDescriptors(context),
       ),
       _WalletSettingsItem(
         icon: Icons.restore,
@@ -43,6 +50,27 @@ class WalletSettingsScreen extends StatelessWidget {
 
   void _onWipeWalletButtonPressed(BuildContext context) {
     goToScreen(context, const ConfirmWalletDeletionScreen());
+  }
+
+  void _onShowDescriptors(BuildContext context) async {
+    final walletState = Provider.of<WalletState>(context, listen: false);
+    try {
+      final wallet = await walletState.getWalletFromSecureStorage();
+
+      if (context.mounted) {
+        goToScreen(
+          context,
+          ViewDescriptorsScreen(
+            encodedWatchOnly: wallet.getEncodedDescriptorWatchOnly(),
+            encodedFull: wallet.getEncodedDescriptor(),
+            twoKeyWatchOnly: wallet.getTwoKeyDescriptorWatchOnly(),
+            twoKeyFull: wallet.getTwoKeyDescriptor(),
+          ),
+        );
+      }
+    } catch (e) {
+      displayError("Failed to load descriptors", e);
+    }
   }
 
   void _onShowMnemonic(BuildContext context) async {
