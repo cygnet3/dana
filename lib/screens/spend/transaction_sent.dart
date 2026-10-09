@@ -4,7 +4,6 @@ import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
-import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/screens/contacts/add_contact_sheet.dart';
 import 'package:danawallet/widgets/sheets/show_app_bottom_sheet.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
@@ -45,12 +44,11 @@ class _TransactionSentScreenState extends State<TransactionSentScreen> {
   }
 
   void _checkEligibleToSaveContact() {
-    final paymentCode = widget.recipient.paymentCode;
+    final silentPaymentCode = widget.recipient.paymentCode.silentPaymentCode();
     final contacts = Provider.of<ContactsState>(context, listen: false);
 
     // only reusable payment codes (sp-addresses) are eligible
-    final isReusable = isReusablePaymentCode(address: paymentCode);
-    if (isReusable) {
+    if (silentPaymentCode != null) {
       // We check by (reusable) payment codes instead of dana address.
       // This is important in the following case:
       // A user has 2 domains pointing to the same underlying payment code
@@ -58,9 +56,8 @@ class _TransactionSentScreenState extends State<TransactionSentScreen> {
       // If we already have aaa@domain in our contact list,
       // and we send to bbb@domain, we should still recognize that
       // we already have this recipient in our contact list.
-      final knownPaymentCodes = contacts.getKnownPaymentCodes();
-
-      final isInContacts = knownPaymentCodes.contains(paymentCode);
+      final isInContacts =
+          contacts.getContactByPaymentCode(silentPaymentCode) != null;
       if (!isInContacts) {
         setState(() {
           _isEligible = true;
@@ -78,7 +75,7 @@ class _TransactionSentScreenState extends State<TransactionSentScreen> {
       context: context,
       builder: (_) => AddContactSheet(
         initialDanaAddress: widget.providedBip353,
-        initialPaymentCode: widget.recipient.paymentCode,
+        initialPaymentCode: widget.recipient.paymentCode.silentPaymentCode(),
       ),
     );
     if (result == true) {

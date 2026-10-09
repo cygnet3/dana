@@ -7,6 +7,7 @@ import 'package:danawallet/data/enums/fiat_currency.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/extensions/payment_code.dart';
+import 'package:danawallet/extensions/silent_payment_code.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:danawallet/global_functions.dart';
@@ -24,7 +25,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class AmountSelectionScreen extends StatefulWidget {
-  final String paymentCode;
+  final PaymentCode paymentCode;
   final Bip353Address? providedBip353;
   final Amount? initialAmount;
   const AmountSelectionScreen(
@@ -210,7 +211,11 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
       blocksToScan = chainState.tip - walletState.lastSync!;
     }
 
-    final contact = contacts.getContactByPaymentCode(widget.paymentCode);
+    final displayedCode = widget.paymentCode.encode();
+    final silentPaymentCode = widget.paymentCode.silentPaymentCode();
+    final contact = silentPaymentCode == null
+        ? null
+        : contacts.getContactByPaymentCode(silentPaymentCode);
 
     TextStyle recipientTextStyle = BitcoinTextStyle.body4(Bitcoin.neutral7);
 
@@ -221,8 +226,7 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
     recipientName ??= widget.providedBip353?.toString();
 
     // if no human-readable name available, format payment code nicely
-    recipientName ??=
-        widget.paymentCode.chunked(context, recipientTextStyle, 0.70);
+    recipientName ??= displayedCode.chunked(context, recipientTextStyle, 0.70);
 
     return ScreenSkeleton(
       showBackButton: true,

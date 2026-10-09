@@ -5,8 +5,10 @@ import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/prefix_search_response.dart';
 import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/extensions/bip321_uri.dart';
+import 'package:danawallet/extensions/silent_payment_code.dart';
 import 'package:danawallet/generated/rust/api/bip39.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
+import 'package:danawallet/generated/rust/api/structs/silent_payment_code.dart';
 import 'package:danawallet/repositories/name_server_repository.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:logger/logger.dart';
@@ -41,7 +43,7 @@ class DanaAddressService {
   /// [entropy] - The entropy bytes (typically from a SHA-256 hash)
   /// [offset] - Byte offset into the entropy (0, 6, 12, 18, etc.) to use different parts
   String _generateRandomDanaAddress(
-      {required String paymentCode, required int offset}) {
+      {required SilentPaymentCode paymentCode, required int offset}) {
     final entropy = _generateEntropyFromPaymentCode(paymentCode);
 
     final wordlist = getEnglishWordlist();
@@ -66,8 +68,8 @@ class DanaAddressService {
   }
 
   /// Generates entropy (SHA-256 hash) from an address
-  List<int> _generateEntropyFromPaymentCode(String paymentCode) {
-    final bytes = utf8.encode(paymentCode);
+  List<int> _generateEntropyFromPaymentCode(SilentPaymentCode paymentCode) {
+    final bytes = utf8.encode(paymentCode.encode());
     final hash = sha256.convert(bytes);
     return hash.bytes;
   }
@@ -75,7 +77,7 @@ class DanaAddressService {
   /// Generate an available dana address by trying different username candidates
   /// Returns the first available username found within maxRetries attempts, or null if all are taken
   Future<String?> generateAvailableDanaAddress({
-    required String paymentCode,
+    required SilentPaymentCode paymentCode,
     required int maxRetries,
   }) async {
     for (int attempt = 0; attempt < maxRetries; attempt++) {
@@ -101,7 +103,7 @@ class DanaAddressService {
   /// Returns the registered [Bip353Address].
   Future<Bip353Address> registerUser({
     required String username,
-    required String paymentCode,
+    required SilentPaymentCode paymentCode,
   }) async {
     final requestId = _generateUniqueId();
     final domain = await danaAddressDomain;
@@ -115,7 +117,9 @@ class DanaAddressService {
       if (resolvedPaymentCode == null) {
         throw Bip353InvalidRecordException(
             "$danaAddress exists but doesn't contain payment code");
-      } else if (resolvedPaymentCode == paymentCode) {
+      }
+      final parsed = tryParseSilentPaymentCode(resolvedPaymentCode);
+      if (parsed != null && parsed.matches(other: paymentCode)) {
         return danaAddress;
       } else {
         throw Bip353AddressAlreadyUsed(
@@ -140,14 +144,10 @@ class DanaAddressService {
   /// Returns a list of dana addresses in the format `user_name@danawallet.app`
   /// Returns an empty list if no addresses are found
   /// Throws an exception for network errors, invalid responses, or malformed data
-  Future<Bip353Address?> lookupDanaAddress(String paymentCode) async {
-    if (paymentCode.isEmpty) {
-      throw ArgumentError("Silent payment address cannot be empty");
-    }
-
+  Future<Bip353Address?> lookupDanaAddress(SilentPaymentCode code) async {
     final requestId = _generateUniqueId();
     final addresses =
-        await nameServerRepository.lookupDanaAddresses(paymentCode, requestId);
+        await nameServerRepository.lookupDanaAddresses(code, requestId);
 
     Logger().i('Found ${addresses.length} dana address(es) for SP address');
 
@@ -157,11 +157,13 @@ class DanaAddressService {
         final resolved = bip321Uri.reusablePaymentCodeForNetwork(network);
         if (resolved == null) {
           throw Bip353PaymentCodeMismatchException(
-              address: candidate, expected: paymentCode, resolved: null);
-        } else if (resolved != paymentCode) {
+              address: candidate, expected: code.encode(), resolved: null);
+        }
+        final parsed = tryParseSilentPaymentCode(resolved);
+        if (parsed == null || !parsed.matches(other: code)) {
           // If this happen something's wrong with the nameserver
           throw Bip353PaymentCodeMismatchException(
-              address: candidate, expected: paymentCode, resolved: resolved);
+              address: candidate, expected: code.encode(), resolved: resolved);
         }
         // No exception means the candidate resolves to our payment code.
         return candidate;
