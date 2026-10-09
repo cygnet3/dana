@@ -12,7 +12,8 @@ use spdk_wallet::{
 use crate::api::structs::amount::Amount;
 use crate::api::structs::discovered_output::DiscoveredOutput;
 use crate::api::structs::input_selection::CoinSelectionStrategy;
-use crate::api::structs::recipient::Recipient;
+use crate::api::structs::recipient::{PaymentCode, PaymentCodeKind, Recipient};
+use crate::api::structs::silent_payment_code::SilentPaymentCode;
 
 pub struct SilentPaymentUnsignedTransaction {
     pub selected_utxos: Vec<(super::outpoint::OutPoint, DiscoveredOutput)>,
@@ -66,11 +67,7 @@ impl From<SilentPaymentUnsignedTransaction>
                 .into_iter()
                 .map(|(outpoint, output)| (outpoint.into(), output.into()))
                 .collect(),
-            recipients: value
-                .recipients
-                .into_iter()
-                .map(|r| r.try_into().unwrap())
-                .collect(),
+            recipients: value.recipients.into_iter().map(|r| r.into()).collect(),
             partial_secret: PartialSecret::from_slice(&value.partial_secret).unwrap(),
             unsigned_tx: value
                 .unsigned_tx
@@ -117,5 +114,19 @@ impl SilentPaymentUnsignedTransaction {
             .filter(|(i, _)| self.change_index != Some(*i as u32))
             .map(|(_, r)| r.clone())
             .collect()
+    }
+}
+
+fn is_change(address: &PaymentCode, change_code: &SilentPaymentCode) -> bool {
+    address.silent_payment_code().as_ref() == Some(change_code)
+}
+
+/// Silent payment outputs other than change, plus bech32/bech32m and Base58Check.
+/// OP_RETURN is left out.
+fn is_payment_recipient(address: &PaymentCode, change_code: &SilentPaymentCode) -> bool {
+    match address.kind() {
+        Ok(PaymentCodeKind::SilentPayment) => !is_change(address, change_code),
+        Ok(PaymentCodeKind::Bech32 | PaymentCodeKind::Base58) => true,
+        Err(_) => false,
     }
 }

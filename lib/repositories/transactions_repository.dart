@@ -107,7 +107,8 @@ class TransactionsRepository {
 
     for (final row in res) {
       result.add(Recipient(
-          paymentCode: row['payment_code'] as String,
+          paymentCode:
+              PaymentCode.parse(address: row['payment_code'] as String),
           amount: Amount(field0: BigInt.from(row['amount_sat'] as int))));
     }
 
@@ -276,7 +277,11 @@ class TransactionsRepository {
         await txn.rawInsert('''
           INSERT INTO tx_recipients (transaction_id, payment_code, amount_sat)
           VALUES (?, ?, ?)
-        ''', [transactionId, recipient.paymentCode, recipient.amount.toSat()]);
+        ''', [
+          transactionId,
+          recipient.paymentCode.encode(),
+          recipient.amount.toSat()
+        ]);
       }
     });
   }
