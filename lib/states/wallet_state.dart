@@ -5,11 +5,13 @@ import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/extensions/bip321_uri.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
+import 'package:danawallet/extensions/silent_payment_code.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/input_selection.dart';
 import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/owned_output.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
+import 'package:danawallet/generated/rust/api/structs/silent_payment_code.dart';
 import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart';
 import 'package:danawallet/data/models/recorded_transaction.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
@@ -34,8 +36,8 @@ class WalletState extends ChangeNotifier {
 
   // variables that never change (unless wallet is reset)
   late Network network;
-  late String receivePaymentCode;
-  late String changePaymentCode;
+  late SilentPaymentCode receivePaymentCode;
+  late SilentPaymentCode changePaymentCode;
   DateTime? birthday; // birthday may not be known
 
   // variables that change
@@ -231,7 +233,7 @@ class WalletState extends ChangeNotifier {
     // in that case, we can get the unconfirmed change from the owned outputs repository,
     // but for now we have to look at the transaction recipients
     unconfirmedChange = await transactionsRepository.getUnconfirmedChange(
-        receivePaymentCode, changePaymentCode);
+        receivePaymentCode.encode(), changePaymentCode.encode());
 
     // Cache outputs for spending and scanning
     unspentOutputs = await ownedOutputsRepository.getUnspentOutputs();
@@ -242,7 +244,7 @@ class WalletState extends ChangeNotifier {
 
     // Cache transactions for UI
     transactions = await transactionsRepository.getAllTransactions(
-        receivePaymentCode, changePaymentCode);
+        receivePaymentCode.encode(), changePaymentCode.encode());
   }
 
   Future<void> saveNote(int transactionId, String note) async {
@@ -406,12 +408,14 @@ class WalletState extends ChangeNotifier {
       try {
         final bip321Uri = await Bip353Resolver.resolveParsed(danaAddress!);
         final resolved = bip321Uri.reusablePaymentCodeForNetwork(network);
-        if (resolved == receivePaymentCode) {
+        final parsed =
+            resolved != null ? tryParseSilentPaymentCode(resolved) : null;
+        if (parsed != null && receivePaymentCode.matches(other: parsed)) {
           Logger().i("Stored dana address is valid");
           return false;
         }
-        Logger()
-            .w("Stored dana address points to another payment code, removing");
+        Logger().w(
+            "Stored dana address doesn't point to a valid payment code, removing");
         danaAddress = null;
       } on Bip353AddressNotRegisteredException {
         Logger().w("Stored dana address is no longer registered, removing");
