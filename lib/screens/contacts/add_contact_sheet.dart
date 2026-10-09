@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/extensions/bip321_uri.dart';
+import 'package:danawallet/extensions/silent_payment_code.dart';
 import 'package:danawallet/extensions/string_display.dart';
-import 'package:danawallet/generated/rust/api/validate.dart';
+import 'package:danawallet/generated/rust/api/structs/silent_payment_code.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/exceptions.dart';
@@ -22,7 +23,7 @@ import 'package:provider/provider.dart';
 
 class AddContactSheet extends StatefulWidget {
   final Bip353Address? initialDanaAddress;
-  final String? initialPaymentCode;
+  final SilentPaymentCode? initialPaymentCode;
 
   /// Pre-fills the Dana search field with an arbitrary string (e.g. a partial
   /// username typed in ChooseRecipientScreen). Ignored when [initialDanaAddress]
@@ -51,7 +52,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
 
   // Confirmed address — set once user picks a Dana suggestion,
   // types a full dana address (auto-resolved), or pastes an SP address.
-  String? _confirmedPaymentCode;
+  SilentPaymentCode? _confirmedPaymentCode;
   Bip353Address? _confirmedDanaAddress;
 
   // Whether the SP fallback section is expanded.
@@ -193,7 +194,10 @@ class _AddContactSheetState extends State<AddContactSheet> {
 
       final reusablePaymentCode =
           resolved.reusablePaymentCodeForNetwork(network);
-      if (reusablePaymentCode == null) {
+      final parsedPaymentCode = reusablePaymentCode == null
+          ? null
+          : tryParseSilentPaymentCode(reusablePaymentCode);
+      if (parsedPaymentCode == null) {
         setState(() {
           _errorMessage = 'No reusable payment code found';
           _isResolving = false;
@@ -201,7 +205,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
       } else {
         setState(() {
           _confirmedDanaAddress = parsedBip353Address;
-          _confirmedPaymentCode = reusablePaymentCode;
+          _confirmedPaymentCode = parsedPaymentCode;
           _remoteDanaAddresses = [];
           _nameController.text = parsedBip353Address.username;
           _isResolving = false;
@@ -367,21 +371,22 @@ class _AddContactSheetState extends State<AddContactSheet> {
   /// Validates a pasted/scanned SP address and, if valid, confirms it. Shows an
   /// inline error otherwise so the confirmation card never reflects bad input.
   void _confirmPaymentCode(String code) {
-    if (code.isEmpty) return;
+    final parsed = tryParseSilentPaymentCode(code);
+    if (parsed == null) {
+      if (code.trim().isNotEmpty) {
+        setState(() => _errorMessage = 'Not a valid silent payment address');
+      } // if empty we just ignore
+      return;
+    }
 
     final network = Provider.of<ChainState>(context, listen: false).network;
-    try {
-      validateAddressWithNetwork(address: code, network: network);
-      if (!isReusablePaymentCode(address: code)) {
-        throw Exception('Non-reusable payment info not allowed');
-      }
-    } catch (e) {
+    if (!parsed.isValidForNetwork(network: network)) {
       setState(() => _errorMessage = 'Not a valid silent payment address');
       return;
     }
 
     setState(() {
-      _confirmedPaymentCode = code;
+      _confirmedPaymentCode = parsed;
       _confirmedDanaAddress = null;
       _errorMessage = null;
     });
@@ -473,7 +478,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
     final isDana = _confirmedDanaAddress != null;
     final displayLabel = isDana
         ? _confirmedDanaAddress!.toString()
-        : _confirmedPaymentCode!.truncated(maxFullLength: 24);
+        : _confirmedPaymentCode!.encode().truncated(maxFullLength: 24);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

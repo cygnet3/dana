@@ -77,7 +77,7 @@ final class RecordedTransactionOutgoing extends RecordedTransaction {
     buffer.writeln('txid: $txid');
     buffer.writeln('recipients:');
     for (final r in recipients) {
-      buffer.writeln('  ${r.paymentCode}: ${r.amount.field0} sat');
+      buffer.writeln('  ${r.paymentCode.encode()}: ${r.amount.field0} sat');
     }
     buffer.writeln('fee: ${fee.field0} sat');
     buffer.writeln('change: ${change.field0} sat');

@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
-extension PaymentCode on String {
+extension PaymentCodeText on String {
   /// Truncates the address to fit within [widthFraction] of the screen width,
   /// chunked into groups of 4 characters with the middle elided.
   String chunked(BuildContext context, TextStyle style, double widthFraction) {

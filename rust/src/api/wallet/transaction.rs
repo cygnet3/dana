@@ -23,7 +23,7 @@ impl SpWallet {
         network: Network,
     ) -> Result<SilentPaymentUnsignedTransaction> {
         let available_utxos = OwnedOutput::try_into_utxos(owned_outputs)?;
-        let recipients = Recipient::try_into_recipients(api_recipients)?;
+        let recipients = api_recipients.into_iter().map(Into::into).collect();
         let network = network.into();
 
         let res = match selection.as_inner() {

@@ -1,5 +1,6 @@
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact_field.dart';
+import 'package:danawallet/generated/rust/api/structs/silent_payment_code.dart';
 import 'package:flutter/material.dart';
 
 class Contact {
@@ -7,7 +8,7 @@ class Contact {
   final String? name; // user defined user name
   final Bip353Address?
       bip353Address; // Eventually register more than one, for now keep it simple
-  final String paymentCode; // silent payment address of the contact
+  final SilentPaymentCode paymentCode;
   final List<ContactField>? customFields; // Optional custom fields
 
   Contact({
@@ -23,7 +24,7 @@ class Contact {
       'id': id,
       'name': name,
       'bip353Address': bip353Address?.toString(),
-      'paymentCode': paymentCode,
+      'paymentCode': paymentCode.encode(),
     };
   }
 
@@ -35,7 +36,8 @@ class Contact {
       bip353Address: bip353Address != null
           ? Bip353Address.fromString(bip353Address)
           : null,
-      paymentCode: map['paymentCode'],
+      paymentCode:
+          SilentPaymentCode.parse(code: (map['paymentCode'] as String).trim()),
       customFields: null, // Custom fields loaded separately
     );
   }
@@ -50,7 +52,7 @@ class Contact {
 
   Color get avatarColor {
     // Generate a consistent color based on the static payment code
-    final hash = paymentCode.hashCode;
+    final hash = paymentCode.encode().hashCode;
     final colors = [
       Colors.blue,
       Colors.green,

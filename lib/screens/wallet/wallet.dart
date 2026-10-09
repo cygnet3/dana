@@ -3,8 +3,8 @@ import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/enums/amount_display_unit.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/api_amount.dart';
-import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/extensions/payment_code.dart';
+import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/data/models/recorded_transaction.dart';
 import 'package:danawallet/global_functions.dart';
@@ -232,7 +232,7 @@ class WalletScreenState extends State<WalletScreen> {
     String amountprefix;
     String amountFiat;
     Widget? leadingWidget;
-    String title;
+    String? title;
     String date;
 
     final contactsState = Provider.of<ContactsState>(context);
@@ -254,27 +254,30 @@ class WalletScreenState extends State<WalletScreen> {
             image: const AssetImage("icons/receive.png", package: "bitcoin_ui"),
             color: Bitcoin.neutral3Dark);
       case RecordedTransactionOutgoing outgoing:
-        final paymentCode = outgoing.recipients.isNotEmpty
+        final recipient = outgoing.recipients.isNotEmpty
             ? outgoing.recipients[0].paymentCode
             : null;
-        if (paymentCode != null) {
-          final contact = contactsState.getContactByPaymentCode(paymentCode);
-          if (contact != null) {
-            leadingWidget = CircleAvatar(
-                radius: 20,
-                backgroundColor: contact.avatarColor,
-                child: Text(
-                  contact.displayNameInitial ?? '?',
-                  style: BitcoinTextStyle.body4(Bitcoin.white)
-                      .apply(fontWeightDelta: 2),
-                ));
-            // contact always has a display name available
-            title = contact.displayName!;
-          } else {
-            // no known contact info, use the payment code
-            title = paymentCode.chunked(
-                context, BitcoinTextStyle.body4(Bitcoin.black), 0.53);
+        if (recipient != null) {
+          final silentPaymentCode = recipient.silentPaymentCode();
+          if (silentPaymentCode != null) {
+            final contact =
+                contactsState.getContactByPaymentCode(silentPaymentCode);
+            if (contact != null) {
+              leadingWidget = CircleAvatar(
+                  radius: 20,
+                  backgroundColor: contact.avatarColor,
+                  child: Text(
+                    contact.displayNameInitial ?? '?',
+                    style: BitcoinTextStyle.body4(Bitcoin.white)
+                        .apply(fontWeightDelta: 2),
+                  ));
+              title = contact.displayName;
+            }
           }
+          // if not a known contact, use a chunked payment code format
+          title ??= recipient
+              .encode()
+              .chunked(context, BitcoinTextStyle.body4(Bitcoin.black), 0.53);
         } else {
           // outgoing transactions with no recipients are send-to-self transactions
           title = "Send-to-Self";
@@ -643,7 +646,7 @@ class WalletScreenState extends State<WalletScreen> {
       appBar: buildAppBar(walletState.network.toColor),
       body: showFundingScreen
           ? buildFundingScreen(
-              walletState.receivePaymentCode,
+              walletState.receivePaymentCode.encode(),
               danaAddress?.toString(),
               syncProgress,
               chainState,
@@ -674,7 +677,7 @@ class WalletScreenState extends State<WalletScreen> {
                 const Spacer(),
                 buildTransactionHistory(walletState.transactions, exchangeRate,
                     displayPreference.amountDisplayUnit, displayPreference),
-                buildBottomButtons(walletState.receivePaymentCode),
+                buildBottomButtons(walletState.receivePaymentCode.encode()),
                 const SizedBox(
                   height: 20.0,
                 ),

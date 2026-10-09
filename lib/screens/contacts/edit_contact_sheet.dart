@@ -3,6 +3,7 @@ import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/extensions/bip321_uri.dart';
+import 'package:danawallet/extensions/silent_payment_code.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/states/chain_state.dart';
@@ -106,8 +107,12 @@ class _EditContactSheetState extends State<EditContactSheet> {
           final resolved = await Bip353Resolver.resolveParsed(newBip353Parsed);
           final reusablePaymentCode =
               resolved.reusablePaymentCodeForNetwork(network);
+          final parsed = reusablePaymentCode != null
+              ? tryParseSilentPaymentCode(reusablePaymentCode)
+              : null;
           // updated bip353 address *must* point to same underlying payment code
-          if (reusablePaymentCode != widget.contact.paymentCode) {
+          if (parsed == null ||
+              !widget.contact.paymentCode.matches(other: parsed)) {
             setState(() {
               _isUpdating = false;
               _errorMessage =

@@ -7,7 +7,7 @@ import 'package:danawallet/data/models/recorded_transaction.dart';
 import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/extensions/bip321_uri.dart';
-import 'package:danawallet/generated/rust/api/validate.dart';
+import 'package:danawallet/extensions/silent_payment_code.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/data/models/contact_field.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
@@ -191,13 +191,12 @@ class ContactDetailsScreen extends StatelessWidget {
   Future<void> _onSendBitcoin(BuildContext context, Contact contact) async {
     // If a dana address is present, we must verify it
     Bip353Address? bip353 = contact.bip353Address;
-    String paymentCode = contact.paymentCode;
+    final silentPaymentCode = contact.paymentCode;
     final network = Provider.of<ChainState>(context, listen: false).network;
 
-    try {
-      validateAddressWithNetwork(address: paymentCode, network: network);
-    } catch (e) {
-      displayError("Network validation error", e);
+    if (!silentPaymentCode.isValidForNetwork(network: network)) {
+      displayWarning("Provided payment code is for the wrong network, "
+          "expected $network");
       return;
     }
 
@@ -210,10 +209,14 @@ class ContactDetailsScreen extends StatelessWidget {
             bip321Uri.reusablePaymentCodeForNetwork(network);
         if (resolvedPaymentCode == null) {
           throw Bip353AddressNotRegisteredException(bip353);
-        } else if (resolvedPaymentCode != paymentCode) {
+        }
+        final fetchedPaymentCode =
+            tryParseSilentPaymentCode(resolvedPaymentCode);
+        if (fetchedPaymentCode == null ||
+            !fetchedPaymentCode.matches(other: silentPaymentCode)) {
           throw Bip353PaymentCodeMismatchException(
               address: bip353,
-              expected: paymentCode,
+              expected: silentPaymentCode.encode(),
               resolved: resolvedPaymentCode);
         }
       } on Bip353PaymentCodeMismatchException {
@@ -235,7 +238,9 @@ class ContactDetailsScreen extends StatelessWidget {
 
     if (context.mounted) {
       goToScreen(
-          context, AmountSelectionScreen(paymentCode: contact.paymentCode));
+          context,
+          AmountSelectionScreen(
+              paymentCode: silentPaymentCode.toPaymentCode()));
     }
   }
 
@@ -305,7 +310,11 @@ class ContactDetailsScreen extends StatelessWidget {
 
     return allTransactions.where((tx) {
       if (tx is RecordedTransactionOutgoing) {
-        return tx.recipients.any((r) => r.paymentCode == contactPaymentCode);
+        return tx.recipients.any((r) =>
+            r.paymentCode
+                .silentPaymentCode()
+                ?.matches(other: contactPaymentCode) ??
+            false);
       }
       return false;
     }).toList();
@@ -519,13 +528,14 @@ class ContactDetailsScreen extends StatelessWidget {
                           .apply(fontWeightDelta: 1),
                     ),
                     subtitle: Text(
-                      _formatAddress(contact.paymentCode),
+                      _formatAddress(contact.paymentCode.encode()),
                       style: BitcoinTextStyle.body5(Bitcoin.neutral7),
                     ),
                     trailing:
                         Icon(Icons.chevron_right, color: Bitcoin.neutral7),
                     onTap: () {
-                      _showStaticAddressSheet(context, contact.paymentCode);
+                      _showStaticAddressSheet(
+                          context, contact.paymentCode.encode());
                     },
                   ),
                   if (!isYouContact) ...[
