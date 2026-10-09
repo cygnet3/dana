@@ -1,4 +1,5 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
+import 'package:danawallet/extensions/payment_code.dart';
 import 'package:danawallet/extensions/string_display.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/data/models/contact.dart';
@@ -7,9 +8,10 @@ import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/data/models/recorded_transaction.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
+import 'package:danawallet/generated/rust/api/structs/recipient.dart';
+import 'package:danawallet/generated/rust/api/structs/silent_payment_code.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
-import 'package:danawallet/generated/rust/api/validate.dart';
 import 'package:danawallet/screens/contacts/add_contact_sheet.dart';
 import 'package:danawallet/screens/contacts/contact_details.dart';
 import 'package:danawallet/screens/home/wallet/transaction_note_screen.dart';
@@ -44,7 +46,8 @@ class TransactionDetailsScreen extends StatelessWidget {
         ));
   }
 
-  void _openAddContactSheet(BuildContext context, String paymentCode) {
+  void _openAddContactSheet(
+      BuildContext context, SilentPaymentCode paymentCode) {
     showAppBottomSheet(
       context: context,
       builder: (_) => AddContactSheet(
@@ -205,9 +208,10 @@ class TransactionDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildOnchainAddressRow(BuildContext context, String address) {
+  Widget _buildOnchainAddressRow(BuildContext context, PaymentCode address) {
+    final encoded = address.encode();
     final truncatedAddress =
-        address.truncated(prefix: 8, suffix: 8, maxFullLength: 16);
+        encoded.truncated(prefix: 8, suffix: 8, maxFullLength: 16);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -218,7 +222,7 @@ class TransactionDetailsScreen extends StatelessWidget {
               style: BitcoinTextStyle.body4(Bitcoin.neutral8)),
           GestureDetector(
             onTap: () {
-              Clipboard.setData(ClipboardData(text: address));
+              Clipboard.setData(ClipboardData(text: encoded));
               HapticFeedback.lightImpact();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -389,6 +393,11 @@ class TransactionDetailsScreen extends StatelessWidget {
         displayPreference.amountDisplayUnit,
         exchangeRate,
         displayPreference.fiatCurrency);
+    final recipient = txData.recipientAddress;
+    final silentPaymentCode = recipient?.silentPaymentCode();
+    final recipientContact = silentPaymentCode == null
+        ? null
+        : contactsState.getContactByPaymentCode(silentPaymentCode);
 
     return ScreenSkeleton(
       showBackButton: true,
@@ -429,15 +438,11 @@ class TransactionDetailsScreen extends StatelessWidget {
               style: BitcoinTextStyle.body3(Bitcoin.neutral6),
             ),
             if (!txData.isIncoming &&
-                txData.recipientAddress != null &&
-                isReusablePaymentCode(address: txData.recipientAddress!) &&
-                contactsState
-                        .getContactByPaymentCode(txData.recipientAddress!) ==
-                    null) ...[
+                silentPaymentCode != null &&
+                recipientContact == null) ...[
               const SizedBox(height: 8),
               GestureDetector(
-                onTap: () =>
-                    _openAddContactSheet(context, txData.recipientAddress!),
+                onTap: () => _openAddContactSheet(context, silentPaymentCode),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -456,30 +461,12 @@ class TransactionDetailsScreen extends StatelessWidget {
             const Divider(height: 1),
             _buildNoteRow(context, transaction),
             const Divider(height: 1),
-            if (!txData.isIncoming && txData.recipientAddress != null) ...[
-              Builder(builder: (context) {
-                final isSpCode =
-                    isReusablePaymentCode(address: txData.recipientAddress!);
-
-                if (isSpCode) {
-                  final contact = contactsState
-                      .getContactByPaymentCode(txData.recipientAddress!);
-                  if (contact != null) {
-                    return Column(
-                      children: [
-                        _buildContactTile(context, contact),
-                        const Divider(height: 1),
-                      ],
-                    );
-                  }
-                }
-                return Column(
-                  children: [
-                    _buildOnchainAddressRow(context, txData.recipientAddress!),
-                    const Divider(height: 1),
-                  ],
-                );
-              }),
+            if (!txData.isIncoming && recipient != null) ...[
+              if (recipientContact != null)
+                _buildContactTile(context, recipientContact)
+              else
+                _buildOnchainAddressRow(context, recipient),
+              const Divider(height: 1),
             ],
             _buildInfoRow('Date/time', txData.date),
             const Divider(height: 1),
@@ -503,7 +490,7 @@ class _TransactionData {
   final bool isIncoming;
   final int? confirmationHeight;
   final String date;
-  final String? recipientAddress;
+  final PaymentCode? recipientAddress;
   final Amount? fee;
   final Amount? change;
 
