@@ -7,6 +7,7 @@ import 'package:danawallet/data/models/name_server_register_request.dart';
 import 'package:danawallet/data/models/name_server_register_response.dart';
 import 'package:danawallet/data/models/prefix_search_response.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
+import 'package:danawallet/generated/rust/api/structs/silent_payment_code.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
@@ -49,19 +50,20 @@ class NameServerRepository {
   /// Creates a dana address by calling the external name_server
   ///
   /// [danaAddress] - The address to register.
+  /// [paymentCode] - The silent payment code to register.
   /// [requestId] - The unique id for this request, can be useful for tracking requests.
   ///
   /// Returns [NameServerRegisterResponse] with the created address or error details
   Future<Bip353Address> registerDanaAddress({
     required Bip353Address danaAddress,
-    required String paymentCode,
+    required SilentPaymentCode paymentCode,
     required String requestId,
   }) async {
     final request = NameServerRegisterRequest(
       id: requestId,
       userName: danaAddress.username,
       domain: danaAddress.domain,
-      spAddress: paymentCode,
+      spAddress: paymentCode.encode(),
     );
 
     Logger().d(
@@ -111,15 +113,13 @@ class NameServerRepository {
   /// Returns an empty list if no addresses are found
   /// Throws an exception for network errors, invalid responses, or malformed data
   Future<List<Bip353Address>> lookupDanaAddresses(
-      String spAddress, String requestId) async {
-    if (spAddress.isEmpty) {
-      throw ArgumentError("Silent payment address cannot be empty");
-    }
+      SilentPaymentCode code, String requestId) async {
+    final stringified = code.encode();
     Logger().d(
-        'Looking up dana addresses for SP address: ${spAddress.substring(0, 20)}... (request ID: $requestId)');
+        'Looking up dana addresses for SP address: ${stringified.substring(0, 20)}... (request ID: $requestId)');
     final response = await http.Client().get(
       Uri.parse('$baseUrl/lookup').replace(queryParameters: {
-        'sp_address': spAddress,
+        'sp_address': stringified,
         'id': requestId,
       }),
     );

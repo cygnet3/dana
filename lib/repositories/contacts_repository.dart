@@ -1,5 +1,6 @@
 import 'package:danawallet/data/models/contact_field.dart';
 import 'package:danawallet/data/models/contact.dart';
+import 'package:danawallet/generated/rust/api/structs/silent_payment_code.dart';
 import 'package:danawallet/repositories/database_helper.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -82,13 +83,13 @@ class ContactsRepository {
     return contact;
   }
 
-  Future<Contact?> getContactByPaymentCode(String paymentCode,
+  Future<Contact?> getContactByPaymentCode(SilentPaymentCode paymentCode,
       {bool loadCustomFields = false}) async {
     final db = await _dbHelper.database;
     final maps = await db.query(
       'contacts',
       where: 'paymentCode = ?',
-      whereArgs: [paymentCode],
+      whereArgs: [paymentCode.encode()],
     );
 
     if (maps.isEmpty) return null;

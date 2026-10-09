@@ -3,6 +3,7 @@ import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/enums/amount_display_unit.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/api_amount.dart';
+import 'package:danawallet/extensions/payment_code.dart';
 import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/data/models/recorded_transaction.dart';
@@ -256,14 +257,19 @@ class WalletScreenState extends State<WalletScreen> {
             image: const AssetImage("icons/receive.png", package: "bitcoin_ui"),
             color: Bitcoin.neutral3Dark);
       case RecordedTransactionOutgoing outgoing:
-        final paymentCode = outgoing.recipients.isNotEmpty
+        final recipient = outgoing.recipients.isNotEmpty
             ? outgoing.recipients[0].paymentCode
             : null;
-        recipientWidget = paymentCode != null
-            ? contactsState.getDisplayNameWidget(context, paymentCode)
-            // if an outgoing transaction has no recipients, this is very likely a self-spend
-            : Text('Send-to-Self',
-                style: BitcoinTextStyle.body4(Bitcoin.black));
+        final silentPaymentCode = recipient?.silentPaymentCode();
+        final addressStyle = BitcoinTextStyle.body4(Bitcoin.black);
+        recipientWidget = silentPaymentCode != null
+            ? contactsState.getDisplayNameWidget(context, silentPaymentCode)
+            : Text(
+                recipient == null
+                    ? 'Outgoing'
+                    : recipient.encode().chunked(context, addressStyle, 0.53),
+                style: addressStyle,
+              );
         date = outgoing.confirmationHeight?.toString() ?? 'Unconfirmed';
         if (outgoing.confirmationHeight == null) {
           color = Bitcoin.neutral4;
@@ -279,9 +285,9 @@ class WalletScreenState extends State<WalletScreen> {
             : exchangeRate.displayFiat(
                 outgoing.totalOutgoing(), displayPreference.fiatCurrency);
         // Show contact avatar if contact is known, otherwise show send icon
-        final contact = paymentCode != null
-            ? contactsState.getContactByPaymentCode(paymentCode)
-            : null;
+        final contact = silentPaymentCode == null
+            ? null
+            : contactsState.getContactByPaymentCode(silentPaymentCode);
         if (contact != null) {
           leadingWidget = CircleAvatar(
             radius: 20,
@@ -644,7 +650,7 @@ class WalletScreenState extends State<WalletScreen> {
       appBar: buildAppBar(walletState.network.toColor),
       body: showFundingScreen
           ? buildFundingScreen(
-              walletState.receivePaymentCode,
+              walletState.receivePaymentCode.encode(),
               danaAddress?.toString(),
               syncProgress,
               chainState,
@@ -675,7 +681,7 @@ class WalletScreenState extends State<WalletScreen> {
                 const Spacer(),
                 buildTransactionHistory(walletState.transactions, exchangeRate,
                     displayPreference.amountDisplayUnit, displayPreference),
-                buildBottomButtons(walletState.receivePaymentCode),
+                buildBottomButtons(walletState.receivePaymentCode.encode()),
                 const SizedBox(
                   height: 20.0,
                 ),

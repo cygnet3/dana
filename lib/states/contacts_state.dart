@@ -5,6 +5,7 @@ import 'package:danawallet/data/models/contact_field.dart';
 import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/extensions/bip321_uri.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
+import 'package:danawallet/generated/rust/api/structs/silent_payment_code.dart';
 import 'package:danawallet/extensions/payment_code.dart';
 import 'package:danawallet/repositories/contacts_repository.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
@@ -20,7 +21,7 @@ class ContactsState extends ChangeNotifier {
   ContactsState();
 
   Future<void> initialize(
-      String paymentCode, Bip353Address? danaAddress) async {
+      SilentPaymentCode paymentCode, Bip353Address? danaAddress) async {
     // Initialize the 'you' contact
     _youContact = Contact(
       id: -1,
@@ -64,12 +65,12 @@ class ContactsState extends ChangeNotifier {
   /// Throws [ArgumentError] if dana address format is invalid
   /// Throws [Exception] if dana address cannot be resolved or contact already exists
   Future<void> addContact({
-    required String paymentCode,
+    required SilentPaymentCode paymentCode,
     required Network network,
     Bip353Address? danaAddress,
     String? name,
   }) async {
-    if (paymentCode == _youContact!.paymentCode) {
+    if (paymentCode.matches(other: _youContact!.paymentCode)) {
       throw Exception("Adding yourself is not allowed");
     }
     // First check for duplicates
@@ -86,11 +87,13 @@ class ContactsState extends ChangeNotifier {
           bip321Uri.reusablePaymentCodeForNetwork(network);
       if (resolvedPaymentCode == null) {
         throw Exception("$danaAddress doesn't contain a reusable payment code");
-      } else if (resolvedPaymentCode != paymentCode) {
+      }
+      final parsed = SilentPaymentCode.parse(code: resolvedPaymentCode);
+      if (!parsed.matches(other: paymentCode)) {
         throw Bip353PaymentCodeMismatchException(
             address: danaAddress,
-            expected: paymentCode,
-            resolved: resolvedPaymentCode);
+            expected: paymentCode.encode(),
+            resolved: parsed.encode());
       }
     }
 
@@ -127,18 +130,6 @@ class ContactsState extends ChangeNotifier {
     return result;
   }
 
-  Set<String> getKnownPaymentCodes() {
-    Set<String> result = {};
-    // add your own payment code
-    result.add(_youContact!.paymentCode);
-
-    // add contacts payment codes
-    for (var contact in _contacts) {
-      result.add(contact.paymentCode);
-    }
-    return result;
-  }
-
   Contact getYouContact() {
     return _youContact!;
   }
@@ -165,9 +156,10 @@ class ContactsState extends ChangeNotifier {
   /// Creates the appropriate display widget for a given silent payment address, using data from the contact list
   /// Priority: contact name > contact dana address > SP address
   /// note: this may not be the best place to put this function, may be refactored out later
-  Widget getDisplayNameWidget(BuildContext context, String paymentCode) {
-    final Contact? contact = _contacts
-        .firstWhereOrNull((contact) => contact.paymentCode == paymentCode);
+  Widget getDisplayNameWidget(
+      BuildContext context, SilentPaymentCode paymentCode) {
+    final Contact? contact = _contacts.firstWhereOrNull(
+        (contact) => contact.paymentCode.matches(other: paymentCode));
 
     if (contact != null) {
       if (contact.name != null) {
@@ -179,14 +171,16 @@ class ContactsState extends ChangeNotifier {
         return contact.bip353Address!.asRichText(15.0);
       } else {
         return Text(
-            paymentCode.chunked(
-                context, BitcoinTextStyle.body4(Bitcoin.black), 0.53),
+            paymentCode
+                .encode()
+                .chunked(context, BitcoinTextStyle.body4(Bitcoin.black), 0.53),
             style: BitcoinTextStyle.body4(Bitcoin.black));
       }
     } else {
       return Text(
-        paymentCode.chunked(
-            context, BitcoinTextStyle.body4(Bitcoin.black), 0.53),
+        paymentCode
+            .encode()
+            .chunked(context, BitcoinTextStyle.body4(Bitcoin.black), 0.53),
         style: BitcoinTextStyle.body4(Bitcoin.black),
       );
     }
@@ -330,12 +324,12 @@ class ContactsState extends ChangeNotifier {
     }
   }
 
-  Contact? getContactByPaymentCode(String paymentCode) {
-    if (paymentCode == _youContact!.paymentCode) {
+  Contact? getContactByPaymentCode(SilentPaymentCode paymentCode) {
+    if (_youContact!.paymentCode.matches(other: paymentCode)) {
       return _youContact;
     } else {
-      return _contacts
-          .firstWhereOrNull((contact) => contact.paymentCode == paymentCode);
+      return _contacts.firstWhereOrNull(
+          (contact) => contact.paymentCode.matches(other: paymentCode));
     }
   }
 
