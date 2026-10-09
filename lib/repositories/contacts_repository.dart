@@ -1,7 +1,8 @@
+import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact_field.dart';
 import 'package:danawallet/data/models/contact.dart';
-import 'package:danawallet/generated/rust/api/structs/silent_payment_code.dart';
 import 'package:danawallet/repositories/database_helper.dart';
+import 'package:logger/logger.dart';
 import 'package:sqflite/sqflite.dart';
 
 class ContactsRepository {
@@ -63,7 +64,7 @@ class ContactsRepository {
     return contact;
   }
 
-  Future<Contact?> getContactByBip353Address(String bip353Address,
+  Future<Contact?> getContactByBip353Address(Bip353Address bip353Address,
       {bool loadCustomFields = false}) async {
     final db = await _dbHelper.database;
     final maps = await db.query(
@@ -83,32 +84,23 @@ class ContactsRepository {
     return contact;
   }
 
-  Future<Contact?> getContactByPaymentCode(SilentPaymentCode paymentCode,
-      {bool loadCustomFields = false}) async {
-    final db = await _dbHelper.database;
-    final maps = await db.query(
-      'contacts',
-      where: 'paymentCode = ?',
-      whereArgs: [paymentCode.encode()],
-    );
-
-    if (maps.isEmpty) return null;
-
-    final contact = Contact.fromMap(maps.first);
-
-    if (loadCustomFields) {
-      return await _loadCustomFields(contact);
-    }
-
-    return contact;
-  }
-
   Future<List<Contact>> getAllContacts({required bool loadCustomFields}) async {
     final db = await _dbHelper.database;
-    final maps = await db.query(
+    var maps = await db.query(
       'contacts',
       orderBy: 'name COLLATE NOCASE ASC',
     );
+
+    try {
+      if (await _collapseDuplicatePaymentCodes(db, maps)) {
+        maps = await db.query(
+          'contacts',
+          orderBy: 'name COLLATE NOCASE ASC',
+        );
+      }
+    } catch (e) {
+      Logger().e('Failed to collapse duplicate payment codes: $e');
+    }
 
     if (!loadCustomFields) {
       return maps.map((map) => Contact.fromMap(map)).toList();
@@ -122,6 +114,130 @@ class ContactsRepository {
     }
 
     return contacts;
+  }
+
+  /// Rewrites a lone non-canonical payment code in place. Rows that parse to
+  /// the same code are deleted and replaced by one contact. Returns true when
+  /// a row was written.
+  ///
+  /// Name and Dana address come from the lowest id that has one. A custom
+  /// field type is kept from the lowest id with a non-empty value for it.
+  Future<bool> _collapseDuplicatePaymentCodes(
+    Database db,
+    List<Map<String, Object?>> maps,
+  ) async {
+    final groups = <String, List<Map<String, Object?>>>{};
+    for (final map in maps) {
+      final canonical = Contact.fromMap(map).paymentCode.encode();
+      (groups[canonical] ??= []).add(map);
+    }
+
+    final dirty = groups.entries.where((entry) {
+      final rows = entry.value;
+      if (rows.length > 1) return true;
+      final raw = (rows.single['paymentCode'] as String).trim();
+      return raw != entry.key;
+    }).toList();
+    if (dirty.isEmpty) return false;
+
+    await db.transaction((txn) async {
+      for (final entry in dirty) {
+        await _collapsePaymentCodeGroup(txn, entry.key, entry.value);
+      }
+    });
+    return true;
+  }
+
+  Future<void> _collapsePaymentCodeGroup(
+    Transaction txn,
+    String canonical,
+    List<Map<String, Object?>> rows,
+  ) async {
+    if (rows.length == 1) {
+      await txn.update(
+        'contacts',
+        {'paymentCode': canonical},
+        where: 'id = ?',
+        whereArgs: [rows.single['id']],
+      );
+      return;
+    }
+
+    final ordered = [...rows]
+      ..sort((a, b) => (a['id'] as int).compareTo(b['id'] as int));
+    final fields = await _fieldsKeptFromLowestId(txn, ordered);
+
+    for (final row in ordered) {
+      await txn.delete(
+        'contacts',
+        where: 'id = ?',
+        whereArgs: [row['id']],
+      );
+    }
+
+    final newId = await txn.insert('contacts', {
+      'name': _firstFilled(ordered, 'name'),
+      'bip353Address': _firstFilled(ordered, 'bip353Address'),
+      'paymentCode': canonical,
+    });
+    for (final field in fields) {
+      await txn.insert('contact_fields', {
+        'contact_id': newId,
+        'field_type': field['field_type'],
+        'field_value': field['field_value'],
+      });
+    }
+
+    Logger().i(
+        'Collapsed contacts ${ordered.map((row) => row['id']).join(', ')} into id=$newId');
+  }
+
+  String? _firstFilled(List<Map<String, Object?>> orderedRows, String column) {
+    for (final row in orderedRows) {
+      final value = row[column] as String?;
+      if (value != null && value.trim().isNotEmpty) return value;
+    }
+    return orderedRows.first[column] as String?;
+  }
+
+  /// Field type is the key. Values come from the lowest id with a non-empty
+  /// value for that type. An empty value does not block a later row.
+  Future<List<Map<String, Object?>>> _fieldsKeptFromLowestId(
+    Transaction txn,
+    List<Map<String, Object?>> orderedRows,
+  ) async {
+    final kept = <Map<String, Object?>>[];
+    final empties = <String, List<Map<String, Object?>>>{};
+    final takenTypes = <String>{};
+    for (final row in orderedRows) {
+      final rowFields = await txn.query(
+        'contact_fields',
+        where: 'contact_id = ?',
+        whereArgs: [row['id']],
+        orderBy: 'id ASC',
+      );
+      final filledOnThisRow = <String>{};
+      for (final field in rowFields) {
+        final type = field['field_type'] as String;
+        if (takenTypes.contains(type)) continue;
+        final value = field['field_value'] as String?;
+        if (value == null || value.trim().isEmpty) {
+          if (filledOnThisRow.contains(type) || empties.containsKey(type)) {
+            continue;
+          }
+          empties[type] = [field];
+          continue;
+        }
+        empties.remove(type);
+        filledOnThisRow.add(type);
+        kept.add(field);
+      }
+      takenTypes.addAll(filledOnThisRow);
+    }
+    for (final fields in empties.values) {
+      kept.addAll(fields);
+    }
+    return kept;
   }
 
   Future<int> updateContact(Contact contact) async {
