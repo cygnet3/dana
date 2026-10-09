@@ -119,7 +119,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 [[package]]
 name = "backend-blindbit-v1"
 version = "0.0.0"
-source = "git+https://github.com/cygnet3/spdk?rev=318d70730b96e5a084b588ab9ec11af4583cb6ad#318d70730b96e5a084b588ab9ec11af4583cb6ad"
+source = "git+https://github.com/cygnet3/spdk?rev=24f0b67839a9647d0e80134c82fc7877ceac1815#24f0b67839a9647d0e80134c82fc7877ceac1815"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1353,7 +1353,7 @@ checksum = "47d9d19d1d6efa0109d2f65ff4c85cddd50bd572e5a00127ab10987290bcefae"
 [[package]]
 name = "local-scanner"
 version = "0.0.0"
-source = "git+https://github.com/cygnet3/spdk?rev=318d70730b96e5a084b588ab9ec11af4583cb6ad#318d70730b96e5a084b588ab9ec11af4583cb6ad"
+source = "git+https://github.com/cygnet3/spdk?rev=24f0b67839a9647d0e80134c82fc7877ceac1815#24f0b67839a9647d0e80134c82fc7877ceac1815"
 dependencies = [
  "anyhow",
  "bitcoin 0.32.102",
@@ -1401,6 +1401,17 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "miniscript"
+version = "13.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "867b1f11e0545ad5ebbddd8a9f18756d9657a6758bf10d96cf15ddd0b726b650"
+dependencies = [
+ "bech32 0.11.1",
+ "bitcoin 0.32.102",
+ "hex-conservative 1.3.0",
+]
 
 [[package]]
 name = "miniz_oxide"
@@ -1925,6 +1936,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "simplelog",
+ "sp-descriptor",
  "spdk-wallet",
  "tokio",
 ]
@@ -2165,7 +2177,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 [[package]]
 name = "silentpayments"
 version = "0.8.0"
-source = "git+https://github.com/cygnet3/spdk?rev=318d70730b96e5a084b588ab9ec11af4583cb6ad#318d70730b96e5a084b588ab9ec11af4583cb6ad"
+source = "git+https://github.com/cygnet3/spdk?rev=24f0b67839a9647d0e80134c82fc7877ceac1815#24f0b67839a9647d0e80134c82fc7877ceac1815"
 dependencies = [
  "bech32 0.9.1",
  "bitcoin_hashes 0.13.1",
@@ -2223,9 +2235,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sp-descriptor"
+version = "0.1.0"
+source = "git+https://github.com/cygnet3/spdk?rev=24f0b67839a9647d0e80134c82fc7877ceac1815#24f0b67839a9647d0e80134c82fc7877ceac1815"
+dependencies = [
+ "bitcoin 0.32.102",
+ "miniscript",
+ "secp256k1 0.29.1",
+ "silentpayments",
+ "spdk-core",
+]
+
+[[package]]
 name = "spdk-core"
 version = "0.0.0"
-source = "git+https://github.com/cygnet3/spdk?rev=318d70730b96e5a084b588ab9ec11af4583cb6ad#318d70730b96e5a084b588ab9ec11af4583cb6ad"
+source = "git+https://github.com/cygnet3/spdk?rev=24f0b67839a9647d0e80134c82fc7877ceac1815#24f0b67839a9647d0e80134c82fc7877ceac1815"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2238,7 +2262,7 @@ dependencies = [
 [[package]]
 name = "spdk-wallet"
 version = "0.0.0"
-source = "git+https://github.com/cygnet3/spdk?rev=318d70730b96e5a084b588ab9ec11af4583cb6ad#318d70730b96e5a084b588ab9ec11af4583cb6ad"
+source = "git+https://github.com/cygnet3/spdk?rev=24f0b67839a9647d0e80134c82fc7877ceac1815#24f0b67839a9647d0e80134c82fc7877ceac1815"
 dependencies = [
  "anyhow",
  "backend-blindbit-v1",
@@ -2250,6 +2274,7 @@ dependencies = [
  "log",
  "serde",
  "silentpayments",
+ "sp-descriptor",
  "spdk-core",
 ]
 
