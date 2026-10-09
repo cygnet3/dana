@@ -74,7 +74,7 @@ class ContactsState extends ChangeNotifier {
       throw Exception("Adding yourself is not allowed");
     }
     // First check for duplicates
-    final existing = await _repository.getContactByPaymentCode(paymentCode);
+    final existing = getContactByPaymentCode(paymentCode);
     if (existing != null) {
       throw Exception('Contact with sp address $paymentCode already exists');
     }
@@ -158,8 +158,7 @@ class ContactsState extends ChangeNotifier {
   /// note: this may not be the best place to put this function, may be refactored out later
   Widget getDisplayNameWidget(
       BuildContext context, SilentPaymentCode paymentCode) {
-    final Contact? contact = _contacts.firstWhereOrNull(
-        (contact) => contact.paymentCode.matches(other: paymentCode));
+    final contact = getContactByPaymentCode(paymentCode);
 
     if (contact != null) {
       if (contact.name != null) {
