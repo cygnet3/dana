@@ -72,7 +72,7 @@ class ContactsState extends ChangeNotifier {
       throw Exception("Adding yourself is not allowed");
     }
     // First check for duplicates
-    final existing = await _repository.getContactByPaymentCode(paymentCode);
+    final existing = getContactByPaymentCode(paymentCode);
     if (existing != null) {
       throw Exception('Contact with sp address $paymentCode already exists');
     }
