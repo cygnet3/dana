@@ -168,6 +168,25 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
     return '≈ ${fiatExchangeRate.displayFiat(amount, fiatCurrency)}';
   }
 
+  void _fillMaxAmount() {
+    final availableBalance =
+        Provider.of<WalletState>(context, listen: false).amount;
+    if (availableBalance.field0 <= BigInt.zero) {
+      return;
+    }
+
+    // A fiat conversion does not round-trip to the exact sat balance.
+    // createUnsignedTxToThisRecipient only drains when the amount is within
+    // 546 sats of the balance, so Max has to enter that exact sat amount.
+    _isFiatSelected = false;
+    final sats = availableBalance.field0.toString();
+    if (amountController.text == sats) {
+      _onAmountChanged();
+    } else {
+      amountController.text = sats;
+    }
+  }
+
   void onContinue() {
     final amount = _parsedAmount;
     if (amount == null || _amountErrorText != null) {
@@ -294,10 +313,36 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
                 const SizedBox(
                   height: 10.0,
                 ),
-                Text(
-                    'Available Balance: ${_isFiatSelected && hasFiatRate ? fiatExchangeRate.displayFiat(availableBalance, fiatCurrency) : availableBalance.display(bitcoinUnit)}',
-                    style: BitcoinTextStyle.body3(Bitcoin.black)
-                        .apply(fontWeightDelta: 1)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                          'Available Balance: ${_isFiatSelected && hasFiatRate ? fiatExchangeRate.displayFiat(availableBalance, fiatCurrency) : availableBalance.display(bitcoinUnit)}',
+                          style: BitcoinTextStyle.body3(Bitcoin.black)
+                              .apply(fontWeightDelta: 1)),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        foregroundColor: Bitcoin.orange,
+                        disabledForegroundColor: Bitcoin.neutral7,
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: availableBalance.field0 > BigInt.zero
+                          ? _fillMaxAmount
+                          : null,
+                      child: Text(
+                        'Max',
+                        style: BitcoinTextStyle.body3(
+                          availableBalance.field0 > BigInt.zero
+                              ? Bitcoin.orange
+                              : Bitcoin.neutral7,
+                        ).apply(fontWeightDelta: 2),
+                      ),
+                    ),
+                  ],
+                ),
                 if (blocksToScan != 0)
                   Padding(
                     padding: const EdgeInsets.only(top: 8.0),
