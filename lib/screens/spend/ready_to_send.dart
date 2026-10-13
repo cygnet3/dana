@@ -123,6 +123,8 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
 
     String displayEstimatedFee =
         widget.unsignedTx.getFeeAmount().display(bitcoinUnit);
+    String displayEstimatedFeeFiat = exchangeRate.displayFiat(
+        widget.unsignedTx.getFeeAmount(), displayPreference.fiatCurrency);
 
     return ScreenSkeleton(
         showBackButton: true,
@@ -140,7 +142,8 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
             const Divider(),
             entryRow('Arrival time', displayArrivalTime, false),
             const Divider(),
-            entryRow('Fee', displayEstimatedFee, false),
+            entryRow('Fee', displayEstimatedFee, false,
+                secondary: displayEstimatedFeeFiat),
           ],
         ),
         footer: Column(
