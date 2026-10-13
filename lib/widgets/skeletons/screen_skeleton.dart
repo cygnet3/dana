@@ -20,23 +20,27 @@ class ScreenSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          title: showBackButton ? const BackButtonWidget() : null,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: showBackButton ? const BackButtonWidget() : null,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(25.0),
+          child: Column(
+            children: [
+              if (title != null)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(title!,
+                      style: BitcoinTextStyle.title4(Bitcoin.black)),
+                ),
+              Flexible(child: body),
+              if (footer != null) footer!,
+            ],
+          ),
         ),
-        body: Padding(
-            padding: const EdgeInsets.all(25.0),
-            child: Column(
-              children: [
-                if (title != null)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(title!,
-                        style: BitcoinTextStyle.title4(Bitcoin.black)),
-                  ),
-                Flexible(child: body),
-                if (footer != null) footer!,
-              ],
-            )));
+      ),
+    );
   }
 }

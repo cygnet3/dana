@@ -10,8 +10,11 @@ Future<T?> showAppBottomSheet<T>({
     backgroundColor: Colors.transparent,
     builder: (context) {
       final viewInsets = MediaQuery.viewInsetsOf(context);
+      final viewPadding = MediaQuery.viewPaddingOf(context);
       return Padding(
-        padding: EdgeInsets.only(bottom: viewInsets.bottom),
+        padding: EdgeInsets.only(
+          bottom: viewInsets.bottom + viewPadding.bottom,
+        ),
         child: builder(context),
       );
     },
