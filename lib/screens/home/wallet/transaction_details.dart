@@ -14,9 +14,11 @@ import 'package:danawallet/screens/contacts/add_contact_sheet.dart';
 import 'package:danawallet/screens/contacts/contact_details.dart';
 import 'package:danawallet/screens/home/wallet/transaction_note_screen.dart';
 import 'package:danawallet/data/enums/amount_display_unit.dart';
+import 'package:danawallet/data/enums/fiat_currency.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/display_preferences_state.dart';
+import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/sheets/show_app_bottom_sheet.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
@@ -316,7 +318,10 @@ class TransactionDetailsScreen extends StatelessWidget {
   }
 
   _TransactionData _extractTransactionData(
-      RecordedTransaction tx, AmountDisplayUnit unit) {
+      RecordedTransaction tx,
+      AmountDisplayUnit unit,
+      FiatExchangeRateState exchangeRate,
+      FiatCurrency currency) {
     final dateDisplay = _getDateDisplay(tx);
 
     switch (tx) {
@@ -324,6 +329,7 @@ class TransactionDetailsScreen extends StatelessWidget {
         return _TransactionData(
           txid: incoming.txid,
           amount: incoming.amount.display(unit),
+          amountFiat: exchangeRate.displayFiat(incoming.amount, currency),
           amountPrefix: '+',
           amountColor: Bitcoin.green,
           isIncoming: true,
@@ -334,9 +340,11 @@ class TransactionDetailsScreen extends StatelessWidget {
           change: null,
         );
       case RecordedTransactionOutgoing outgoing:
+        final total = outgoing.totalOutgoing();
         return _TransactionData(
           txid: outgoing.txid,
-          amount: outgoing.totalOutgoing().display(unit),
+          amount: total.display(unit),
+          amountFiat: exchangeRate.displayFiat(total, currency),
           amountPrefix: '-',
           amountColor: outgoing.confirmationHeight == null
               ? Bitcoin.neutral4
@@ -354,6 +362,7 @@ class TransactionDetailsScreen extends StatelessWidget {
         return _TransactionData(
           txid: 'Unknown',
           amount: unknown.amount.display(unit),
+          amountFiat: exchangeRate.displayFiat(unknown.amount, currency),
           amountPrefix: '-',
           amountColor: Bitcoin.red,
           isIncoming: false,
@@ -384,6 +393,7 @@ class TransactionDetailsScreen extends StatelessWidget {
     final walletState = Provider.of<WalletState>(context);
     final chainState = Provider.of<ChainState>(context);
     final displayPreference = Provider.of<DisplayPreferencesState>(context);
+    final exchangeRate = Provider.of<FiatExchangeRateState>(context);
     final contactsState = Provider.of<ContactsState>(context);
     final network = walletState.network;
 
@@ -391,7 +401,10 @@ class TransactionDetailsScreen extends StatelessWidget {
       (t) => t.id == transactionId,
     );
     final txData = _extractTransactionData(
-        transaction, displayPreference.amountDisplayUnit);
+        transaction,
+        displayPreference.amountDisplayUnit,
+        exchangeRate,
+        displayPreference.fiatCurrency);
 
     return ScreenSkeleton(
       showBackButton: true,
@@ -425,6 +438,11 @@ class TransactionDetailsScreen extends StatelessWidget {
             Text(
               '${txData.amountPrefix}${txData.amount}',
               style: BitcoinTextStyle.title3(txData.amountColor),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              txData.amountFiat,
+              style: BitcoinTextStyle.body3(Bitcoin.neutral6),
             ),
             if (!txData.isIncoming &&
                 txData.recipientAddress != null &&
@@ -504,6 +522,7 @@ class TransactionDetailsScreen extends StatelessWidget {
 class _TransactionData {
   final String txid;
   final String amount;
+  final String amountFiat;
   final String amountPrefix;
   final Color amountColor;
   final bool isIncoming;
@@ -516,6 +535,7 @@ class _TransactionData {
   _TransactionData({
     required this.txid,
     required this.amount,
+    required this.amountFiat,
     required this.amountPrefix,
     required this.amountColor,
     required this.isIncoming,
