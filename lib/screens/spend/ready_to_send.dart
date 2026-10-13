@@ -11,6 +11,7 @@ import 'package:danawallet/generated/rust/api/structs/unsigned_transaction.dart'
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/states/display_preferences_state.dart';
+import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/screens/spend/transaction_sent.dart';
 import 'package:danawallet/states/wallet_state.dart';
@@ -95,6 +96,7 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
     final contacts = Provider.of<ContactsState>(context, listen: false);
     final displayPreference =
         Provider.of<DisplayPreferencesState>(context, listen: false);
+    final exchangeRate = Provider.of<FiatExchangeRateState>(context);
 
     final bitcoinUnit = displayPreference.amountDisplayUnit;
 
@@ -114,6 +116,8 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
         .chunked(context, displayRecipientStyle, 0.85);
 
     String displayAmount = widget.recipient.amount.display(bitcoinUnit);
+    String displayAmountFiat = exchangeRate.displayFiat(
+        widget.recipient.amount, displayPreference.fiatCurrency);
 
     String displayArrivalTime = widget.fee.toEstimatedTime;
 
@@ -131,7 +135,8 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
             ),
             entryRow('To', displayRecipient, true),
             const Divider(),
-            entryRow('Amount', displayAmount, false),
+            entryRow('Amount', displayAmount, false,
+                secondary: displayAmountFiat),
             const Divider(),
             entryRow('Arrival time', displayArrivalTime, false),
             const Divider(),
@@ -154,23 +159,35 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
   }
 }
 
-Widget entryRow(String left, String right, bool scrolling) {
+Widget entryRow(String left, String right, bool scrolling,
+    {String? secondary}) {
+  final valueStyle = BitcoinTextStyle.title5(Bitcoin.neutral8);
+  final Widget value;
+  if (scrolling) {
+    value = ScrollableText(text: right, style: valueStyle);
+  } else if (secondary == null) {
+    value = Text(right, textAlign: TextAlign.end, style: valueStyle);
+  } else {
+    value = Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(right, textAlign: TextAlign.end, style: valueStyle),
+        Text(secondary,
+            textAlign: TextAlign.end,
+            style: BitcoinTextStyle.body4(Bitcoin.neutral6)),
+      ],
+    );
+  }
+
   return Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
         left,
         style: BitcoinTextStyle.title5(Bitcoin.neutral7),
       ),
       const SizedBox(width: 30),
-      if (scrolling)
-        Expanded(
-            child: ScrollableText(
-                text: right, style: BitcoinTextStyle.title5(Bitcoin.neutral8))),
-      if (!scrolling)
-        Expanded(
-            child: Text(right,
-                textAlign: TextAlign.end,
-                style: BitcoinTextStyle.title5(Bitcoin.neutral8))),
+      Expanded(child: value),
     ],
   );
 }
