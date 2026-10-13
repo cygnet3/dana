@@ -441,7 +441,7 @@ class TransactionDetailsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              txData.amountFiat,
+              '${txData.amountPrefix}${txData.amountFiat}',
               style: BitcoinTextStyle.body3(Bitcoin.neutral6),
             ),
             if (!txData.isIncoming &&
