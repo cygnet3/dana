@@ -162,36 +162,6 @@ class ContactsState extends ChangeNotifier {
     }).toList();
   }
 
-  /// Creates the appropriate display widget for a given silent payment address, using data from the contact list
-  /// Priority: contact name > contact dana address > SP address
-  /// note: this may not be the best place to put this function, may be refactored out later
-  Widget getDisplayNameWidget(BuildContext context, String paymentCode) {
-    final Contact? contact = _contacts
-        .firstWhereOrNull((contact) => contact.paymentCode == paymentCode);
-
-    if (contact != null) {
-      if (contact.name != null) {
-        return Text(
-          contact.name!,
-          style: BitcoinTextStyle.body4(Bitcoin.black),
-        );
-      } else if (contact.bip353Address != null) {
-        return contact.bip353Address!.asRichText(15.0);
-      } else {
-        return Text(
-            paymentCode.chunked(
-                context, BitcoinTextStyle.body4(Bitcoin.black), 0.53),
-            style: BitcoinTextStyle.body4(Bitcoin.black));
-      }
-    } else {
-      return Text(
-        paymentCode.chunked(
-            context, BitcoinTextStyle.body4(Bitcoin.black), 0.53),
-        style: BitcoinTextStyle.body4(Bitcoin.black),
-      );
-    }
-  }
-
   /// Updates an existing contact
   ///
   /// Throws [ArgumentError] if contact id is null
