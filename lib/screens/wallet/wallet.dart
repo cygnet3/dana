@@ -4,6 +4,7 @@ import 'package:danawallet/data/enums/amount_display_unit.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/extensions/network.dart';
+import 'package:danawallet/extensions/payment_code.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/data/models/recorded_transaction.dart';
 import 'package:danawallet/global_functions.dart';
@@ -230,18 +231,15 @@ class WalletScreenState extends State<WalletScreen> {
     String amount;
     String amountprefix;
     String amountFiat;
-    Widget leadingWidget;
-    Widget recipientWidget;
+    Widget? leadingWidget;
+    String title;
     String date;
 
     final contactsState = Provider.of<ContactsState>(context);
 
     switch (tx) {
       case RecordedTransactionIncoming incoming:
-        recipientWidget = Text(
-          'Incoming',
-          style: BitcoinTextStyle.body4(Bitcoin.black),
-        );
+        title = 'Incoming';
         date = incoming.confirmationHeight?.toString() ?? 'Unconfirmed';
         color = Bitcoin.green;
         amount = hideAmount
@@ -259,11 +257,31 @@ class WalletScreenState extends State<WalletScreen> {
         final paymentCode = outgoing.recipients.isNotEmpty
             ? outgoing.recipients[0].paymentCode
             : null;
-        recipientWidget = paymentCode != null
-            ? contactsState.getDisplayNameWidget(context, paymentCode)
-            // if an outgoing transaction has no recipients, this is very likely a self-spend
-            : Text('Send-to-Self',
-                style: BitcoinTextStyle.body4(Bitcoin.black));
+        if (paymentCode != null) {
+          final contact = contactsState.getContactByPaymentCode(paymentCode);
+          if (contact != null) {
+            leadingWidget = CircleAvatar(
+                radius: 20,
+                backgroundColor: contact.avatarColor,
+                child: Text(
+                  contact.displayNameInitial ?? '?',
+                  style: BitcoinTextStyle.body4(Bitcoin.white)
+                      .apply(fontWeightDelta: 2),
+                ));
+            // contact always has a display name available
+            title = contact.displayName!;
+          } else {
+            // no known contact info, use the payment code
+            title = paymentCode.chunked(
+                context, BitcoinTextStyle.body4(Bitcoin.black), 0.53);
+          }
+        } else {
+          // outgoing transactions with no recipients are send-to-self transactions
+          title = "Send-to-Self";
+        }
+        leadingWidget ??= Image(
+            image: const AssetImage("icons/send.png", package: "bitcoin_ui"),
+            color: Bitcoin.neutral3Dark);
         date = outgoing.confirmationHeight?.toString() ?? 'Unconfirmed';
         if (outgoing.confirmationHeight == null) {
           color = Bitcoin.neutral4;
@@ -278,31 +296,8 @@ class WalletScreenState extends State<WalletScreen> {
             ? hideAmountFormat
             : exchangeRate.displayFiat(
                 outgoing.totalOutgoing(), displayPreference.fiatCurrency);
-        // Show contact avatar if contact is known, otherwise show send icon
-        final contact = paymentCode != null
-            ? contactsState.getContactByPaymentCode(paymentCode)
-            : null;
-        if (contact != null) {
-          leadingWidget = CircleAvatar(
-            radius: 20,
-            backgroundColor: contact.avatarColor,
-            child: Text(
-              contact.displayNameInitial ?? '?',
-              style: BitcoinTextStyle.body4(Bitcoin.white)
-                  .apply(fontWeightDelta: 2),
-            ),
-          );
-        } else {
-          leadingWidget = Image(
-              image: const AssetImage("icons/send.png", package: "bitcoin_ui"),
-              color: Bitcoin.neutral3Dark);
-        }
-
       case RecordedTransactionUnknownOutgoing unknown:
-        recipientWidget = Text(
-          'Unknown',
-          style: BitcoinTextStyle.body4(Bitcoin.black),
-        );
+        title = "Unknown";
         date = unknown.confirmationHeight.toString();
         color = Bitcoin.red;
         amount =
@@ -321,7 +316,11 @@ class WalletScreenState extends State<WalletScreen> {
       leading: leadingWidget,
       title: Row(
         children: [
-          Expanded(child: recipientWidget),
+          Expanded(
+              child: Text(
+            title,
+            style: BitcoinTextStyle.body4(Bitcoin.black),
+          )),
           Text('$amountprefix $amount', style: BitcoinTextStyle.body4(color)),
         ],
       ),
