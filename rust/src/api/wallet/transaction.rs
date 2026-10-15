@@ -1,4 +1,4 @@
-use crate::api::structs::input_selection::{InputSelection, SelectionInner};
+use crate::api::structs::input_selection::{CoinSelectProposal, SelectionInner};
 use crate::api::structs::network::Network;
 use crate::api::structs::owned_output::OwnedOutput;
 use crate::api::structs::recipient::Recipient;
@@ -19,7 +19,7 @@ impl SpWallet {
         &self,
         owned_outputs: Vec<OwnedOutput>,
         api_recipients: Vec<Recipient>,
-        selection: &InputSelection,
+        selection: &CoinSelectProposal,
         network: Network,
     ) -> Result<SilentPaymentUnsignedTransaction> {
         let available_utxos = OwnedOutput::try_into_utxos(owned_outputs)?;
@@ -27,7 +27,7 @@ impl SpWallet {
         let network = network.into();
 
         let res = match selection.as_inner() {
-            SelectionInner::Payment(selection) => self.client.create_transaction_from_selection(
+            SelectionInner::Payment(selection) => self.client.create_transaction_from_proposal(
                 &available_utxos,
                 recipients,
                 &selection,

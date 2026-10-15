@@ -11,7 +11,7 @@ import 'package:danawallet/generated/rust/api/structs/input_selection.dart';
 /// exact-rate selection — which spdk only produces when the requested rate
 /// can be honored — is preferred, then lowest fee, then greedy; a
 /// changeless selection comes last, as it may exceed the requested rate.
-InputSelection pickDefaultSelection(List<InputSelection> selections,
+CoinSelectProposal pickDefaultSelection(List<CoinSelectProposal> selections,
     {bool forceFeeRate = false}) {
   final preference = forceFeeRate
       ? const [
