@@ -205,22 +205,6 @@ class TransactionDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRecipientRow(
-      BuildContext context, String address, ContactsState contactsState) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text('Recipient', style: BitcoinTextStyle.body4(Bitcoin.neutral8)),
-          Flexible(
-            child: contactsState.getDisplayNameWidget(context, address),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildOnchainAddressRow(BuildContext context, String address) {
     final truncatedAddress =
         address.truncated(prefix: 8, suffix: 8, maxFullLength: 16);
@@ -474,10 +458,10 @@ class TransactionDetailsScreen extends StatelessWidget {
             const Divider(height: 1),
             if (!txData.isIncoming && txData.recipientAddress != null) ...[
               Builder(builder: (context) {
-                final isPaymentCode =
+                final isSpCode =
                     isReusablePaymentCode(address: txData.recipientAddress!);
 
-                if (isPaymentCode) {
+                if (isSpCode) {
                   final contact = contactsState
                       .getContactByPaymentCode(txData.recipientAddress!);
                   if (contact != null) {
@@ -488,22 +472,13 @@ class TransactionDetailsScreen extends StatelessWidget {
                       ],
                     );
                   }
-                  return Column(
-                    children: [
-                      _buildRecipientRow(
-                          context, txData.recipientAddress!, contactsState),
-                      const Divider(height: 1),
-                    ],
-                  );
-                } else {
-                  return Column(
-                    children: [
-                      _buildOnchainAddressRow(
-                          context, txData.recipientAddress!),
-                      const Divider(height: 1),
-                    ],
-                  );
                 }
+                return Column(
+                  children: [
+                    _buildOnchainAddressRow(context, txData.recipientAddress!),
+                    const Divider(height: 1),
+                  ],
+                );
               }),
             ],
             _buildInfoRow('Date/time', txData.date),
