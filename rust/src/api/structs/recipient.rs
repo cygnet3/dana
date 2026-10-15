@@ -127,8 +127,8 @@ impl PaymentCode {
     }
 
     #[frb(sync)]
-    pub fn matches(&self, other: Self) -> bool {
-        *self == other
+    pub fn matches(&self, other: &PaymentCode) -> bool {
+        self == other
     }
 }
 

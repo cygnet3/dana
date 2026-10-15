@@ -82,8 +82,8 @@ impl SilentPaymentCode {
     }
 
     #[frb(sync)]
-    pub fn matches(&self, other: Self) -> bool {
-        *self == other
+    pub fn matches(&self, other: &Self) -> bool {
+        self == other
     }
 }
 
