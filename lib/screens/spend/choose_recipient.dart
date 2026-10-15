@@ -5,7 +5,8 @@ import 'package:danawallet/extensions/bip321_uri.dart';
 import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/generated/rust/api/bip321.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
-import 'package:danawallet/generated/rust/api/validate.dart';
+import 'package:danawallet/generated/rust/api/structs/recipient.dart';
+import 'package:danawallet/generated/rust/api/structs/silent_payment_code.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/contacts/add_contact_sheet.dart';
 import 'package:danawallet/screens/spend/amount_selection.dart';
@@ -81,14 +82,14 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
         Provider.of<ContactsState>(context, listen: false).getYouContact();
 
     try {
-      final String resolvedPaymentCode;
+      final PaymentCode resolvedPaymentCode;
       final Bip353Address? resolvedBip353;
       Amount? parsedAmount;
 
       if (contact != null) {
         // Selected from contact list — use contact data directly, leave field unchanged.
         _externalPaymentInfo = null;
-        resolvedPaymentCode = contact.paymentCode;
+        resolvedPaymentCode = contact.paymentCode.toPaymentCode();
         resolvedBip353 = contact.bip353Address;
       } else {
         final external = _externalPaymentInfo?.trim();
@@ -98,8 +99,6 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
 
         if (textField.isEmpty) {
           throw Exception("Please enter a valid payment info");
-        } else if (textField == youContact.paymentCode) {
-          throw Exception("You cannot send to yourself");
         }
 
         if (textField.toLowerCase().startsWith('bitcoin:')) {
@@ -111,9 +110,11 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
               parsed.reusablePaymentCodeForNetwork(network);
           final legacyPaymentCode = parsed.legacyPaymentCodeForNetwork(network);
           if (reusablePaymentCode != null) {
-            resolvedPaymentCode = reusablePaymentCode;
+            resolvedPaymentCode =
+                SilentPaymentCode.parse(code: reusablePaymentCode)
+                    .toPaymentCode();
           } else if (legacyPaymentCode != null) {
-            resolvedPaymentCode = legacyPaymentCode;
+            resolvedPaymentCode = PaymentCode.parse(address: legacyPaymentCode);
           } else {
             // We don't have any valid payment code in URI
             throw Exception('No valid address found');
@@ -121,7 +122,10 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
           parsedAmount = parsed.amount;
           resolvedBip353 = null;
 
-          if (resolvedPaymentCode == youContact.paymentCode) {
+          if (resolvedPaymentCode
+                  .silentPaymentCode()
+                  ?.matches(other: youContact.paymentCode) ??
+              false) {
             throw Exception("You cannot send to yourself");
           }
         } else if (textField.contains('@')) {
@@ -135,34 +139,34 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
           if (reusablePaymentCode == null) {
             throw Exception("Payment URI does not contain an address");
           }
-          resolvedPaymentCode = reusablePaymentCode;
+          resolvedPaymentCode = PaymentCode.parse(address: reusablePaymentCode);
           parsedAmount = resolved.amount;
           resolvedBip353 = parsed;
 
-          if (resolvedPaymentCode == youContact.paymentCode) {
+          if (resolvedPaymentCode
+                  .silentPaymentCode()
+                  ?.matches(other: youContact.paymentCode) ??
+              false) {
             throw Exception("You cannot send to yourself");
           }
 
           Logger().d(
-              'Successfully resolved dana address to SP address: ${resolvedPaymentCode.substring(0, 20)}...');
+              'Successfully resolved dana address to SP address: ${resolvedPaymentCode.encode().substring(0, 20)}...');
         } else {
-          resolvedPaymentCode = textField;
+          final parsed = PaymentCode.parse(address: textField);
+          if (parsed
+                  .silentPaymentCode()
+                  ?.matches(other: youContact.paymentCode) ??
+              false) {
+            throw Exception("You cannot send to yourself");
+          }
+          resolvedPaymentCode = parsed;
           resolvedBip353 = null;
         }
       }
 
-      if (resolvedPaymentCode == youContact.paymentCode) {
-        throw Exception("You cannot send to yourself");
-      }
-      try {
-        validateAddressWithNetwork(
-            address: resolvedPaymentCode, network: network);
-      } catch (e) {
-        if (e.toString().contains('network')) {
-          throw InvalidNetworkException();
-        } else {
-          throw InvalidAddressException();
-        }
+      if (!resolvedPaymentCode.isValidForNetwork(network: network)) {
+        throw InvalidNetworkException();
       }
 
       if (mounted) {
