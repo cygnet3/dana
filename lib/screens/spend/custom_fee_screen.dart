@@ -32,7 +32,7 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
 
   int _selectedFeeRate = _minFeeRate; // Default to 1 sat/vB
   double _sliderValue = 0.0; // slider position in [0, 1]
-  InputSelection? _selection;
+  CoinSelectProposal? _selection;
   bool _isLoadingFees = true;
   String? _errorMessage;
 
