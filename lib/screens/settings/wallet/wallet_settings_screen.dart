@@ -3,6 +3,7 @@ import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/recovery/view_mnemonic_screen.dart';
 import 'package:danawallet/screens/settings/wallet/confirm_reset_wallet.dart';
 import 'package:danawallet/screens/settings/wallet/confirm_wallet_deletion.dart';
+import 'package:danawallet/screens/settings/wallet/view_descriptors_screen.dart';
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/wallet_state.dart';
@@ -12,13 +13,21 @@ import 'package:provider/provider.dart';
 class WalletSettingsScreen extends StatelessWidget {
   const WalletSettingsScreen({super.key});
 
-  List<_WalletSettingsItem> _buildItems(BuildContext context) {
+  List<_WalletSettingsItem> _buildItems(
+      BuildContext context, bool hasSeedPhrase) {
     return [
+      if (hasSeedPhrase)
+        _WalletSettingsItem(
+          icon: Icons.key_outlined,
+          title: 'Show seed phrase',
+          subtitle: 'View your recovery phrase',
+          onTap: () => _onShowMnemonic(context),
+        ),
       _WalletSettingsItem(
-        icon: Icons.key_outlined,
-        title: 'Show seed phrase',
-        subtitle: 'View your recovery phrase',
-        onTap: () => _onShowMnemonic(context),
+        icon: Icons.description_outlined,
+        title: 'Show descriptors',
+        subtitle: 'View wallet descriptors',
+        onTap: () => _onShowDescriptors(context),
       ),
       _WalletSettingsItem(
         icon: Icons.restore,
@@ -45,24 +54,44 @@ class WalletSettingsScreen extends StatelessWidget {
     goToScreen(context, const ConfirmWalletDeletionScreen());
   }
 
-  void _onShowMnemonic(BuildContext context) async {
+  void _onShowDescriptors(BuildContext context) async {
+    final walletState = Provider.of<WalletState>(context, listen: false);
+    try {
+      final wallet = await walletState.getWalletFromSecureStorage();
+
+      if (context.mounted) {
+        goToScreen(
+          context,
+          ViewDescriptorsScreen(
+            encodedWatchOnly: wallet.getEncodedDescriptorWatchOnly(),
+            encodedFull: wallet.getEncodedDescriptor(),
+            twoKeyWatchOnly: wallet.getTwoKeyDescriptorWatchOnly(),
+            twoKeyFull: wallet.getTwoKeyDescriptor(),
+            birthday: walletState.birthday,
+          ),
+        );
+      }
+    } catch (e) {
+      displayError("Failed to load descriptors", e);
+    }
+  }
+
+  Future<void> _onShowMnemonic(BuildContext context) async {
     final wallet = Provider.of<WalletState>(context, listen: false);
     final mnemonic = await wallet.getSeedPhraseFromSecureStorage();
+    if (!context.mounted || mnemonic == null) return;
 
-    if (context.mounted) {
-      if (mnemonic != null) {
-        goToScreen(context,
-            ViewMnemonicScreen(mnemonic: mnemonic, birthday: wallet.birthday));
-      } else {
-        showAlertDialog("Seed phrase unknown",
-            "Seed phrase unknown! Did you import from keys?");
-      }
-    }
+    goToScreen(
+      context,
+      ViewMnemonicScreen(mnemonic: mnemonic, birthday: wallet.birthday),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final items = _buildItems(context);
+    final hasSeedPhrase =
+        Provider.of<WalletState>(context, listen: false).hasSeedPhrase;
+    final items = _buildItems(context, hasSeedPhrase);
 
     return ScreenSkeleton(
       showBackButton: true,
