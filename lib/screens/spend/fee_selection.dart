@@ -33,7 +33,7 @@ class FeeSelectionScreen extends StatefulWidget {
 class FeeSelectionScreenState extends State<FeeSelectionScreen> {
   RecommendedFeeResponse? _currentFeeRates;
   SelectedFee _selected = SelectedFee.normal;
-  final Map<SelectedFee, InputSelection> _selections = {};
+  final Map<SelectedFee, CoinSelectProposal> _selections = {};
 
   @override
   void initState() {
