@@ -1,8 +1,16 @@
+use std::str::FromStr;
+
 use flutter_rust_bridge::frb;
+use spdk_wallet::bitcoin::{key::Secp256k1, Network as BitcoinNetwork, PrivateKey};
+use spdk_wallet::client::SpendKey;
+use spdk_wallet::silentpayments::Network as SpNetwork;
 
 use crate::api::structs::network::Network;
 
 use super::SpWallet;
+use bip392::{
+    DescriptorPublicKey, DescriptorSecretKey, DescriptorSpendKey, Sp, SpKey, SpScanKey, SpSpendKey,
+};
 
 impl SpWallet {
     #[frb(sync)]
@@ -18,5 +26,82 @@ impl SpWallet {
     #[frb(sync)]
     pub fn get_network(&self) -> Network {
         self.client.network().into()
+    }
+
+    #[frb(sync)]
+    pub fn get_encoded_descriptor_watch_only(&self) -> String {
+        let spend_pk = match self.get_spend_key().0 {
+            SpendKey::Secret(sk) => sk.public_key(&Secp256k1::signing_only()),
+            SpendKey::Public(pk) => pk,
+        };
+
+        let network: BitcoinNetwork = self.get_network().into();
+        let sp_network = SpNetwork::try_from(network.to_core_arg()).unwrap();
+        let sp_scan_key = SpScanKey {
+            scan_key: self.get_scan_key().0,
+            spend_key: spend_pk,
+            network: sp_network,
+        };
+        let encoded_key: SpKey = SpKey::Scan(sp_scan_key);
+        let encoded_descriptor = Sp::from_sp_key(encoded_key);
+
+        format!("{}", encoded_descriptor)
+    }
+
+    #[frb(sync)]
+    pub fn get_encoded_descriptor(&self) -> Option<String> {
+        let SpendKey::Secret(spend_key) = self.get_spend_key().0 else {
+            return None;
+        };
+
+        let network: BitcoinNetwork = self.get_network().into();
+        let sp_network = SpNetwork::try_from(network.to_core_arg()).unwrap();
+        let sp_spend_key = SpSpendKey {
+            scan_key: self.get_scan_key().0,
+            spend_key,
+            network: sp_network,
+        };
+        let encoded_key: SpKey = SpKey::Spend(sp_spend_key);
+        let encoded_descriptor = Sp::from_sp_key(encoded_key);
+
+        Some(format!("{}", encoded_descriptor))
+    }
+
+    #[frb(sync)]
+    pub fn get_two_key_descriptor_watch_only(&self) -> String {
+        let network: BitcoinNetwork = self.get_network().into();
+
+        let scan_wif = PrivateKey::new(self.get_scan_key().0, network).to_wif();
+        let scan_desc = DescriptorSecretKey::from_str(&scan_wif).unwrap();
+
+        let spend_pk = match self.get_spend_key().0 {
+            SpendKey::Secret(sk) => sk.public_key(&Secp256k1::signing_only()),
+            SpendKey::Public(pk) => pk,
+        };
+        let spend_desc = DescriptorSpendKey::Public(
+            DescriptorPublicKey::from_str(&spend_pk.to_string()).unwrap(),
+        );
+
+        let descriptor = Sp::from_keys(scan_desc, spend_desc).unwrap();
+        format!("{}", descriptor)
+    }
+
+    #[frb(sync)]
+    pub fn get_two_key_descriptor(&self) -> Option<String> {
+        let network: BitcoinNetwork = self.get_network().into();
+
+        let scan_wif = PrivateKey::new(self.get_scan_key().0, network).to_wif();
+        let scan_desc = DescriptorSecretKey::from_str(&scan_wif).unwrap();
+
+        let spend_desc = match self.get_spend_key().0 {
+            SpendKey::Secret(sk) => {
+                let spend_wif = PrivateKey::new(sk, network).to_wif();
+                DescriptorSpendKey::Private(DescriptorSecretKey::from_str(&spend_wif).unwrap())
+            }
+            SpendKey::Public(_) => return None,
+        };
+
+        let descriptor = Sp::from_keys(scan_desc, spend_desc).unwrap();
+        Some(format!("{}", descriptor))
     }
 }
