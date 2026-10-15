@@ -1,18 +1,10 @@
-import 'dart:io';
-
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/enums/warning_type.dart';
-import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
-import 'package:danawallet/screens/home/home.dart';
-import 'package:danawallet/screens/onboarding/notification_permission_screen.dart';
 import 'package:danawallet/screens/onboarding/recovery/birthday_picker_screen.dart';
-import 'package:danawallet/screens/onboarding/register_dana_address.dart';
-import 'package:danawallet/states/chain_state.dart';
-import 'package:danawallet/states/contacts_state.dart';
-import 'package:danawallet/services/sync_orchestrator.dart';
+import 'package:danawallet/screens/onboarding/recovery/restore_flow.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:danawallet/widgets/loading_widget.dart';
@@ -21,9 +13,6 @@ import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sizer/sizer.dart';
-
-const String bandwidthWarning =
-    "The recovery process may require a lot of network usage. Please make sure you are connected to wifi before you continue.";
 
 const int _mnemonicCount = 12;
 
@@ -51,10 +40,6 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
     try {
       final mnemonic = pills.mnemonic;
       final walletState = Provider.of<WalletState>(context, listen: false);
-      final chainState = Provider.of<ChainState>(context, listen: false);
-      final contactsState = Provider.of<ContactsState>(context, listen: false);
-      final orchestrator =
-          Provider.of<SyncOrchestrator>(context, listen: false);
 
       // Get birthday: navigate to picker if user knows it, else null
       DateTime? birthday;
@@ -82,52 +67,8 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
       });
 
       await walletState.restoreWallet(widget.network, mnemonic, birthday);
-
-      chainState.initialize(widget.network);
-
-      // Try to connect, but continue even if it fails (offline mode)
-      final connected =
-          await chainState.connect(widget.network.defaultBlindbitUrl);
-      if (!connected) {
-        // Connection failed, but continue anyway - sync will happen when network is available
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'Unable to connect to network. Wallet will sync when connection is restored.'),
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-      }
-
-      final goToDanaAddressSetup =
-          await walletState.checkDanaAddressRegistrationNeeded();
-
-      // initialize contacts state using restored wallet state
-      contactsState.initialize(
-          walletState.receivePaymentCode, walletState.danaAddress);
-
-      await orchestrator.start();
-
       if (!context.mounted) return;
-
-      final Widget nextScreen;
-      if (Platform.isAndroid) {
-        nextScreen = NotificationPermissionScreen(
-          goToDanaAddressSetup: goToDanaAddressSetup,
-        );
-      } else if (goToDanaAddressSetup) {
-        nextScreen = const RegisterDanaAddressScreen();
-      } else {
-        nextScreen = const HomeScreen();
-      }
-
-      // clear path (don't allow users to go back to registration screen by pressing 'back')
-      Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => nextScreen),
-          (Route<dynamic> route) => false);
+      await openWalletAfterRestore(context, widget.network);
     } catch (e) {
       if (context.mounted) {
         setState(() {
@@ -152,7 +93,7 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
 
     // add warning message about bandwidth after building
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      showWarningDialog(bandwidthWarning, WarningType.info);
+      showWarningDialog(restoreBandwidthWarning, WarningType.info);
     });
   }
 
