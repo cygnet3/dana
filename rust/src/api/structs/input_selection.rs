@@ -36,7 +36,7 @@ impl From<CoinSelectionStrategy> for spdk_wallet::client::Strategy {
 
 #[derive(Debug)]
 pub(crate) enum SelectionInner {
-    Payment(spdk_wallet::client::InputSelection),
+    Payment(spdk_wallet::client::CoinSelectProposal),
     Drain(spdk_wallet::client::DrainSelection),
 }
 
@@ -44,11 +44,11 @@ pub(crate) enum SelectionInner {
 /// inspect display fields via getters but cannot forge the underlying selection.
 #[derive(Debug)]
 #[frb(opaque)]
-pub struct InputSelection {
+pub struct CoinSelectProposal {
     inner: SelectionInner,
 }
 
-impl InputSelection {
+impl CoinSelectProposal {
     #[frb(sync, getter)]
     pub fn sent(&self) -> Amount {
         match &self.inner {
@@ -104,15 +104,15 @@ impl InputSelection {
     }
 }
 
-impl From<spdk_wallet::client::InputSelection> for InputSelection {
-    fn from(value: spdk_wallet::client::InputSelection) -> Self {
+impl From<spdk_wallet::client::CoinSelectProposal> for CoinSelectProposal {
+    fn from(value: spdk_wallet::client::CoinSelectProposal) -> Self {
         Self {
             inner: SelectionInner::Payment(value),
         }
     }
 }
 
-impl From<spdk_wallet::client::DrainSelection> for InputSelection {
+impl From<spdk_wallet::client::DrainSelection> for CoinSelectProposal {
     fn from(value: spdk_wallet::client::DrainSelection) -> Self {
         Self {
             inner: SelectionInner::Drain(value),

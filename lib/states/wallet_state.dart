@@ -37,6 +37,7 @@ class WalletState extends ChangeNotifier {
   late String receivePaymentCode;
   late String changePaymentCode;
   DateTime? birthday; // birthday may not be known
+  bool hasSeedPhrase = false;
 
   // variables that change
   late Amount amount;
@@ -75,6 +76,7 @@ class WalletState extends ChangeNotifier {
     // since the wallet data is present, the following items must also be present
     network = await walletRepository.readNetwork();
     birthday = await _getBirthday();
+    hasSeedPhrase = await walletRepository.hasSeedPhrase();
     danaAddress = await walletRepository.readDanaAddress();
 
     // we calculate these based on our wallet data (scan key, spend key, network)
@@ -98,6 +100,7 @@ class WalletState extends ChangeNotifier {
   Future<void> reset() async {
     _initialized = false;
     danaAddress = null;
+    hasSeedPhrase = false;
     await transactionsRepository.reset();
     // this is redudant, but we do it to be sure
     await ownedOutputsRepository.reset();
@@ -106,9 +109,27 @@ class WalletState extends ChangeNotifier {
 
   Future<void> restoreWallet(
       Network network, String mnemonic, DateTime? birthday) async {
+    await _restoreWallet(
+      WalletSetupArgs(
+          setupType: WalletSetupType.mnemonic(mnemonic), network: network),
+      network,
+      birthday,
+    );
+  }
+
+  Future<void> restoreWalletFromDescriptor(
+      Network network, String descriptor, DateTime? birthday) async {
+    await _restoreWallet(
+      WalletSetupArgs(
+          setupType: WalletSetupType.descriptor(descriptor), network: network),
+      network,
+      birthday,
+    );
+  }
+
+  Future<void> _restoreWallet(
+      WalletSetupArgs args, Network network, DateTime? birthday) async {
     _initialized = false;
-    final args = WalletSetupArgs(
-        setupType: WalletSetupType.mnemonic(mnemonic), network: network);
     final setupResult = SpWallet.setupWallet(setupArgs: args);
     final wallet = await walletRepository.setupWallet(
         setupResult, network, birthday, null);
@@ -118,6 +139,7 @@ class WalletState extends ChangeNotifier {
     changePaymentCode = wallet.getChangeAddress();
     this.birthday = birthday;
     this.network = network;
+    hasSeedPhrase = setupResult.mnemonic != null;
 
     // lastSync will be initialized by chainState synchronization service
     lastSync = null;
@@ -140,6 +162,7 @@ class WalletState extends ChangeNotifier {
     receivePaymentCode = wallet.getReceivingAddress();
     changePaymentCode = wallet.getChangeAddress();
     birthday = now;
+    hasSeedPhrase = setupResult.mnemonic != null;
     this.network = network;
     lastSync = currentTip;
 
@@ -262,7 +285,8 @@ class WalletState extends ChangeNotifier {
   /// When [forceFeeRate] is set (the user explicitly chose a fee rate), the
   /// selection honoring the requested rate is preferred over a changeless
   /// one (which may exceed it).
-  Future<InputSelection> proposeCoinSelection(Recipient recipient, int feerate,
+  Future<CoinSelectProposal> proposeCoinSelection(
+      Recipient recipient, int feerate,
       {bool forceFeeRate = false}) async {
     if (_isDrainPayment(recipient)) {
       return selectUtxosToDrain(
@@ -282,7 +306,7 @@ class WalletState extends ChangeNotifier {
   /// (see [proposeCoinSelection]), so the transaction signed is exactly the
   /// one whose fee was presented to the user.
   Future<SilentPaymentUnsignedTransaction> createUnsignedTxFromSelection(
-      Recipient recipient, InputSelection selection) async {
+      Recipient recipient, CoinSelectProposal selection) async {
     final wallet = await getWalletFromSecureStorage();
 
     if (_isDrainPayment(recipient)) {

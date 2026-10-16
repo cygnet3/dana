@@ -1,5 +1,5 @@
 use crate::api::structs::{
-    input_selection::InputSelection, owned_output::OwnedOutput, recipient::Recipient,
+    input_selection::CoinSelectProposal, owned_output::OwnedOutput, recipient::Recipient,
 };
 
 use anyhow::Result;
@@ -11,7 +11,7 @@ pub fn select_utxos_to_spend(
     owned_outputs: Vec<OwnedOutput>,
     recipients: Vec<Recipient>,
     feerate: f32,
-) -> Result<Vec<InputSelection>> {
+) -> Result<Vec<CoinSelectProposal>> {
     let available_utxos = OwnedOutput::try_into_utxos(owned_outputs)?;
     let recipients = Recipient::try_into_recipients(recipients)?;
 
@@ -28,7 +28,7 @@ pub fn select_utxos_to_drain(
     owned_outputs: Vec<OwnedOutput>,
     recipient_address: String,
     feerate: f32,
-) -> Result<InputSelection> {
+) -> Result<CoinSelectProposal> {
     let available_utxos = OwnedOutput::try_into_utxos(owned_outputs)?;
     let recipient_address = RecipientAddress::try_from(recipient_address)?;
 

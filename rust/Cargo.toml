@@ -8,7 +8,8 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 flutter_rust_bridge = "=2.13.0"
-spdk-wallet = { git = "https://github.com/cygnet3/spdk", rev = "dc6c47420745a745275f57534603383829ff049d" }
+spdk-wallet = { git = "https://github.com/cygnet3/spdk", rev = "bf8cbeaa1d8a089eb8975ce8a78f0146ac36bcfc" }
+bip392 = { git = "https://github.com/cygnet3/spdk", rev = "bf8cbeaa1d8a089eb8975ce8a78f0146ac36bcfc" }
 lazy_static = "1.4"
 anyhow = "1.0"
 serde = { version = "1.0.188", features = ["derive"] }
