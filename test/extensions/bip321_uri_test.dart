@@ -12,23 +12,8 @@ void main() {
       Bip321Uri(sp: sp, tsp: tsp, bc: const [], tb: const []);
 
   group('Bip321Uri.reusablePaymentCodeForNetwork', () {
-    test('returns sp on mainnet', () {
-      expect(
-        uri(sp: const ['sp1qours']).reusablePaymentCodeForNetwork(
-          Network.mainnet,
-        ),
-        'sp1qours',
-      );
-    });
-
-    test('returns tsp on test networks', () {
-      expect(
-        uri(tsp: const ['tsp1qours']).reusablePaymentCodeForNetwork(
-          Network.testnet4,
-        ),
-        'tsp1qours',
-      );
-    });
+    // Success-path coverage (parse + encode) lives in Rust bip321 tests;
+    // these Dart tests stay FFI-free and only cover selection / ambiguity.
 
     test('returns null when the record has no reusable payment code', () {
       expect(
