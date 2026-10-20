@@ -6,7 +6,6 @@ import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/generated/rust/api/bip321.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/recipient.dart';
-import 'package:danawallet/generated/rust/api/structs/silent_payment_code.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/contacts/add_contact_sheet.dart';
 import 'package:danawallet/screens/spend/amount_selection.dart';
@@ -110,9 +109,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
               parsed.reusablePaymentCodeForNetwork(network);
           final legacyPaymentCode = parsed.legacyPaymentCodeForNetwork(network);
           if (reusablePaymentCode != null) {
-            resolvedPaymentCode =
-                SilentPaymentCode.parse(code: reusablePaymentCode)
-                    .toPaymentCode();
+            resolvedPaymentCode = reusablePaymentCode.toPaymentCode();
           } else if (legacyPaymentCode != null) {
             resolvedPaymentCode = PaymentCode.parse(address: legacyPaymentCode);
           } else {
@@ -139,7 +136,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
           if (reusablePaymentCode == null) {
             throw Exception("Payment URI does not contain an address");
           }
-          resolvedPaymentCode = PaymentCode.parse(address: reusablePaymentCode);
+          resolvedPaymentCode = reusablePaymentCode.toPaymentCode();
           parsedAmount = resolved.amount;
           resolvedBip353 = parsed;
 

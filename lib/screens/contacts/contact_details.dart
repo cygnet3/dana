@@ -7,7 +7,6 @@ import 'package:danawallet/data/models/recorded_transaction.dart';
 import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/extensions/bip321_uri.dart';
-import 'package:danawallet/extensions/silent_payment_code.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/data/models/contact_field.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
@@ -210,14 +209,11 @@ class ContactDetailsScreen extends StatelessWidget {
         if (resolvedPaymentCode == null) {
           throw Bip353AddressNotRegisteredException(bip353);
         }
-        final fetchedPaymentCode =
-            tryParseSilentPaymentCode(resolvedPaymentCode);
-        if (fetchedPaymentCode == null ||
-            !fetchedPaymentCode.matches(other: silentPaymentCode)) {
+        if (!resolvedPaymentCode.matches(other: silentPaymentCode)) {
           throw Bip353PaymentCodeMismatchException(
               address: bip353,
               expected: silentPaymentCode.encode(),
-              resolved: resolvedPaymentCode);
+              resolved: resolvedPaymentCode.encode());
         }
       } on Bip353PaymentCodeMismatchException {
         displayWarning(

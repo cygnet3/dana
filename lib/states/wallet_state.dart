@@ -5,7 +5,6 @@ import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/extensions/bip321_uri.dart';
 import 'package:danawallet/extensions/date_time.dart';
 import 'package:danawallet/extensions/network.dart';
-import 'package:danawallet/extensions/silent_payment_code.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/input_selection.dart';
 import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
@@ -408,9 +407,7 @@ class WalletState extends ChangeNotifier {
       try {
         final bip321Uri = await Bip353Resolver.resolveParsed(danaAddress!);
         final resolved = bip321Uri.reusablePaymentCodeForNetwork(network);
-        final parsed =
-            resolved != null ? tryParseSilentPaymentCode(resolved) : null;
-        if (parsed != null && receivePaymentCode.matches(other: parsed)) {
+        if (resolved != null && receivePaymentCode.matches(other: resolved)) {
           Logger().i("Stored dana address is valid");
           return false;
         }
