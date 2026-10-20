@@ -192,11 +192,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
 
       if (!mounted || generation != _resolveGeneration) return;
 
-      final reusablePaymentCode =
-          resolved.reusablePaymentCodeForNetwork(network);
-      final parsedPaymentCode = reusablePaymentCode == null
-          ? null
-          : tryParseSilentPaymentCode(reusablePaymentCode);
+      final parsedPaymentCode = resolved.reusablePaymentCodeForNetwork(network);
       if (parsedPaymentCode == null) {
         setState(() {
           _errorMessage = 'No reusable payment code found';

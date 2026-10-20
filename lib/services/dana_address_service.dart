@@ -5,7 +5,6 @@ import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/prefix_search_response.dart';
 import 'package:danawallet/exceptions.dart';
 import 'package:danawallet/extensions/bip321_uri.dart';
-import 'package:danawallet/extensions/silent_payment_code.dart';
 import 'package:danawallet/generated/rust/api/bip39.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/structs/silent_payment_code.dart';
@@ -118,12 +117,11 @@ class DanaAddressService {
         throw Bip353InvalidRecordException(
             "$danaAddress exists but doesn't contain payment code");
       }
-      final parsed = tryParseSilentPaymentCode(resolvedPaymentCode);
-      if (parsed != null && parsed.matches(other: paymentCode)) {
+      if (resolvedPaymentCode.matches(other: paymentCode)) {
         return danaAddress;
       } else {
         throw Bip353AddressAlreadyUsed(
-            address: danaAddress, resolved: resolvedPaymentCode);
+            address: danaAddress, resolved: resolvedPaymentCode.encode());
       }
     } on Bip353AddressNotRegisteredException {
       Logger().i(
@@ -159,11 +157,12 @@ class DanaAddressService {
           throw Bip353PaymentCodeMismatchException(
               address: candidate, expected: code.encode(), resolved: null);
         }
-        final parsed = tryParseSilentPaymentCode(resolved);
-        if (parsed == null || !parsed.matches(other: code)) {
+        if (!resolved.matches(other: code)) {
           // If this happen something's wrong with the nameserver
           throw Bip353PaymentCodeMismatchException(
-              address: candidate, expected: code.encode(), resolved: resolved);
+              address: candidate,
+              expected: code.encode(),
+              resolved: resolved.encode());
         }
         // No exception means the candidate resolves to our payment code.
         return candidate;

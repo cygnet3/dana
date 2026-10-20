@@ -86,12 +86,11 @@ class ContactsState extends ChangeNotifier {
       if (resolvedPaymentCode == null) {
         throw Exception("$danaAddress doesn't contain a reusable payment code");
       }
-      final parsed = SilentPaymentCode.parse(code: resolvedPaymentCode);
-      if (!parsed.matches(other: paymentCode)) {
+      if (!resolvedPaymentCode.matches(other: paymentCode)) {
         throw Bip353PaymentCodeMismatchException(
             address: danaAddress,
             expected: paymentCode.encode(),
-            resolved: parsed.encode());
+            resolved: resolvedPaymentCode.encode());
       }
     }
 
