@@ -1,4 +1,4 @@
-use crate::api::structs::input_selection::{InputSelection, SelectionInner};
+use crate::api::structs::input_selection::{InputSelection, InputSelectionInner};
 use crate::api::structs::network::Network;
 use crate::api::structs::owned_output::OwnedOutput;
 use crate::api::structs::recipient::Recipient;
@@ -7,7 +7,7 @@ use crate::stream::send_tx_broadcast_update;
 
 use anyhow::Result;
 use bip39::rand::{thread_rng, RngCore};
-use spdk_wallet::backend_blindbit_v1::BlindbitClient;
+use spdk_wallet::backend_blindbit_v1::BlindbitBackend;
 use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex};
 use spdk_wallet::client::SpClient;
 
@@ -27,13 +27,15 @@ impl SpWallet {
         let network = network.into();
 
         let res = match selection.as_inner() {
-            SelectionInner::Payment(selection) => self.client.create_transaction_from_selection(
-                &available_utxos,
-                recipients,
-                &selection,
-                network,
-            )?,
-            SelectionInner::Drain(selection) => {
+            InputSelectionInner::Payment(selection) => {
+                self.client.create_transaction_from_proposal(
+                    &available_utxos,
+                    recipients,
+                    &selection,
+                    network,
+                )?
+            }
+            InputSelectionInner::Drain(selection) => {
                 self.client.create_drain_transaction_from_selection(
                     &available_utxos,
                     recipients,
@@ -71,9 +73,9 @@ impl SpWallet {
 
     // note: should only be used when using regtest, else there is privacy loss!
     pub async fn broadcast_using_blindbit(blindbit_url: String, tx: String) -> Result<String> {
-        let blindbit_client = BlindbitClient::new(&blindbit_url)?;
+        let backend = BlindbitBackend::new(&blindbit_url)?;
 
-        let res = blindbit_client.forward_tx(tx).await?;
+        let res = backend.forward_tx(tx).await?;
 
         Ok(res.to_string())
     }

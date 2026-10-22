@@ -35,8 +35,8 @@ impl From<CoinSelectionStrategy> for spdk_wallet::client::Strategy {
 }
 
 #[derive(Debug)]
-pub(crate) enum SelectionInner {
-    Payment(spdk_wallet::client::InputSelection),
+pub(crate) enum InputSelectionInner {
+    Payment(spdk_wallet::client::CoinSelectProposal),
     Drain(spdk_wallet::client::DrainSelection),
 }
 
@@ -45,39 +45,39 @@ pub(crate) enum SelectionInner {
 #[derive(Debug)]
 #[frb(opaque)]
 pub struct InputSelection {
-    inner: SelectionInner,
+    inner: InputSelectionInner,
 }
 
 impl InputSelection {
     #[frb(sync, getter)]
     pub fn sent(&self) -> Amount {
         match &self.inner {
-            SelectionInner::Payment(s) => s.sent().into(),
-            SelectionInner::Drain(s) => s.sent().into(),
+            InputSelectionInner::Payment(s) => s.sent().into(),
+            InputSelectionInner::Drain(s) => s.sent().into(),
         }
     }
 
     #[frb(sync, getter)]
     pub fn n_sent_outputs(&self) -> usize {
         match &self.inner {
-            SelectionInner::Payment(s) => s.n_sent_outputs(),
-            SelectionInner::Drain(s) => s.n_sent_outputs(),
+            InputSelectionInner::Payment(s) => s.n_sent_outputs(),
+            InputSelectionInner::Drain(s) => s.n_sent_outputs(),
         }
     }
 
     #[frb(sync, getter)]
     pub fn change(&self) -> Amount {
         match &self.inner {
-            SelectionInner::Payment(s) => s.change().into(),
-            SelectionInner::Drain(_) => Amount::zero(),
+            InputSelectionInner::Payment(s) => s.change().into(),
+            InputSelectionInner::Drain(_) => Amount::zero(),
         }
     }
 
     #[frb(sync, getter)]
     pub fn fee(&self) -> Amount {
         match &self.inner {
-            SelectionInner::Payment(s) => s.fee().into(),
-            SelectionInner::Drain(s) => s.fee().into(),
+            InputSelectionInner::Payment(s) => s.fee().into(),
+            InputSelectionInner::Drain(s) => s.fee().into(),
         }
     }
 
@@ -85,8 +85,8 @@ impl InputSelection {
     #[frb(sync, getter)]
     pub fn actual_fee_rate(&self) -> f32 {
         match &self.inner {
-            SelectionInner::Payment(s) => s.actual_fee_rate().as_sat_vb(),
-            SelectionInner::Drain(s) => s.actual_fee_rate().as_sat_vb(),
+            InputSelectionInner::Payment(s) => s.actual_fee_rate().as_sat_vb(),
+            InputSelectionInner::Drain(s) => s.actual_fee_rate().as_sat_vb(),
         }
     }
 
@@ -94,20 +94,20 @@ impl InputSelection {
     #[frb(sync, getter)]
     pub fn strategy(&self) -> Option<CoinSelectionStrategy> {
         match &self.inner {
-            SelectionInner::Payment(s) => Some(s.strategy().into()),
-            SelectionInner::Drain(_) => None,
+            InputSelectionInner::Payment(s) => Some(s.strategy().into()),
+            InputSelectionInner::Drain(_) => None,
         }
     }
 
-    pub(crate) fn as_inner(&self) -> &SelectionInner {
+    pub(crate) fn as_inner(&self) -> &InputSelectionInner {
         &self.inner
     }
 }
 
-impl From<spdk_wallet::client::InputSelection> for InputSelection {
-    fn from(value: spdk_wallet::client::InputSelection) -> Self {
+impl From<spdk_wallet::client::CoinSelectProposal> for InputSelection {
+    fn from(value: spdk_wallet::client::CoinSelectProposal) -> Self {
         Self {
-            inner: SelectionInner::Payment(value),
+            inner: InputSelectionInner::Payment(value),
         }
     }
 }
@@ -115,7 +115,7 @@ impl From<spdk_wallet::client::InputSelection> for InputSelection {
 impl From<spdk_wallet::client::DrainSelection> for InputSelection {
     fn from(value: spdk_wallet::client::DrainSelection) -> Self {
         Self {
-            inner: SelectionInner::Drain(value),
+            inner: InputSelectionInner::Drain(value),
         }
     }
 }
