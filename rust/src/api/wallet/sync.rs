@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use futures::StreamExt as _;
-use spdk_wallet::backend_blindbit_v1::{BlindbitBackend, BlindbitClient};
+use spdk_wallet::backend_blindbit_v1::BlindbitBackend;
 use spdk_wallet::bitcoin::{absolute::Height, Amount};
 use spdk_wallet::scanner::{ScanResult, Scanner as _};
 use spdk_wallet::SpScanner;
@@ -35,8 +35,7 @@ impl SpWallet {
         dust_limit: u64,
         owned_outpoints: Vec<OutPoint>,
     ) -> Result<()> {
-        let client = BlindbitClient::new(&blindbit_url)?;
-        let backend = BlindbitBackend::new(client);
+        let backend = BlindbitBackend::new(&blindbit_url)?;
 
         let dust_limit = Amount::from_sat(dust_limit);
 
