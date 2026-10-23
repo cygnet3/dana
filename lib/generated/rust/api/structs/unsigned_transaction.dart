@@ -12,6 +12,7 @@ import 'outpoint.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'recipient.dart';
 
+// These functions are ignored because they are not marked as `pub`: `is_change`, `is_payment_recipient`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`
 
 class SilentPaymentUnsignedTransaction {

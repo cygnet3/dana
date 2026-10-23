@@ -13,6 +13,7 @@ import 'structs/network.dart';
 import 'structs/outpoint.dart';
 import 'structs/owned_output.dart';
 import 'structs/recipient.dart';
+import 'structs/silent_payment_code.dart';
 import 'structs/unsigned_transaction.dart';
 import 'wallet/setup.dart';
 
@@ -57,11 +58,11 @@ abstract class SpWallet implements RustOpaqueInterface {
       RustLib.instance.api.crateApiWalletSpWalletFinalizeTransaction(
           unsignedTransaction: unsignedTransaction);
 
-  String getChangeAddress();
+  SilentPaymentCode getChangeAddress();
 
   Network getNetwork();
 
-  String getReceivingAddress();
+  SilentPaymentCode getReceivingAddress();
 
   ApiScanKey getScanKey();
 
