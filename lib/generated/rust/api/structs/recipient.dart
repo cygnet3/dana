@@ -5,28 +5,68 @@
 
 import '../../frb_generated.dart';
 import 'amount.dart';
+import 'network.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
+import 'silent_payment_code.dart';
 
-// These functions are ignored because they are not marked as `pub`: `try_into_recipients`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `eq`, `fmt`, `from`, `try_from`
+// These functions are ignored because they are not marked as `pub`: `parse_as_str`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `deserialize`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `hash`, `serialize`, `try_from`
 
-class Recipient {
-  final String paymentCode;
-  final Amount amount;
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PaymentCode>>
+abstract class PaymentCode implements RustOpaqueInterface {
+  /// Canonical text form.
+  ///
+  /// Segwit, taproot, and silent payment codes are lowercase. Base58Check is unchanged.
+  String encode();
 
-  const Recipient({
-    required this.paymentCode,
-    required this.amount,
-  });
+  /// Whether this address is valid for `network`.
+  ///
+  /// `tsp` and `tb` match testnet3, testnet4, and signet, not regtest.
+  /// Base58 testnet version bytes also match regtest.
+  bool isValidForNetwork({required Network network});
 
-  @override
-  int get hashCode => paymentCode.hashCode ^ amount.hashCode;
+  PaymentCodeKind kind();
 
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Recipient &&
-          runtimeType == other.runtimeType &&
-          paymentCode == other.paymentCode &&
-          amount == other.amount;
+  bool matches({required PaymentCode other});
+
+  /// Parse a silent payment code, segwit v0 address, taproot address, or
+  /// Base58Check address. Segwit v0 and taproot share [`PaymentCodeKind::Bech32`].
+  ///
+  /// Rejects OP_RETURN payloads and anything else.
+  static PaymentCode parse({required String address}) => RustLib.instance.api
+      .crateApiStructsRecipientPaymentCodeParse(address: address);
+
+  /// `None` unless this is a silent payment code.
+  SilentPaymentCode? silentPaymentCode();
+}
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Recipient>>
+abstract class Recipient implements RustOpaqueInterface {
+  Amount get amount;
+
+  PaymentCode get paymentCode;
+
+  set amount(Amount amount);
+
+  set paymentCode(PaymentCode paymentCode);
+
+  factory Recipient(
+          {required PaymentCode paymentCode, required Amount amount}) =>
+      RustLib.instance.api.crateApiStructsRecipientRecipientNew(
+          paymentCode: paymentCode, amount: amount);
+}
+
+/// How a [`PaymentCode`] is encoded.
+///
+/// OP_RETURN is not a kind: [`PaymentCode::parse`] rejects it.
+enum PaymentCodeKind {
+  /// BIP352 `sp1` / `tsp1` / `sprt1`.
+  silentPayment,
+
+  /// Bech32 or bech32m: segwit v0 (`bc1q`) or taproot (`bc1p`).
+  bech32,
+
+  /// Base58Check P2PKH or P2SH.
+  base58,
+  ;
 }

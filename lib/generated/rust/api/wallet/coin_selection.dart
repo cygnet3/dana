@@ -21,7 +21,7 @@ Future<List<InputSelection>> selectUtxosToSpend(
 
 Future<InputSelection> selectUtxosToDrain(
         {required List<OwnedOutput> ownedOutputs,
-        required String recipientAddress,
+        required PaymentCode recipientAddress,
         required double feerate}) =>
     RustLib.instance.api.crateApiWalletCoinSelectionSelectUtxosToDrain(
         ownedOutputs: ownedOutputs,
