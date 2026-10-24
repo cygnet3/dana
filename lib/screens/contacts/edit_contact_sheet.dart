@@ -104,10 +104,10 @@ class _EditContactSheetState extends State<EditContactSheet> {
       if (newBip353Parsed != null) {
         try {
           final resolved = await Bip353Resolver.resolveParsed(newBip353Parsed);
-          final reusablePaymentCode =
-              resolved.reusablePaymentCodeForNetwork(network);
+          final parsed = resolved.reusablePaymentCodeForNetwork(network);
           // updated bip353 address *must* point to same underlying payment code
-          if (reusablePaymentCode != widget.contact.paymentCode) {
+          if (parsed == null ||
+              !widget.contact.paymentCode.matches(other: parsed)) {
             setState(() {
               _isUpdating = false;
               _errorMessage =
