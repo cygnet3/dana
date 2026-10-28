@@ -14,10 +14,10 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 Future<List<InputSelection>> selectUtxosToSpend(
         {required List<OwnedOutput> ownedOutputs,
-        required List<Recipient> recipients,
+        required Recipient recipient,
         required double feerate}) =>
     RustLib.instance.api.crateApiWalletCoinSelectionSelectUtxosToSpend(
-        ownedOutputs: ownedOutputs, recipients: recipients, feerate: feerate);
+        ownedOutputs: ownedOutputs, recipient: recipient, feerate: feerate);
 
 Future<InputSelection> selectUtxosToDrain(
         {required List<OwnedOutput> ownedOutputs,

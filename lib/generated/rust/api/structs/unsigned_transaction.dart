@@ -7,93 +7,26 @@ import '../../frb_generated.dart';
 import '../../lib.dart';
 import 'amount.dart';
 import 'discovered_output.dart';
-import 'input_selection.dart';
 import 'outpoint.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'recipient.dart';
 
 // These functions are ignored because they are not marked as `pub`: `is_change`, `is_payment_recipient`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `from`, `from`
 
-class SilentPaymentUnsignedTransaction {
-  final List<(OutPoint, DiscoveredOutput)> selectedUtxos;
-  final List<Recipient> recipients;
-  final U8Array32 partialSecret;
-  final String? unsignedTx;
-  final String network;
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SilentPaymentUnsignedTransaction>>
+abstract class SilentPaymentUnsignedTransaction implements RustOpaqueInterface {
+  double get actualFeeRate;
 
-  /// Wallet change amount (zero for drain / changeless selections).
-  final Amount change;
+  Amount getChangeAmount();
 
-  /// Index into `recipients` of the change output, if any.
-  final int? changeIndex;
-  final Amount fee;
+  Amount getFeeAmount();
 
-  /// Fee rate in satoshis per virtual byte.
-  final double actualFeeRate;
+  List<Recipient> getRecipients();
 
-  /// Coin-selection strategy used for a payment; `None` for drain transactions.
-  final CoinSelectionStrategy? strategy;
+  Amount getSendAmount();
 
-  const SilentPaymentUnsignedTransaction({
-    required this.selectedUtxos,
-    required this.recipients,
-    required this.partialSecret,
-    this.unsignedTx,
-    required this.network,
-    required this.change,
-    this.changeIndex,
-    required this.fee,
-    required this.actualFeeRate,
-    this.strategy,
-  });
+  List<Recipient> get recipients;
 
-  Amount getChangeAmount() => RustLib.instance.api
-          .crateApiStructsUnsignedTransactionSilentPaymentUnsignedTransactionGetChangeAmount(
-        that: this,
-      );
-
-  Amount getFeeAmount() => RustLib.instance.api
-          .crateApiStructsUnsignedTransactionSilentPaymentUnsignedTransactionGetFeeAmount(
-        that: this,
-      );
-
-  List<Recipient> getRecipients() => RustLib.instance.api
-          .crateApiStructsUnsignedTransactionSilentPaymentUnsignedTransactionGetRecipients(
-        that: this,
-      );
-
-  Amount getSendAmount() => RustLib.instance.api
-          .crateApiStructsUnsignedTransactionSilentPaymentUnsignedTransactionGetSendAmount(
-        that: this,
-      );
-
-  @override
-  int get hashCode =>
-      selectedUtxos.hashCode ^
-      recipients.hashCode ^
-      partialSecret.hashCode ^
-      unsignedTx.hashCode ^
-      network.hashCode ^
-      change.hashCode ^
-      changeIndex.hashCode ^
-      fee.hashCode ^
-      actualFeeRate.hashCode ^
-      strategy.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is SilentPaymentUnsignedTransaction &&
-          runtimeType == other.runtimeType &&
-          selectedUtxos == other.selectedUtxos &&
-          recipients == other.recipients &&
-          partialSecret == other.partialSecret &&
-          unsignedTx == other.unsignedTx &&
-          network == other.network &&
-          change == other.change &&
-          changeIndex == other.changeIndex &&
-          fee == other.fee &&
-          actualFeeRate == other.actualFeeRate &&
-          strategy == other.strategy;
+  List<(OutPoint, DiscoveredOutput)> get selectedUtxos;
 }

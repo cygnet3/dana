@@ -15,21 +15,40 @@ use crate::api::structs::input_selection::CoinSelectionStrategy;
 use crate::api::structs::recipient::{PaymentCode, PaymentCodeKind, Recipient};
 use crate::api::structs::silent_payment_code::SilentPaymentCode;
 
+#[derive(Clone)]
+#[frb(opaque)]
 pub struct SilentPaymentUnsignedTransaction {
-    pub selected_utxos: Vec<(super::outpoint::OutPoint, DiscoveredOutput)>,
-    pub recipients: Vec<Recipient>,
-    pub partial_secret: [u8; 32],
-    pub unsigned_tx: Option<String>,
-    pub network: String,
+    selected_utxos: Vec<(super::outpoint::OutPoint, DiscoveredOutput)>,
+    recipients: Vec<Recipient>,
+    partial_secret: [u8; 32],
+    unsigned_tx: Option<String>,
+    network: String,
     /// Wallet change amount (zero for drain / changeless selections).
-    pub change: Amount,
+    change: Amount,
     /// Index into `recipients` of the change output, if any.
-    pub change_index: Option<u32>,
-    pub fee: Amount,
+    change_index: Option<u32>,
+    fee: Amount,
     /// Fee rate in satoshis per virtual byte.
-    pub actual_fee_rate: f32,
+    actual_fee_rate: f32,
     /// Coin-selection strategy used for a payment; `None` for drain transactions.
-    pub strategy: Option<CoinSelectionStrategy>,
+    strategy: Option<CoinSelectionStrategy>,
+}
+
+impl SilentPaymentUnsignedTransaction {
+    #[frb(sync, getter)]
+    pub fn recipients(&self) -> Vec<Recipient> {
+        self.recipients.clone()
+    }
+
+    #[frb(sync, getter)]
+    pub fn actual_fee_rate(&self) -> f32 {
+        self.actual_fee_rate.clone()
+    }
+
+    #[frb(sync, getter)]
+    pub fn selected_utxos(&self) -> Vec<(super::outpoint::OutPoint, DiscoveredOutput)> {
+        self.selected_utxos.clone()
+    }
 }
 
 impl From<spdk_wallet::client::SilentPaymentUnsignedTransaction>

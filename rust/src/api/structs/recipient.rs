@@ -178,18 +178,29 @@ impl std::fmt::Display for PaymentCode {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[frb(opaque)]
 pub struct Recipient {
-    pub payment_code: PaymentCode,
-    pub amount: Amount,
+    payment_code: PaymentCode,
+    pub(crate) amount: Amount,
 }
 
 impl Recipient {
     #[frb(sync)]
-    pub fn new(payment_code: PaymentCode, amount: Amount) -> Self {
+    pub fn new(payment_code: &PaymentCode, amount: Amount) -> Self {
         Self {
-            payment_code,
+            payment_code: payment_code.clone(),
             amount,
         }
+    }
+
+    #[frb(sync, getter)]
+    pub fn payment_code(&self) -> PaymentCode {
+        self.payment_code.clone()
+    }
+
+    #[frb(sync, getter)]
+    pub fn amount(&self) -> Amount {
+        self.amount.clone()
     }
 }
 
