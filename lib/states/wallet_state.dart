@@ -274,7 +274,7 @@ class WalletState extends ChangeNotifier {
 
     final selections = await selectUtxosToSpend(
         ownedOutputs: unspentOutputs,
-        recipients: [recipient],
+        recipient: recipient,
         feerate: feerate.toDouble());
     return pickDefaultSelection(selections, forceFeeRate: forceFeeRate);
   }
@@ -294,14 +294,14 @@ class WalletState extends ChangeNotifier {
 
       return wallet.createTransactionFromSelection(
           ownedOutputs: unspentOutputs,
-          apiRecipients: [drainRecipient],
+          recipient: drainRecipient,
           selection: selection,
           network: network);
     }
 
     return wallet.createTransactionFromSelection(
         ownedOutputs: unspentOutputs,
-        apiRecipients: [recipient],
+        recipient: recipient,
         selection: selection,
         network: network);
   }

@@ -7,7 +7,6 @@ import '../frb_generated.dart';
 import '../lib.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'structs/amount.dart';
-import 'structs/discovered_output.dart';
 import 'structs/input_selection.dart';
 import 'structs/network.dart';
 import 'structs/outpoint.dart';
@@ -49,7 +48,7 @@ abstract class SpWallet implements RustOpaqueInterface {
 
   SilentPaymentUnsignedTransaction createTransactionFromSelection(
       {required List<OwnedOutput> ownedOutputs,
-      required List<Recipient> apiRecipients,
+      required Recipient recipient,
       required InputSelection selection,
       required Network network});
 

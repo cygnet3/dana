@@ -44,16 +44,12 @@ abstract class PaymentCode implements RustOpaqueInterface {
 abstract class Recipient implements RustOpaqueInterface {
   Amount get amount;
 
-  PaymentCode get paymentCode;
-
-  set amount(Amount amount);
-
-  set paymentCode(PaymentCode paymentCode);
-
   factory Recipient(
           {required PaymentCode paymentCode, required Amount amount}) =>
       RustLib.instance.api.crateApiStructsRecipientRecipientNew(
           paymentCode: paymentCode, amount: amount);
+
+  PaymentCode get paymentCode;
 }
 
 /// How a [`PaymentCode`] is encoded.

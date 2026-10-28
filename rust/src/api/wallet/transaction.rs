@@ -18,12 +18,12 @@ impl SpWallet {
     pub fn create_transaction_from_selection(
         &self,
         owned_outputs: Vec<OwnedOutput>,
-        api_recipients: Vec<Recipient>,
+        recipient: &Recipient,
         selection: &InputSelection,
         network: Network,
     ) -> Result<SilentPaymentUnsignedTransaction> {
         let available_utxos = OwnedOutput::try_into_utxos(owned_outputs)?;
-        let recipients = api_recipients.into_iter().map(Into::into).collect();
+        let recipients = vec![recipient.clone().into()];
         let network = network.into();
 
         let res = match selection.as_inner() {
@@ -51,7 +51,7 @@ impl SpWallet {
     #[flutter_rust_bridge::frb(sync)]
     pub fn sign_transaction(
         &self,
-        unsigned_transaction: SilentPaymentUnsignedTransaction,
+        unsigned_transaction: &SilentPaymentUnsignedTransaction,
     ) -> Result<String> {
         let mut aux_rand = [0u8; 32];
 
@@ -59,15 +59,15 @@ impl SpWallet {
         rng.fill_bytes(&mut aux_rand);
 
         let client = &self.client;
-        let tx = client.sign_transaction(&unsigned_transaction.into(), &aux_rand)?;
+        let tx = client.sign_transaction(&unsigned_transaction.clone().into(), &aux_rand)?;
         Ok(serialize(&tx).to_lower_hex_string())
     }
 
     #[flutter_rust_bridge::frb(sync)]
     pub fn finalize_transaction(
-        unsigned_transaction: SilentPaymentUnsignedTransaction,
+        unsigned_transaction: &SilentPaymentUnsignedTransaction,
     ) -> Result<SilentPaymentUnsignedTransaction> {
-        let res = SpClient::finalize_transaction(unsigned_transaction.into())?;
+        let res = SpClient::finalize_transaction(unsigned_transaction.clone().into())?;
         Ok(res.into())
     }
 
