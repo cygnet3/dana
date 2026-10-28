@@ -27,8 +27,18 @@ class ContactsState extends ChangeNotifier {
       paymentCode: paymentCode,
       bip353Address: danaAddress,
     );
-
     await refreshContacts();
+
+    // double-check there are no contacts that have the current user's payment code.
+    // this is required because older versions of dana (<=0.8.3) have a bug where you can add yourself.
+    // this can be dropped later.
+    final selfcontact = _contacts.firstWhereOrNull(
+        (contact) => contact.paymentCode.matches(other: paymentCode));
+    if (selfcontact != null) {
+      Logger().w("Dropping self-contact from database: ${selfcontact.id}");
+      await _repository.deleteContact(selfcontact.id!);
+      await refreshContacts();
+    }
   }
 
   Future<void> refreshContacts() async {
