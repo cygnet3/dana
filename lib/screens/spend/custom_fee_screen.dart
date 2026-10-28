@@ -12,6 +12,7 @@ import 'package:danawallet/states/display_preferences_state.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
+import 'package:danawallet/utils/coin_selection.dart';
 import 'package:danawallet/widgets/buttons/footer/footer_button.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -32,7 +33,8 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
 
   int _selectedFeeRate = _minFeeRate; // Default to 1 sat/vB
   double _sliderValue = 0.0; // slider position in [0, 1]
-  InputSelection? _selection;
+  FeeOptions? _options;
+  InputSelection? _chosen;
   bool _isLoadingFees = true;
   String? _errorMessage;
 
@@ -46,14 +48,19 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
       .round()
       .clamp(_minFeeRate, _maxFeeRate);
 
+  String _formatFeeRate(double feeRate) => feeRate
+      .toStringAsFixed(2)
+      .replaceAll(RegExp(r'0+$'), '')
+      .replaceAll(RegExp(r'\.$'), '');
+
   @override
   void initState() {
     super.initState();
     _sliderValue = _feeRateToSlider(_selectedFeeRate);
-    _computeFeeAmounts();
+    _computeFeeOptions();
   }
 
-  void _computeFeeAmounts() async {
+  void _computeFeeOptions() async {
     final walletState = Provider.of<WalletState>(context, listen: false);
 
     try {
@@ -64,22 +71,21 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
         });
       }
 
-      // Propose a selection for the currently selected rate; the user
-      // explicitly chose this rate, so honor it rather than going changeless
-      final selection = await walletState.proposeCoinSelection(
-          widget.recipient, _selectedFeeRate,
-          forceFeeRate: true);
+      final options = await walletState.estimateFeeOptions(
+          widget.recipient, _selectedFeeRate);
 
       if (mounted) {
         setState(() {
-          _selection = selection;
+          _options = options;
+          _chosen = _recommended(options);
           _isLoadingFees = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _selection = null;
+          _options = null;
+          _chosen = null;
           _isLoadingFees = false;
           // Check if it's an insufficient funds error
           if (e.toString().contains('Insufficient funds') ||
@@ -94,15 +100,29 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
     }
   }
 
+  // The no-change option is recommended when its fee does not exceed the
+  // exact-rate fee plus the estimated future cost of spending the change
+  // output at the same rate (~58 vB for a taproot key-spend input).
+  InputSelection _recommended(FeeOptions options) {
+    final noChange = options.noChange;
+    if (noChange == null) {
+      return options.exact;
+    }
+    final futureChangeCost = BigInt.from(58 * _selectedFeeRate);
+    if (noChange.fee.field0 <= options.exact.fee.field0 + futureChangeCost) {
+      return noChange;
+    }
+    return options.exact;
+  }
+
   Future<void> onContinue() async {
-    final selection = _selection;
-    if (selection == null) return;
+    final chosen = _chosen;
+    if (chosen == null) return;
 
     final walletState = Provider.of<WalletState>(context, listen: false);
 
-    // build the transaction from the selection the fee was displayed for
     final unsignedTx = await walletState.createUnsignedTxFromSelection(
-        widget.recipient, selection);
+        widget.recipient, chosen);
 
     // update the send amount to the actual sent amount (can be different e.g. dust)
     final updatedRecipient = Recipient(
@@ -115,10 +135,142 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
           context,
           ReadyToSendScreen(
             recipient: updatedRecipient,
+            providedBip353: widget.providedBip353,
             fee: SelectedFee.custom,
             unsignedTx: unsignedTx,
           ));
     }
+  }
+
+  Widget _optionCard(
+    InputSelection selection, {
+    required bool isNoChange,
+    required bool recommended,
+    required FiatExchangeRateState exchangeRate,
+    required DisplayPreferencesState displayPreference,
+  }) {
+    final bitcoinUnit = displayPreference.amountDisplayUnit;
+    final feeText =
+        '${selection.fee.display(bitcoinUnit)} (${exchangeRate.displayFiat(selection.fee, displayPreference.fiatCurrency)})';
+
+    final String title;
+    final String subtitle;
+    if (isNoChange) {
+      title = 'No change output';
+      subtitle =
+          'Actual rate: ${_formatFeeRate(selection.actualFeeRate)} sat/vB. '
+          'The remainder goes to the fee instead of a change output you would pay to spend later.';
+    } else {
+      title = 'Exact $_selectedFeeRate sat/vB';
+      subtitle =
+          'Returns ${selection.change.display(bitcoinUnit)} as change (a fee applies when spending it later).';
+    }
+
+    return GestureDetector(
+      onTap: () => setState(() => _chosen = selection),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Bitcoin.neutral1,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+              color: _chosen == selection ? Bitcoin.orange : Bitcoin.neutral3),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Radio<InputSelection>(
+              value: selection,
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(title,
+                            style: BitcoinTextStyle.body4(Bitcoin.black)),
+                      ),
+                      const Spacer(),
+                      Text(feeText,
+                          style: BitcoinTextStyle.body4(Bitcoin.black)),
+                    ],
+                  ),
+                  if (recommended) ...[
+                    const SizedBox(height: 2),
+                    Text('recommended',
+                        style: BitcoinTextStyle.body5(Bitcoin.orange)),
+                  ],
+                  const SizedBox(height: 4),
+                  Text(subtitle,
+                      style: BitcoinTextStyle.body5(Bitcoin.neutral7)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _singleOption(
+      InputSelection selection,
+      FiatExchangeRateState exchangeRate,
+      DisplayPreferencesState displayPreference) {
+    final bitcoinUnit = displayPreference.amountDisplayUnit;
+    // when even the best rate-honoring selection has no change output, the
+    // remainder goes to the fee and the actual rate overshoots the target
+    final absorbedInFee = selection.change.field0 == BigInt.zero &&
+        selection.actualFeeRate > _selectedFeeRate * 1.05;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Bitcoin.neutral1,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Estimated Fee',
+                style: BitcoinTextStyle.body4(Bitcoin.black),
+              ),
+              Text(
+                selection.fee.display(bitcoinUnit),
+                style: BitcoinTextStyle.body4(Bitcoin.black),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Fiat Equivalent',
+                style: BitcoinTextStyle.body5(Bitcoin.neutral7),
+              ),
+              Text(
+                exchangeRate.displayFiat(
+                    selection.fee, displayPreference.fiatCurrency),
+                style: BitcoinTextStyle.body5(Bitcoin.neutral7),
+              ),
+            ],
+          ),
+          if (absorbedInFee) ...[
+            const SizedBox(height: 8),
+            Text(
+              'No change output is created; the remainder goes to the fee (actual rate: ${_formatFeeRate(selection.actualFeeRate)} sat/vB). '
+              'This can be cheaper than creating and spending a change output later.',
+              style: BitcoinTextStyle.body5(Bitcoin.neutral7),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   @override
@@ -188,7 +340,7 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
                       _sliderValue = value;
                       if (newFeeRate != _selectedFeeRate) {
                         _selectedFeeRate = newFeeRate;
-                        // the cached fee amounts are for the previous rate
+                        // the fee options are for the previous rate
                         _isLoadingFees = true;
                       }
                     });
@@ -197,94 +349,90 @@ class _CustomFeeScreenState extends State<CustomFeeScreen> {
                     setState(() {
                       _isLoadingFees = true;
                     });
-                    _computeFeeAmounts();
+                    _computeFeeOptions();
                   },
                 ),
               ),
             ],
           ),
           const SizedBox(height: 30),
-          // Error message or fee details
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: _errorMessage != null
-                  ? Bitcoin.red.withValues(alpha: 0.1)
-                  : Bitcoin.neutral1,
-              borderRadius: BorderRadius.circular(8),
-              border: _errorMessage != null
-                  ? Border.all(color: Bitcoin.red.withValues(alpha: 0.3))
-                  : null,
-            ),
-            child: _errorMessage != null
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          // Error message, loading indicator, or fee options
+          if (_errorMessage != null)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Bitcoin.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Bitcoin.red.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            color: Bitcoin.red,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _errorMessage!,
-                              style: BitcoinTextStyle.body4(Bitcoin.red),
-                            ),
-                          ),
-                        ],
+                      Icon(
+                        Icons.error_outline,
+                        color: Bitcoin.red,
+                        size: 20,
                       ),
-                      if (_errorMessage!.contains('Fee too high'))
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Text(
-                            '💡 Tip: Start with a lower fee rate and gradually increase until you find the maximum your wallet can afford.',
-                            style: BitcoinTextStyle.body5(Bitcoin.neutral6),
-                          ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: BitcoinTextStyle.body4(Bitcoin.red),
                         ),
-                    ],
-                  )
-                : Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Estimated Fee',
-                            style: BitcoinTextStyle.body4(Bitcoin.black),
-                          ),
-                          Text(
-                            _isLoadingFees
-                                ? 'Loading...'
-                                : _selection?.fee.display(
-                                        displayPreference.amountDisplayUnit) ??
-                                    'N/A',
-                            style: BitcoinTextStyle.body4(Bitcoin.black),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Fiat Equivalent',
-                            style: BitcoinTextStyle.body5(Bitcoin.neutral7),
-                          ),
-                          Text(
-                            _isLoadingFees
-                                ? 'Loading...'
-                                : exchangeRate.displayFiat(_selection!.fee,
-                                    displayPreference.fiatCurrency),
-                            style: BitcoinTextStyle.body5(Bitcoin.neutral7),
-                          ),
-                        ],
                       ),
                     ],
                   ),
-          ),
+                  if (_errorMessage!.contains('Fee too high'))
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        '💡 Tip: Start with a lower fee rate and gradually increase until you find the maximum your wallet can afford.',
+                        style: BitcoinTextStyle.body5(Bitcoin.neutral6),
+                      ),
+                    ),
+                ],
+              ),
+            )
+          else if (_isLoadingFees || _options == null)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Bitcoin.neutral1,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'Loading...',
+                style: BitcoinTextStyle.body4(Bitcoin.black),
+              ),
+            )
+          else if (_options!.noChange != null)
+            RadioGroup<InputSelection>(
+              groupValue: _chosen,
+              onChanged: (value) => setState(() => _chosen = value),
+              child: Column(
+                children: [
+                  _optionCard(
+                    _options!.noChange!,
+                    isNoChange: true,
+                    recommended: _recommended(_options!) == _options!.noChange,
+                    exchangeRate: exchangeRate,
+                    displayPreference: displayPreference,
+                  ),
+                  const SizedBox(height: 8),
+                  _optionCard(
+                    _options!.exact,
+                    isNoChange: false,
+                    recommended: _recommended(_options!) == _options!.exact,
+                    exchangeRate: exchangeRate,
+                    displayPreference: displayPreference,
+                  ),
+                ],
+              ),
+            )
+          else
+            _singleOption(_options!.exact, exchangeRate, displayPreference),
           const Spacer(),
         ],
       ),
