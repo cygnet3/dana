@@ -1,0 +1,2 @@
+lib/generated/rust/** linguist-generated
+rust/src/frb_generated.rs linguist-generated
