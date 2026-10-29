@@ -1,5 +1,4 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
-import 'package:danawallet/extensions/payment_code.dart';
 import 'package:danawallet/extensions/string_display.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/data/models/contact.dart';
