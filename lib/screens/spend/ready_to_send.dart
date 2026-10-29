@@ -100,8 +100,8 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
 
     final bitcoinUnit = displayPreference.amountDisplayUnit;
 
-    final displayedCode = widget.recipient.paymentCode.encode();
-    final silentPaymentCode = widget.recipient.paymentCode.silentPaymentCode();
+    final paymentCode = widget.recipient.paymentCode;
+    final silentPaymentCode = paymentCode.silentPaymentCode();
     final contact = silentPaymentCode == null
         ? null
         : contacts.getContactByPaymentCode(silentPaymentCode);
@@ -116,7 +116,7 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
 
     // if no human-readable name available, format payment code nicely
     displayRecipient ??=
-        displayedCode.chunked(context, displayRecipientStyle, 0.85);
+        paymentCode.chunked(context, displayRecipientStyle, 0.85);
 
     String displayAmount = widget.recipient.amount.display(bitcoinUnit);
     String displayAmountFiat = exchangeRate.displayFiat(

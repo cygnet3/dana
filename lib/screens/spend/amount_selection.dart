@@ -230,8 +230,8 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
       blocksToScan = chainState.tip - walletState.lastSync!;
     }
 
-    final displayedCode = widget.paymentCode.encode();
-    final silentPaymentCode = widget.paymentCode.silentPaymentCode();
+    final paymentCode = widget.paymentCode;
+    final silentPaymentCode = paymentCode.silentPaymentCode();
     final contact = silentPaymentCode == null
         ? null
         : contacts.getContactByPaymentCode(silentPaymentCode);
@@ -245,7 +245,7 @@ class AmountSelectionScreenState extends State<AmountSelectionScreen> {
     recipientName ??= widget.providedBip353?.toString();
 
     // if no human-readable name available, format payment code nicely
-    recipientName ??= displayedCode.chunked(context, recipientTextStyle, 0.70);
+    recipientName ??= paymentCode.chunked(context, recipientTextStyle, 0.70);
 
     return ScreenSkeleton(
       showBackButton: true,

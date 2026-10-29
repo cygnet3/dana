@@ -275,9 +275,8 @@ class WalletScreenState extends State<WalletScreen> {
             }
           }
           // if not a known contact, use a chunked payment code format
-          title ??= recipient
-              .encode()
-              .chunked(context, BitcoinTextStyle.body4(Bitcoin.black), 0.53);
+          title ??= recipient.chunked(
+              context, BitcoinTextStyle.body4(Bitcoin.black), 0.53);
         } else {
           // outgoing transactions with no recipients are send-to-self transactions
           title = "Send-to-Self";
