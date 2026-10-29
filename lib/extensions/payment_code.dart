@@ -1,21 +1,23 @@
 import 'dart:math';
 
+import 'package:danawallet/generated/rust/api/structs/recipient.dart';
 import 'package:flutter/material.dart';
 
-extension PaymentCodeText on String {
+extension PaymentCodeText on PaymentCode {
   /// Truncates the address to fit within [widthFraction] of the screen width,
   /// chunked into groups of 4 characters with the middle elided.
   String chunked(BuildContext context, TextStyle style, double widthFraction) {
+    final encoded = encode();
     // split the address into chunks of size 4
     List<String> addrChunks = [];
 
     // if there is overflow, we add it to the first chunk
-    int overflow = length % 4;
-    addrChunks.add(substring(0, 4 + overflow));
+    int overflow = encoded.length % 4;
+    addrChunks.add(encoded.substring(0, 4 + overflow));
 
-    for (int i = 4 + overflow; i < length; i += 4) {
-      int endIndex = min(i + 4, length);
-      addrChunks.add(substring(i, endIndex));
+    for (int i = 4 + overflow; i < encoded.length; i += 4) {
+      int endIndex = min(i + 4, encoded.length);
+      addrChunks.add(encoded.substring(i, endIndex));
     }
 
     // we take a fraction of the total screen width
