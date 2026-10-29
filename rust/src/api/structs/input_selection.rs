@@ -34,88 +34,75 @@ impl From<CoinSelectionStrategy> for spdk_wallet::client::Strategy {
     }
 }
 
-#[derive(Debug)]
-pub(crate) enum InputSelectionInner {
-    Payment(spdk_wallet::client::CoinSelectProposal),
-    Drain(spdk_wallet::client::DrainSelection),
-}
-
 /// Opaque coin-selection result. Built only from spdk propose APIs; Dart can
 /// inspect display fields via getters but cannot forge the underlying selection.
 #[derive(Debug)]
 #[frb(opaque)]
-pub struct InputSelection {
-    inner: InputSelectionInner,
+pub enum InputSelection {
+    Payment(spdk_wallet::client::CoinSelectProposal),
+    Drain(spdk_wallet::client::DrainSelection),
 }
 
 impl InputSelection {
     #[frb(sync, getter)]
     pub fn sent(&self) -> Amount {
-        match &self.inner {
-            InputSelectionInner::Payment(s) => s.sent().into(),
-            InputSelectionInner::Drain(s) => s.sent().into(),
+        match &self {
+            InputSelection::Payment(s) => s.sent().into(),
+            InputSelection::Drain(s) => s.sent().into(),
         }
     }
 
     #[frb(sync, getter)]
     pub fn n_sent_outputs(&self) -> usize {
-        match &self.inner {
-            InputSelectionInner::Payment(s) => s.n_sent_outputs(),
-            InputSelectionInner::Drain(s) => s.n_sent_outputs(),
+        match &self {
+            InputSelection::Payment(s) => s.n_sent_outputs(),
+            InputSelection::Drain(s) => s.n_sent_outputs(),
         }
     }
 
     #[frb(sync, getter)]
     pub fn change(&self) -> Amount {
-        match &self.inner {
-            InputSelectionInner::Payment(s) => s.change().into(),
-            InputSelectionInner::Drain(_) => Amount::zero(),
+        match &self {
+            InputSelection::Payment(s) => s.change().into(),
+            InputSelection::Drain(_) => Amount::zero(),
         }
     }
 
     #[frb(sync, getter)]
     pub fn fee(&self) -> Amount {
-        match &self.inner {
-            InputSelectionInner::Payment(s) => s.fee().into(),
-            InputSelectionInner::Drain(s) => s.fee().into(),
+        match &self {
+            InputSelection::Payment(s) => s.fee().into(),
+            InputSelection::Drain(s) => s.fee().into(),
         }
     }
 
     /// Fee rate in satoshis per virtual byte.
     #[frb(sync, getter)]
     pub fn actual_fee_rate(&self) -> f32 {
-        match &self.inner {
-            InputSelectionInner::Payment(s) => s.actual_fee_rate().as_sat_vb(),
-            InputSelectionInner::Drain(s) => s.actual_fee_rate().as_sat_vb(),
+        match &self {
+            InputSelection::Payment(s) => s.actual_fee_rate().as_sat_vb(),
+            InputSelection::Drain(s) => s.actual_fee_rate().as_sat_vb(),
         }
     }
 
     /// Strategy used for this selection. `None` for drain selections.
     #[frb(sync, getter)]
     pub fn strategy(&self) -> Option<CoinSelectionStrategy> {
-        match &self.inner {
-            InputSelectionInner::Payment(s) => Some(s.strategy().into()),
-            InputSelectionInner::Drain(_) => None,
+        match &self {
+            InputSelection::Payment(s) => Some(s.strategy().into()),
+            InputSelection::Drain(_) => None,
         }
-    }
-
-    pub(crate) fn as_inner(&self) -> &InputSelectionInner {
-        &self.inner
     }
 }
 
 impl From<spdk_wallet::client::CoinSelectProposal> for InputSelection {
     fn from(value: spdk_wallet::client::CoinSelectProposal) -> Self {
-        Self {
-            inner: InputSelectionInner::Payment(value),
-        }
+        Self::Payment(value)
     }
 }
 
 impl From<spdk_wallet::client::DrainSelection> for InputSelection {
     fn from(value: spdk_wallet::client::DrainSelection) -> Self {
-        Self {
-            inner: InputSelectionInner::Drain(value),
-        }
+        Self::Drain(value)
     }
 }
