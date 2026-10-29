@@ -1,4 +1,4 @@
-use crate::api::structs::input_selection::{InputSelection, InputSelectionInner};
+use crate::api::structs::input_selection::InputSelection;
 use crate::api::structs::network::Network;
 use crate::api::structs::owned_output::OwnedOutput;
 use crate::api::structs::recipient::Recipient;
@@ -26,16 +26,14 @@ impl SpWallet {
         let recipients = vec![recipient.clone().into()];
         let network = network.into();
 
-        let res = match selection.as_inner() {
-            InputSelectionInner::Payment(selection) => {
-                self.client.create_transaction_from_proposal(
-                    &available_utxos,
-                    recipients,
-                    &selection,
-                    network,
-                )?
-            }
-            InputSelectionInner::Drain(selection) => {
+        let res = match selection {
+            InputSelection::Payment(selection) => self.client.create_transaction_from_proposal(
+                &available_utxos,
+                recipients,
+                &selection,
+                network,
+            )?,
+            InputSelection::Drain(selection) => {
                 self.client.create_drain_transaction_from_selection(
                     &available_utxos,
                     recipients,
