@@ -135,17 +135,3 @@ impl SilentPaymentUnsignedTransaction {
             .collect()
     }
 }
-
-fn is_change(address: &PaymentCode, change_code: &SilentPaymentCode) -> bool {
-    address.silent_payment_code().as_ref() == Some(change_code)
-}
-
-/// Silent payment outputs other than change, plus bech32/bech32m and Base58Check.
-/// OP_RETURN is left out.
-fn is_payment_recipient(address: &PaymentCode, change_code: &SilentPaymentCode) -> bool {
-    match address.kind() {
-        Ok(PaymentCodeKind::SilentPayment) => !is_change(address, change_code),
-        Ok(PaymentCodeKind::Bech32 | PaymentCodeKind::Base58) => true,
-        Err(_) => false,
-    }
-}
