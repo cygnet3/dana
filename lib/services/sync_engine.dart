@@ -23,10 +23,11 @@ import 'package:logger/logger.dart';
 /// Flutter and android-plugin dependencies and can run safely in both the
 /// main isolate and a background isolate.
 class SyncEngine {
-  /// Called just before [wallet.syncToHeight] begins.
+  /// Called just before [wallet.syncToHeight] or [wallet.syncViaFrigate]
+  /// begins.
   final void Function(int startHeight, int endHeight) onSyncStarted;
 
-  /// Called when [wallet.syncToHeight] finishes or throws. [success] is false
+  /// Called when the active sync call finishes or throws. [success] is false
   /// on error so callers can deactivate progress indicators in both cases.
   final void Function(bool success) onSyncComplete;
 
@@ -128,14 +129,25 @@ class SyncEngine {
       final blindbitUrl =
           await settings.getBlindbitUrl() ?? network.defaultBlindbitUrl;
 
-      final correctNetwork =
-          await checkNetwork(blindbitUrl: blindbitUrl, network: network);
-      if (!correctNetwork) {
-        Logger().w('[$_logTag] wrong network, skipping');
-        return;
+      // Frigate backend override: an unset or empty frigate URL keeps the
+      // blindbit backend as the default.
+      final frigateUrl = (await settings.getFrigateUrl())?.trim();
+      final useFrigate = frigateUrl != null && frigateUrl.isNotEmpty;
+
+      // In frigate mode the scanner streams until CaughtUp, so the blindbit
+      // chain-height precheck (network check + tip lookup) is skipped.
+      int? tip;
+      if (!useFrigate) {
+        final correctNetwork =
+            await checkNetwork(blindbitUrl: blindbitUrl, network: network);
+        if (!correctNetwork) {
+          Logger().w('[$_logTag] wrong network, skipping');
+          return;
+        }
+
+        tip = await getChainHeight(blindbitUrl: blindbitUrl);
       }
 
-      final tip = await getChainHeight(blindbitUrl: blindbitUrl);
       var lastSync = await _walletRepository.readLastSync();
 
       if (lastSync == null) {
@@ -145,34 +157,51 @@ class SyncEngine {
             .i('[$_logTag] initialized lastSync to birthday height $lastSync');
       }
 
-      if (lastSync >= tip) {
+      if (tip != null && lastSync >= tip) {
         Logger().i('[$_logTag] up to date (lastSync=$lastSync tip=$tip)');
         return;
       }
 
-      Logger().i('[$_logTag] syncing $lastSync -> $tip');
+      Logger()
+          .i('[$_logTag] syncing $lastSync -> ${tip ?? "frigate caught-up"}');
 
       final dustLimit = await settings.getDustLimit() ?? defaultDustLimit;
 
-      onSyncStarted(lastSync + 1, tip);
+      // In frigate mode the caught-up tip is unknown up front, so the bar is
+      // activated with end == start and stays indeterminate.
+      onSyncStarted(lastSync + 1, tip ?? lastSync + 1);
 
-      final unconfirmedSpentOutpoints =
-          await _transactionsRepository.getUnconfirmedSpentOutpoints();
-      final unspentOutpoints =
-          await _ownedOutputsRepository.getUnspentOutpoints();
-      final ownedOutpoints = [
-        ...unconfirmedSpentOutpoints,
-        ...unspentOutpoints
-      ];
+      if (useFrigate) {
+        // Watched outputs carry script bytes so the scanner re-subscribes
+        // them on start: unspent + unconfirmed-spent outputs, mirroring the
+        // blindbit scan list.
+        final watchedOutputs =
+            await _ownedOutputsRepository.getWatchedOutputs();
 
-      await wallet.syncToHeight(
-          fromHeight: lastSync + 1,
-          toHeight: tip,
-          blindbitUrl: blindbitUrl,
-          dustLimit: BigInt.from(dustLimit),
-          ownedOutpoints: ownedOutpoints);
+        await wallet.syncViaFrigate(
+            frigateUrl: frigateUrl,
+            fromHeight: lastSync + 1,
+            dustLimit: BigInt.from(dustLimit),
+            watchedOutputs: watchedOutputs);
+      } else {
+        final unconfirmedSpentOutpoints =
+            await _transactionsRepository.getUnconfirmedSpentOutpoints();
+        final unspentOutpoints =
+            await _ownedOutputsRepository.getUnspentOutpoints();
+        final ownedOutpoints = [
+          ...unconfirmedSpentOutpoints,
+          ...unspentOutpoints
+        ];
 
-      Logger().i('[$_logTag] sync complete, tip=$tip');
+        await wallet.syncToHeight(
+            fromHeight: lastSync + 1,
+            toHeight: tip!,
+            blindbitUrl: blindbitUrl,
+            dustLimit: BigInt.from(dustLimit),
+            ownedOutpoints: ownedOutpoints);
+      }
+
+      Logger().i('[$_logTag] sync complete');
       onSyncComplete(true);
     } catch (e) {
       Logger().e('[$_logTag] sync error: $e');

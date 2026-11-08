@@ -4,6 +4,7 @@ import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/owned_output.dart';
+import 'package:danawallet/generated/rust/api/wallet/frigate.dart';
 import 'package:danawallet/generated/rust/lib.dart';
 import 'package:danawallet/repositories/database_helper.dart';
 import 'package:logger/logger.dart';
@@ -81,6 +82,48 @@ class OwnedOutputsRepository {
         .map((row) =>
             OutPoint(txid: row['txid'] as String, vout: row['vout'] as int))
         .toList();
+  }
+
+  /// Get outputs to watch for spends on the frigate scanner: unspent outputs
+  /// plus unconfirmed-spent outpoints — the same scan list the blindbit path
+  /// passes as owned outpoints — each paired with its script bytes so the
+  /// scanner can re-subscribe them on restart.
+  ///
+  /// Unconfirmed-spent outpoints without a known script (unknown spends, e.g.
+  /// from a multi-wallet seed import) cannot be watched and are skipped.
+  Future<List<WatchedOutput>> getWatchedOutputs() async {
+    final db = await _db;
+    final watched = <WatchedOutput>[];
+    final seen = <String>{};
+
+    for (final output in await getUnspentOutputs()) {
+      watched.add(WatchedOutput(
+        outpoint: output.outpoint,
+        script: output.script,
+      ));
+      seen.add('${output.outpoint.txid}:${output.outpoint.vout}');
+    }
+
+    final rows = await db.rawQuery('''
+      SELECT s.outpoint_txid, s.outpoint_vout, o.script
+      FROM tx_spent_outpoints s
+      JOIN transactions t ON t.id = s.transaction_id
+      JOIN owned_outputs o ON o.txid = s.outpoint_txid AND o.vout = s.outpoint_vout
+      WHERE t.confirmation_height IS NULL AND t.confirmation_blockhash IS NULL
+    ''');
+
+    for (final row in rows) {
+      final txid = row['outpoint_txid'] as String;
+      final vout = row['outpoint_vout'] as int;
+      if (!seen.add('$txid:$vout')) continue;
+
+      watched.add(WatchedOutput(
+        outpoint: OutPoint(txid: txid, vout: vout),
+        script: row['script'] as Uint8List,
+      ));
+    }
+
+    return watched;
   }
 
   /// Get amount for a specific outpoint.
