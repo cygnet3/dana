@@ -4,6 +4,11 @@ import 'package:danawallet/generated/rust/api/stream.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:flutter/material.dart';
 
+/// Tracks sync progress for the UI progress bar.
+///
+/// Frigate mode note: when syncing via frigate, [SyncEngine] activates the
+/// bar with end == start (the caught-up tip is unknown up front), so progress
+/// events are ignored here and the bar stays indeterminate until deactivate().
 class SyncProgressState extends ChangeNotifier {
   bool isSyncing = false;
   Completer? _completer;
