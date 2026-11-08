@@ -1,4 +1,5 @@
 pub mod coin_selection;
+pub(crate) mod frigate;
 mod info;
 pub mod setup;
 mod sync;
