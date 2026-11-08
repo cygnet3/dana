@@ -1,3 +1,3 @@
 mod updater;
 
-pub use updater::StateUpdater;
+pub use updater::SyncUpdatePump;

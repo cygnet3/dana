@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use flutter_rust_bridge::frb;
 use spdk_wallet::bip321::Bip321Uri as SpdkBip321Uri;
-use spdk_wallet::client::SpUriExtension;
+use spdk_wallet::SpUriExtension;
 use spdk_wallet::silentpayments::SilentPaymentCode;
 
 use crate::api::structs::amount::Amount;

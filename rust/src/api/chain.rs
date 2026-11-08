@@ -1,16 +1,16 @@
 use std::time::Duration;
 
 use log::warn;
-use spdk_wallet::backend_blindbit_v1::BlindbitClient;
+use spdk_wallet::backend_blindbit_v1::BlindbitBackend;
 use spdk_wallet::bitcoin;
 use tokio::time::sleep;
 
 use crate::api::structs::network::Network;
 
 pub async fn get_chain_height(blindbit_url: String) -> anyhow::Result<u32> {
-    let client = BlindbitClient::new(&blindbit_url)?;
+    let backend = BlindbitBackend::new(&blindbit_url)?;
 
-    match client.block_height().await {
+    match backend.block_height().await {
         Ok(res) => Ok(res.to_consensus_u32()),
         Err(e) => {
             if e.root_cause()
@@ -22,7 +22,7 @@ pub async fn get_chain_height(blindbit_url: String) -> anyhow::Result<u32> {
                 // sleep for 1 second
                 sleep(Duration::from_millis(1000)).await;
 
-                Ok(client.block_height().await?.to_consensus_u32())
+                Ok(backend.block_height().await?.to_consensus_u32())
             } else {
                 Err(e)
             }
@@ -32,9 +32,9 @@ pub async fn get_chain_height(blindbit_url: String) -> anyhow::Result<u32> {
 
 pub async fn check_network(blindbit_url: String, network: Network) -> anyhow::Result<bool> {
     let network: bitcoin::Network = network.into();
-    let client = BlindbitClient::new(&blindbit_url)?;
+    let backend = BlindbitBackend::new(&blindbit_url)?;
 
-    let blindbit_network = client.info().await?.network;
+    let blindbit_network = backend.info().await?.network;
 
     Ok(network == blindbit_network)
 }

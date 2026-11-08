@@ -119,8 +119,8 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "backend-blindbit-v1"
-version = "0.7.0"
-source = "git+https://github.com/cygnet3/spdk?tag=v0.7.0#89ba87409979f00041b3719fd140e983f0330ada"
+version = "0.0.0"
+source = "git+https://github.com/Sosthene00/spdk?branch=feat%2Ffrigate-backend#ea3e47fe633cbd1bf22d5638dc1bc77b9775f02e"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -131,6 +131,23 @@ dependencies = [
  "serde",
  "serde_json",
  "spdk-core",
+]
+
+[[package]]
+name = "backend-frigate"
+version = "0.0.0"
+source = "git+https://github.com/Sosthene00/spdk?branch=feat%2Ffrigate-backend#ea3e47fe633cbd1bf22d5638dc1bc77b9775f02e"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bitcoin 0.32.8",
+ "electrum_streaming_client",
+ "futures",
+ "log",
+ "spdk-core",
+ "tokio",
+ "tokio-rustls",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -585,7 +602,7 @@ checksum = "e5766087c2235fec47fafa4cfecc81e494ee679d0fd4a59887ea0919bfb0e4fc"
 dependencies = [
  "cfg-if",
  "libc",
- "socket2",
+ "socket2 0.5.8",
  "windows-sys 0.48.0",
 ]
 
@@ -594,6 +611,19 @@ name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
+
+[[package]]
+name = "electrum_streaming_client"
+version = "0.4.0"
+source = "git+https://github.com/bitcoindevkit/electrum_streaming_client?rev=01a6d42aac33f86b2bc647e7fc702067be99c9c7#01a6d42aac33f86b2bc647e7fc702067be99c9c7"
+dependencies = [
+ "bitcoin 0.32.8",
+ "futures",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+]
 
 [[package]]
 name = "env_filter"
@@ -682,6 +712,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13624c2627564efccf4934284bdd98cbaa14e79b0b5a141218e507b3a823456"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "frigate"
+version = "0.1.0"
+source = "git+https://github.com/Sosthene00/spdk?branch=feat%2Ffrigate-backend#ea3e47fe633cbd1bf22d5638dc1bc77b9775f02e"
+dependencies = [
+ "anyhow",
+ "backend-frigate",
+ "bitcoin 0.32.8",
+ "electrum_streaming_client",
+ "futures",
+ "log",
+ "silentpayments",
+ "spdk-core",
+ "tokio",
 ]
 
 [[package]]
@@ -958,7 +1004,7 @@ dependencies = [
  "http-body",
  "hyper",
  "pin-project-lite",
- "socket2",
+ "socket2 0.5.8",
  "tokio",
  "tower-service",
  "tracing",
@@ -1193,15 +1239,30 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "libc"
-version = "0.2.169"
+version = "0.2.191"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5aba8db14291edd000dfcc4d620c7ebfb122c613afb886ca8803fa4e128a20a"
+checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 
 [[package]]
 name = "litemap"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee93343901ab17bd981295f2cf0026d4ad018c7c31ba84549a4ddbb47a45104"
+
+[[package]]
+name = "local-scanner"
+version = "0.0.0"
+source = "git+https://github.com/Sosthene00/spdk?branch=feat%2Ffrigate-backend#ea3e47fe633cbd1bf22d5638dc1bc77b9775f02e"
+dependencies = [
+ "anyhow",
+ "bitcoin 0.32.8",
+ "futures",
+ "log",
+ "rayon",
+ "silentpayments",
+ "spdk-core",
+ "tokio",
+]
 
 [[package]]
 name = "lock_api"
@@ -1264,13 +1325,13 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "1.0.3"
+version = "1.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2886843bf800fba2e3377cff24abf6379b4c4d5c6681eaf9ea5b0d15090450bd"
+checksum = "1788edb87fdc09c7e26304471e2f5be8cdefb1b6930d6e3985fc02ff53bf86ee"
 dependencies = [
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1443,7 +1504,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2",
+ "socket2 0.5.8",
  "thiserror",
  "tokio",
  "tracing",
@@ -1478,7 +1539,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2",
+ "socket2 0.5.8",
  "tracing",
  "windows-sys 0.59.0",
 ]
@@ -1679,6 +1740,7 @@ dependencies = [
  "base64 0.22.1",
  "bip39",
  "flutter_rust_bridge",
+ "frigate",
  "futures",
  "lazy_static",
  "log",
@@ -1711,6 +1773,7 @@ version = "0.23.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fb9263ab4eb695e42321db096e3b8fbd715a59b154d5c88d82db2175b681ba7"
 dependencies = [
+ "log",
  "once_cell",
  "ring",
  "rustls-pki-types",
@@ -1909,14 +1972,13 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "silentpayments"
-version = "0.7.0"
-source = "git+https://github.com/cygnet3/spdk?tag=v0.7.0#89ba87409979f00041b3719fd140e983f0330ada"
+version = "0.8.1"
+source = "git+https://github.com/Sosthene00/spdk?branch=feat%2Ffrigate-backend#ea3e47fe633cbd1bf22d5638dc1bc77b9775f02e"
 dependencies = [
  "bech32 0.9.1",
  "bitcoin_hashes 0.13.0",
  "hex",
  "secp256k1 0.29.1",
- "serde",
 ]
 
 [[package]]
@@ -1955,6 +2017,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "socket2"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
+dependencies = [
+ "libc",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "socks"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1967,8 +2039,8 @@ dependencies = [
 
 [[package]]
 name = "spdk-core"
-version = "0.7.0"
-source = "git+https://github.com/cygnet3/spdk?tag=v0.7.0#89ba87409979f00041b3719fd140e983f0330ada"
+version = "0.0.0"
+source = "git+https://github.com/Sosthene00/spdk?branch=feat%2Ffrigate-backend#ea3e47fe633cbd1bf22d5638dc1bc77b9775f02e"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1980,8 +2052,8 @@ dependencies = [
 
 [[package]]
 name = "spdk-wallet"
-version = "0.7.0"
-source = "git+https://github.com/cygnet3/spdk?tag=v0.7.0#89ba87409979f00041b3719fd140e983f0330ada"
+version = "0.0.0"
+source = "git+https://github.com/Sosthene00/spdk?branch=feat%2Ffrigate-backend#ea3e47fe633cbd1bf22d5638dc1bc77b9775f02e"
 dependencies = [
  "anyhow",
  "backend-blindbit-v1",
@@ -1989,8 +2061,8 @@ dependencies = [
  "bip321",
  "bitcoin 0.32.8",
  "futures",
+ "local-scanner",
  "log",
- "rayon",
  "serde",
  "silentpayments",
  "spdk-core",
@@ -2151,29 +2223,28 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.43.0"
+version = "1.54.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d61fa4ffa3de412bfea335c6ecff681de2b609ba3c77ef3e00e521813a9ed9e"
+checksum = "b52fd3255258d26fac7264ab5a76b53c13367136dc011d3d6ad4f8ed070396a3"
 dependencies = [
- "backtrace",
  "bytes",
  "libc",
- "mio 1.0.3",
+ "mio 1.2.4",
  "pin-project-lite",
- "socket2",
+ "socket2 0.6.5",
  "tokio-macros",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "tokio-macros"
-version = "2.5.0"
+version = "2.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e06d43f1345a3bcd39f6a56dbb7dcab2ba47e68e8ac134855e7e2bdbaf8cab8"
+checksum = "78773a2a397f451582ce068015985c33193cf6dea8b74d2a639fe457b2f07b0e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.96",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -2188,13 +2259,15 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.13"
+version = "0.7.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7fcaa8d55a2bdd6b83ace262b016eca0d79ee02818c5c1bcdf0305114081078"
+checksum = "e464cf451ba96ebfc6f9b6542f17ee8b8956e33f1e40d9690624e59d7a7f8a4b"
 dependencies = [
  "bytes",
  "futures-core",
+ "futures-io",
  "futures-sink",
+ "libc",
  "pin-project-lite",
  "tokio",
 ]
@@ -2463,6 +2536,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "windows-link"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5"
+
+[[package]]
 name = "windows-registry"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2517,6 +2596,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e38bc4d79ed67fd075bcc251a1c39b32a1776bbe92e5bef1f0bf1f8c531853b"
 dependencies = [
  "windows-targets 0.52.6",
+]
+
+[[package]]
+name = "windows-sys"
+version = "0.61.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
+dependencies = [
+ "windows-link",
 ]
 
 [[package]]

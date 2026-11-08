@@ -5,6 +5,7 @@ use spdk_wallet::{
         hex::{DisplayHex, FromHex},
         Network,
     },
+    client::FeeRate,
     silentpayments::utils::sending::PartialSecret,
 };
 
@@ -44,22 +45,45 @@ impl From<SilentPaymentUnsignedTransaction>
     for spdk_wallet::client::SilentPaymentUnsignedTransaction
 {
     fn from(value: SilentPaymentUnsignedTransaction) -> Self {
+        let selected_utxos: Vec<(spdk_wallet::bitcoin::OutPoint, spdk_wallet::scanner::DiscoveredOutput)> = value
+            .selected_utxos
+            .into_iter()
+            .map(|(outpoint, output)| (outpoint.into(), output.into()))
+            .collect();
+        let recipients: Vec<spdk_wallet::client::Recipient> = value
+            .recipients
+            .into_iter()
+            .map(|r| r.try_into().unwrap())
+            .collect();
+
+        // Fee = sum(inputs) - sum(outputs), same formula as Dart getFeeAmount.
+        let input_sum: u64 = selected_utxos
+            .iter()
+            .map(|(_, o)| o.txout.value.to_sat())
+            .sum();
+        let output_sum: u64 = recipients.iter().map(|r| r.amount.to_sat()).sum();
+
         Self {
-            selected_utxos: value
-                .selected_utxos
-                .into_iter()
-                .map(|(outpoint, output)| (outpoint.into(), output.into()))
-                .collect(),
-            recipients: value
-                .recipients
-                .into_iter()
-                .map(|r| r.try_into().unwrap())
-                .collect(),
+            selected_utxos,
+            recipients,
             partial_secret: PartialSecret::from_slice(&value.partial_secret).unwrap(),
             unsigned_tx: value
                 .unsigned_tx
                 .map(|tx| deserialize(&Vec::from_hex(&tx).unwrap()).unwrap()),
             network: Network::from_core_arg(&value.network).unwrap(),
+            // Inert post-create: change is decided during coin selection and
+            // finalization upstream, not carried in the Api struct.
+            change: spdk_wallet::bitcoin::Amount::ZERO,
+            change_index: None,
+            fee: spdk_wallet::bitcoin::Amount::from_sat(input_sum - output_sum),
+            // Inert placeholders: verified from spdk @ ea3e47f
+            // (spdk-wallet/src/client/spend.rs) that `finalize_transaction` and
+            // `sign_transaction` consume ONLY selected_utxos / recipients /
+            // partial_secret / network / unsigned_tx; actual_fee_rate and
+            // strategy are display metadata set upstream during proposal
+            // selection.
+            actual_fee_rate: FeeRate::from_sat_per_vb(0.0),
+            strategy: None,
         }
     }
 }

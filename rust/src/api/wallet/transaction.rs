@@ -5,12 +5,15 @@ use crate::api::structs::unsigned_transaction::SilentPaymentUnsignedTransaction;
 
 use anyhow::Result;
 use bip39::rand::{thread_rng, RngCore};
-use spdk_wallet::backend_blindbit_v1::BlindbitClient;
+use spdk_wallet::backend_blindbit_v1::BlindbitBackend;
 use spdk_wallet::bitcoin::secp256k1::Scalar;
 use spdk_wallet::bitcoin::ScriptBuf;
-use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex, OutPoint};
-use spdk_wallet::client::{FeeRate, RecipientAddress, SpClient};
-use spdk_wallet::updater::DiscoveredOutput;
+use spdk_wallet::bitcoin::{consensus::serialize, hex::DisplayHex, OutPoint, TxOut};
+use spdk_wallet::client::{
+    propose_coin_selections, propose_drain_selection, FeeRate, RecipientAddress, SpClient,
+    Strategy,
+};
+use spdk_wallet::scanner::DiscoveredOutput;
 
 use super::SpWallet;
 
@@ -24,33 +27,44 @@ impl SpWallet {
         network: Network,
     ) -> Result<SilentPaymentUnsignedTransaction> {
         let client = &self.client;
-        let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = owned_outputs
-            .into_iter()
-            .map(|output| {
-                let outpoint = output.outpoint.into();
-                let label = match output.label {
-                    Some(l) => Some(Scalar::from_be_bytes(l)?.into()),
-                    None => None,
-                };
-                let output = DiscoveredOutput {
-                    tweak: Scalar::from_be_bytes(output.tweak)?,
-                    value: output.amount.into(),
-                    script_pubkey: ScriptBuf::from_bytes(output.script),
-                    label,
-                };
-                Ok((outpoint, output))
-            })
-            .collect();
+        let available_utxos: Result<std::collections::HashMap<OutPoint, DiscoveredOutput>> =
+            owned_outputs
+                .into_iter()
+                .map(|output| {
+                    let outpoint = output.outpoint.into();
+                    let label = match output.label {
+                        Some(l) => Some(Scalar::from_be_bytes(l)?.into()),
+                        None => None,
+                    };
+                    let output = DiscoveredOutput {
+                        tweak: Scalar::from_be_bytes(output.tweak)?,
+                        txout: TxOut {
+                            value: output.amount.into(),
+                            script_pubkey: ScriptBuf::from_bytes(output.script),
+                        },
+                        label,
+                    };
+                    Ok((outpoint, output))
+                })
+                .collect();
+        let available_utxos = available_utxos?;
         let recipients: Vec<spdk_wallet::client::Recipient> = api_recipients
             .into_iter()
             .map(|r| r.try_into().unwrap())
             .collect();
-        let res = client.create_new_transaction(
-            available_utxos?,
-            recipients,
-            FeeRate::from_sat_per_vb(feerate),
-            network.into(),
-        )?;
+
+        // spdk now exposes coin selection as explicit proposals; prefer the
+        // selection that honours the requested fee rate, then lowest fee
+        let proposals =
+            propose_coin_selections(&available_utxos, &recipients, FeeRate::from_sat_per_vb(feerate))?;
+        let proposal = proposals
+            .iter()
+            .find(|p| p.strategy() == Strategy::FeeRateCap)
+            .or_else(|| proposals.iter().find(|p| p.strategy() == Strategy::LowestFee))
+            .ok_or_else(|| anyhow::Error::msg("no viable coin selection"))?;
+
+        let res =
+            client.create_transaction_from_proposal(&available_utxos, recipients, proposal, network.into())?;
 
         Ok(res.into())
     }
@@ -64,29 +78,42 @@ impl SpWallet {
         network: Network,
     ) -> Result<SilentPaymentUnsignedTransaction> {
         let client = &self.client;
-        let available_utxos: Result<Vec<(OutPoint, DiscoveredOutput)>> = owned_outputs
-            .into_iter()
-            .map(|output| {
-                let outpoint = output.outpoint.into();
-                let label = match output.label {
-                    Some(l) => Some(Scalar::from_be_bytes(l)?.into()),
-                    None => None,
-                };
-                let output = DiscoveredOutput {
-                    tweak: Scalar::from_be_bytes(output.tweak)?,
-                    value: output.amount.into(),
-                    script_pubkey: ScriptBuf::from_bytes(output.script),
-                    label,
-                };
-                Ok((outpoint, output))
-            })
-            .collect();
+        let available_utxos: Result<std::collections::HashMap<OutPoint, DiscoveredOutput>> =
+            owned_outputs
+                .into_iter()
+                .map(|output| {
+                    let outpoint = output.outpoint.into();
+                    let label = match output.label {
+                        Some(l) => Some(Scalar::from_be_bytes(l)?.into()),
+                        None => None,
+                    };
+                    let output = DiscoveredOutput {
+                        tweak: Scalar::from_be_bytes(output.tweak)?,
+                        txout: TxOut {
+                            value: output.amount.into(),
+                            script_pubkey: ScriptBuf::from_bytes(output.script),
+                        },
+                        label,
+                    };
+                    Ok((outpoint, output))
+                })
+                .collect();
+        let available_utxos = available_utxos?;
 
         let recipient_address: RecipientAddress = RecipientAddress::try_from(wipe_address)?;
-        let res = client.create_drain_transaction(
-            available_utxos?,
-            recipient_address,
+        let selection = propose_drain_selection(
+            &available_utxos,
+            &recipient_address,
             FeeRate::from_sat_per_vb(feerate),
+        )?;
+        let recipients = vec![spdk_wallet::client::Recipient {
+            address: recipient_address,
+            amount: selection.sent(),
+        }];
+        let res = client.create_drain_transaction_from_selection(
+            &available_utxos,
+            recipients,
+            &selection,
             network.into(),
         )?;
 
@@ -104,7 +131,8 @@ impl SpWallet {
         rng.fill_bytes(&mut aux_rand);
 
         let client = &self.client;
-        let tx = client.sign_transaction(unsigned_transaction.into(), &aux_rand)?;
+        let unsigned = unsigned_transaction.into();
+        let tx = client.sign_transaction(&unsigned, &aux_rand)?;
         Ok(serialize(&tx).to_lower_hex_string())
     }
 
@@ -118,9 +146,9 @@ impl SpWallet {
 
     // note: should only be used when using regtest, else there is privacy loss!
     pub async fn broadcast_using_blindbit(blindbit_url: String, tx: String) -> Result<String> {
-        let blindbit_client = BlindbitClient::new(&blindbit_url)?;
+        let backend = BlindbitBackend::new(&blindbit_url)?;
 
-        let res = blindbit_client.forward_tx(tx).await?;
+        let res = backend.forward_tx(tx).await?;
 
         Ok(res.to_string())
     }
@@ -161,7 +189,7 @@ impl SpWallet {
                     Err(recv_err) => {
                         log::error!("Channel recv error: {:?}", recv_err);
                         return Err(anyhow::Error::msg(format!(
-                            "Channel closed unexpectedly while waiting for broadcast result: {:?}", 
+                            "Channel closed unexpectedly while waiting for broadcast result: {:?}",
                             recv_err
                         )));
                     }

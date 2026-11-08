@@ -1,12 +1,15 @@
 use std::collections::HashSet;
 
 use anyhow::Result;
-use spdk_wallet::backend_blindbit_v1::{BlindbitBackend, BlindbitClient};
+use futures::StreamExt as _;
+use spdk_wallet::backend_blindbit_v1::BlindbitBackend;
 use spdk_wallet::bitcoin::{absolute::Height, Amount};
-use spdk_wallet::scanner::SpScanner;
+use spdk_wallet::SpScanner;
+use spdk_wallet::scanner::Scanner;
 
 use crate::api::structs::outpoint::OutPoint;
-use crate::{state::StateUpdater, wallet::KEEP_SYNCING};
+use crate::state::SyncUpdatePump;
+use crate::wallet::KEEP_SYNCING;
 
 use super::SpWallet;
 
@@ -27,8 +30,7 @@ impl SpWallet {
         dust_limit: u64,
         owned_outpoints: Vec<OutPoint>,
     ) -> Result<()> {
-        let client = BlindbitClient::new(&blindbit_url)?;
-        let backend = BlindbitBackend::new(client);
+        let backend = BlindbitBackend::new(&blindbit_url)?;
 
         let dust_limit = Amount::from_sat(dust_limit);
 
@@ -38,22 +40,28 @@ impl SpWallet {
         let start = Height::from_consensus(from_height)?;
         let end = Height::from_consensus(to_height)?;
 
-        let sp_client = self.client.clone();
-        let updater = StateUpdater::new(end);
+        let scan_key = self.client.scan_key();
+        let sp_receiver = self.client.receiver();
 
         KEEP_SYNCING.store(true, std::sync::atomic::Ordering::Relaxed);
 
-        let mut scanner = SpScanner::new(
-            sp_client,
-            Box::new(updater),
+        let scanner = SpScanner::new(
             Box::new(backend),
+            scan_key,
+            sp_receiver,
             owned_outpoints,
+            dust_limit,
+            ENABLE_CUTTHROUGH,
             &KEEP_SYNCING,
         );
 
-        scanner
-            .scan_blocks(start..=end, dust_limit, ENABLE_CUTTHROUGH)
-            .await?;
+        let mut results = scanner.scan_blocks(start..=end);
+        let mut pump = SyncUpdatePump::new(dust_limit.to_sat());
+
+        while let Some(scan_result) = results.next().await {
+            let is_final = scan_result.blkheight >= end;
+            pump.record(scan_result, is_final)?;
+        }
 
         Ok(())
     }
