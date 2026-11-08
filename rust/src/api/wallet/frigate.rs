@@ -155,7 +155,8 @@ async fn monitor_pump(mut handle: FrigateHandle, dust_limit: u64) {
                 let result = if caught_up {
                     pump.finalize(height, hash)
                 } else {
-                    Ok(send_sync_progress(height.to_consensus_u32()))
+                    send_sync_progress(height.to_consensus_u32());
+                    Ok(())
                 };
                 if let Err(err) = result {
                     log::warn!("frigate monitor: tip handling failed: {err}");
