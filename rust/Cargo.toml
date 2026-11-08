@@ -8,7 +8,10 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 flutter_rust_bridge = "=2.13.0"
-spdk-wallet = { git = "https://github.com/cygnet3/spdk", rev = "c58d73390d5ac4134f4e3a413a92cb7ce8d05027" }
+# frigate backend branch: event-driven FrigateScanner + reworked scanner/backends
+# (E2E-verified against frigate 1.4.1; see Sosthene00/spdk feat/frigate-backend)
+spdk-wallet = { git = "https://github.com/Sosthene00/spdk", branch = "feat/frigate-backend" }
+frigate = { git = "https://github.com/Sosthene00/spdk", branch = "feat/frigate-backend" }
 lazy_static = "1.4"
 anyhow = "1.0"
 serde = { version = "1.0.188", features = ["derive"] }
