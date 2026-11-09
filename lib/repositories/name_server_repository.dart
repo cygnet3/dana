@@ -50,6 +50,11 @@ class RegisterRejectedException implements Exception {
 class NameServerRepository {
   String baseUrl;
 
+  /// Injectable HTTP client seam: defaults to a fresh
+  ///  per request (identical production behavior); tests
+  /// assign a MockClient to intercept the challenge/registration wire.
+  http.Client Function() client = http.Client.new;
+
   NameServerRepository({required Network network})
       : baseUrl = (() {
           // live flavors only allow mainnet, so we don't need to separate based on the network
@@ -70,7 +75,7 @@ class NameServerRepository {
   Future<NameServerInfoResponse> getInfo() async {
     Logger().d("Getting name server info");
 
-    final response = await http.Client().get(Uri.parse('$baseUrl/info'));
+    final response = await client().get(Uri.parse('$baseUrl/info'));
 
     Logger().d('Info response body: ${response.body}');
     if (response.statusCode == 200) {
@@ -110,7 +115,7 @@ class NameServerRepository {
     Logger().d(
       'Registering dana address: $danaAddress with request ID: $requestId',
     );
-    final response = await http.Client().post(
+    final response = await client().post(
       Uri.parse('$baseUrl/register'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(request.toJson()),
@@ -186,7 +191,7 @@ class NameServerRepository {
     Logger().d(
       'Requesting challenge for: $userName@$domain with request ID: $requestId',
     );
-    final response = await http.Client().post(
+    final response = await client().post(
       Uri.parse('$baseUrl/challenge'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(request.toJson()),
@@ -196,9 +201,50 @@ class NameServerRepository {
     Logger().d('Challenge response body: ${response.body}');
 
     if (response.statusCode == 200) {
-      return NameServerChallengeResponse.fromJson(
-        jsonDecode(response.body) as Map<String, dynamic>,
-      );
+      final NameServerChallengeResponse challenge;
+      try {
+        challenge = NameServerChallengeResponse.fromJson(
+          jsonDecode(response.body) as Map<String, dynamic>,
+        );
+      } catch (e) {
+        Logger().e('Failed to parse challenge response: $e');
+        Logger().e('Response body: ${response.body}');
+        throw FormatException(
+          'Failed to parse challenge response: $e '
+          '(status ${response.statusCode}, body ${response.body})',
+        );
+      }
+
+      // Binding validation: rebuild the message the nameserver must have
+      // produced for *this* request and require an exact match before the
+      // caller is handed anything the spend key could sign (see the Rust
+      // oracle, which enforces only CHALLENGE_PREFIX). The field order and
+      // prefix mirror the server's `challenge_message()`
+      // (dana-nameserver src/main.rs): `dana-register:{network_key}:{nonce}:
+      // {user_name}:{domain}`.
+      //
+      // This is validation-only: [NameServerChallengeResponse.message] stays
+      // the exact bytes the server returned and is what goes on to signing
+      // (via the wallet-held signer, SpWallet::sign_registration_challenge).
+      // A reassembled string must never reach the spend key.
+      if (challenge.networkKey == null) {
+        throw const FormatException(
+          'Challenge response missing network_key: cannot validate the '
+          'binding before signing',
+        );
+      }
+      final String expectedMessage = 'dana-register:'
+          '${challenge.networkKey}:${challenge.nonce}'
+          ':$userName:$domain';
+      if (challenge.message != expectedMessage) {
+        throw FormatException(
+          'Challenge message does not match the requested binding. '
+          'Server message: ${challenge.message} '
+          'Expected: $expectedMessage',
+        );
+      }
+
+      return challenge;
     } else {
       throw ChallengeRejectedException(response.statusCode, response.body);
     }
@@ -219,7 +265,7 @@ class NameServerRepository {
     Logger().d(
       'Looking up dana addresses for SP address: ${stringified.substring(0, 20)}... (request ID: $requestId)',
     );
-    final response = await http.Client().get(
+    final response = await client().get(
       Uri.parse(
         '$baseUrl/lookup',
       ).replace(queryParameters: {'sp_address': stringified, 'id': requestId}),
@@ -260,7 +306,7 @@ class NameServerRepository {
     Logger().d(
       'Searching for dana addresses with prefix: $prefix (request ID: $requestId)',
     );
-    final response = await http.Client().get(
+    final response = await client().get(
       Uri.parse(
         '$baseUrl/search',
       ).replace(queryParameters: {'prefix': prefix, 'id': requestId}),
