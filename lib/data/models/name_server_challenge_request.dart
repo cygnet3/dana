@@ -1,6 +1,6 @@
 /// Outbound-only request body for POST /challenge.
 ///
-/// Deliberately has no : the server never echoes this shape back,
+/// Deliberately has no `fromJson`: the server never echoes this shape back,
 /// so a parse path here would be dead code (finding t_03cb4b3b, YAGNI).
 /// The response direction is modelled by [NameServerChallengeResponse],
 /// which validates with typed FormatExceptions.
@@ -25,5 +25,4 @@ class NameServerChallengeRequest {
       'sp_address': spAddress,
     };
   }
-
 }
