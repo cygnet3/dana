@@ -58,6 +58,15 @@ const String bgKeyComplete = 'complete';
 const String bgKeyRefresh = 'refresh';
 const String bgKeyInterrupt = 'interrupt';
 const String bgKeyFatalError = 'fatalError';
+// Sent when the frigate backend is unreachable (probe failure or a scan
+// that ended Disconnected): transient neutral banner, D8.
+const String bgKeyFrigateOffline = 'frigateOffline';
+
+// Neutral transient banner for an unreachable frigate server (D8): no red
+// error, no blindbit fallback; cleared on the next successful sync.
+const String frigateOfflineMsg =
+    'Frigate unreachable — will retry at next sync';
+const Color frigateOfflineColor = Color.fromARGB(255, 84, 110, 122);
 
 // Message keys sent to the background sync service from the main isolate.
 const String bgKeySync = 'sync';

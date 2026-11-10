@@ -1,4 +1,5 @@
 import 'package:danawallet/services/sync_engine.dart';
+import 'package:danawallet/states/sync_offline_state.dart';
 import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 
@@ -13,6 +14,7 @@ class InProcessSyncService {
   InProcessSyncService({
     required SyncProgressState syncProgress,
     required WalletState walletState,
+    SyncOfflineState? syncOffline,
   }) : _engine = SyncEngine(
           logTag: 'in-process',
           onSyncStarted: (start, end) {
@@ -21,6 +23,7 @@ class InProcessSyncService {
           onSyncComplete: (success) => syncProgress.deactivate(success),
           onStateUpdated: (lastSyncOnly) =>
               walletState.refreshAfterSync(lastSyncOnly: lastSyncOnly),
+          onTransientOffline: (message) => syncOffline?.setOffline(message),
         );
 
   Future<void> trySync() => _engine.trySync();

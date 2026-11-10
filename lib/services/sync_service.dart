@@ -4,6 +4,7 @@ import 'package:danawallet/constants.dart';
 import 'package:danawallet/services/foreground_sync_service.dart';
 import 'package:danawallet/services/in_process_sync_service.dart';
 import 'package:danawallet/states/chain_state.dart';
+import 'package:danawallet/states/sync_offline_state.dart';
 import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -13,6 +14,10 @@ class SyncService {
   final ChainState _chainState;
   final SyncProgressState _syncProgress;
   final WalletState _walletState;
+
+  /// Optional surface for the transient frigate-offline banner (D8). Null in
+  /// hosts without a banner surface; the engine still logs.
+  final SyncOfflineState? syncOffline;
 
   /// Called when the background isolate sends [bgKeyFatalError]. The backend
   /// has already committed to the foreground-service path by the time this
@@ -28,6 +33,7 @@ class SyncService {
     required ChainState chainState,
     required SyncProgressState syncProgress,
     required WalletState walletState,
+    this.syncOffline,
   })  : _chainState = chainState,
         _syncProgress = syncProgress,
         _walletState = walletState;
@@ -58,6 +64,7 @@ class SyncService {
     _inProcessSyncService = InProcessSyncService(
       syncProgress: _syncProgress,
       walletState: _walletState,
+      syncOffline: syncOffline,
     );
     _chainState.startChainPoller(
       true,
@@ -84,6 +91,15 @@ class SyncService {
     } else if (data.containsKey(bgKeyComplete)) {
       bool success = data[bgKeyComplete] as bool;
       _syncProgress.deactivate(success);
+      // a successful sync clears the transient frigate-offline banner (D8)
+      if (success) {
+        syncOffline?.clear();
+      }
+    }
+
+    // transient frigate-offline banner (D8): neutral, auto-resumes next wake
+    if (data[bgKeyFrigateOffline] is String) {
+      syncOffline?.setOffline(data[bgKeyFrigateOffline] as String);
     }
 
     // walletState update

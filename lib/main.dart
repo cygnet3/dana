@@ -21,6 +21,7 @@ import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/home_state.dart';
 import 'package:danawallet/states/permission_state.dart';
 import 'package:danawallet/services/sync_orchestrator.dart';
+import 'package:danawallet/states/sync_offline_state.dart';
 import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
@@ -55,6 +56,7 @@ void main() async {
   final permissionState = await PermissionState.create();
   final syncProgress = SyncProgressState.create();
   final chainState = ChainState();
+  final syncOfflineState = SyncOfflineState();
   final contactsState = ContactsState();
   final displayPreferencesState = await DisplayPreferencesState.create();
   final fiatExchangeRate = FiatExchangeRateState();
@@ -64,6 +66,7 @@ void main() async {
     syncProgress: syncProgress,
     walletState: walletState,
     permissionState: permissionState,
+    syncOffline: syncOfflineState,
   );
 
   // fetch the exchange rate, but don't await the response
@@ -118,6 +121,7 @@ void main() async {
         ChangeNotifierProvider.value(value: walletState),
         ChangeNotifierProvider.value(value: syncProgress),
         ChangeNotifierProvider.value(value: chainState),
+        ChangeNotifierProvider.value(value: syncOfflineState),
         ChangeNotifierProvider.value(value: HomeState()),
         ChangeNotifierProvider.value(value: permissionState),
         ChangeNotifierProvider.value(value: fiatExchangeRate),
