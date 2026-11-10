@@ -65,6 +65,11 @@ class SynchronizationTaskHandler extends TaskHandler {
       onTransientOffline: (message) =>
           FlutterForegroundTask.sendDataToMain({bgKeyFrigateOffline: message}),
     );
+    // Phase-2/3 wiring: the foreground service holds the continuous frigate
+    // subscription for the mempool tail (decision-record amendment
+    // 2026-11-10) while the app runs; the wake-cycle one-shot below stays
+    // the phase-1 catch-up.
+    unawaited(_engine!.ensureFrigateMonitor());
     unawaited(_engine!.trySync());
   }
 
@@ -76,12 +81,17 @@ class SynchronizationTaskHandler extends TaskHandler {
 
   Future<void> _onRepeatEventAsync() async {
     await _ensureInit();
+    // Re-check monitor liveness / backend selection each heartbeat (cheap:
+    // the rust-side probe is a sync flag read), then run the wake cycle.
+    await _engine?.ensureFrigateMonitor();
     unawaited(_engine?.trySync());
   }
 
   @override
   Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
     Logger().i('[BG] service destroyed (isTimeout: $isTimeout)');
+    // Drop the monitor subscription cleanly before the engine goes away.
+    await _engine?.stopFrigateMonitor();
     if (_engine?.isSyncing == true) {
       SpWallet.interruptSync();
       if (!isTimeout) {

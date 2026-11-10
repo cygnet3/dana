@@ -187,10 +187,14 @@ where
             FrigateEvent::Disconnected(reason) => {
                 return Ok(FrigateScanOutcome::Disconnected { reason });
             }
-            FrigateEvent::Unconfirmed { txid, .. } => {
-                // mempool discoveries are re-reported as Confirmed once
-                // mined; Dana's state layer only tracks confirmed outputs
-                log::debug!("frigate: mempool discovery {txid} deferred until confirmation");
+            FrigateEvent::Unconfirmed {
+                txid,
+                discovered_outputs,
+            } => {
+                // phase-2 contract: mempool discoveries enter the candidate
+                // pipeline; wallet state is created only on the confirmation
+                // notification, and candidates never advance the checkpoint
+                pump.record_mempool(txid, discovered_outputs)?
             }
         }
     }
@@ -208,6 +212,19 @@ pub fn stop_frigate_monitor() {
     if let Some(handle) = FRIGATE_MONITOR.lock().unwrap().take() {
         handle.abort();
     }
+}
+
+/// Liveness probe for the background monitor: true while a monitor task is
+/// spawned AND still running (holding the subscription). A finished task —
+/// connection death included — reports false, so the Dart side restarts the
+/// monitor from the persisted checkpoint instead of trusting a dead tail.
+#[flutter_rust_bridge::frb(sync)]
+pub fn frigate_monitor_running() -> bool {
+    FRIGATE_MONITOR
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map_or(false, |handle| !handle.is_finished())
 }
 
 async fn monitor_pump(mut handle: FrigateHandle, dust_limit: u64) {
@@ -244,7 +261,18 @@ async fn monitor_pump(mut handle: FrigateHandle, dust_limit: u64) {
                 log::warn!("frigate monitor disconnected: {reason}");
                 break;
             }
-            FrigateEvent::Unconfirmed { .. } => {}
+            FrigateEvent::Unconfirmed {
+                txid,
+                discovered_outputs,
+            } => {
+                // phase-2 contract: mempool candidates never create wallet
+                // state directly, never advance the checkpoint and never
+                // touch the progress bar; the mined transaction is
+                // re-delivered as Confirmed (real height) and created once.
+                if let Err(err) = pump.record_mempool(txid, discovered_outputs) {
+                    log::warn!("frigate monitor: mempool candidate failed: {err}");
+                }
+            }
         }
     }
 }

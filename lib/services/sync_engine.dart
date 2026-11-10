@@ -16,7 +16,7 @@ import 'package:danawallet/generated/rust/api/wallet/frigate.dart'
 // The engine's own stopFrigateMonitor() method shadows the generated
 // top-level fn inside the class, so the bridge call gets its own prefix.
 import 'package:danawallet/generated/rust/api/wallet/frigate.dart'
-    as frigate_api show stopFrigateMonitor;
+    as frigate_api show stopFrigateMonitor, frigateMonitorRunning;
 import 'package:danawallet/repositories/mempool_api_repository.dart';
 import 'package:danawallet/repositories/owned_outputs_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
@@ -114,6 +114,10 @@ class SyncEngine {
   /// cross-isolate liveness truth.
   bool _frigateMonitorRunning = false;
 
+  /// Periodic scan-session heartbeat while the monitor holds the
+  /// subscription.
+  Timer? _monitorBeatTimer;
+
   /// Current process id — the scan-lock liveness marker (D2). The background
   /// service isolate shares the app process, so it writes the same pid.
   int get pid => io.pid;
@@ -159,9 +163,11 @@ class SyncEngine {
         frigateProbe = frigateProbe ?? _defaultFrigateProbe,
         watchedOutputsFn = watchedOutputsFn ?? _defaultWatchedOutputs,
         frigateScanFn = frigateScanFn ?? _defaultFrigateScan,
-        frigateMonitorStart = frigateMonitorStart ?? _defaultFrigateMonitorStart,
+        frigateMonitorStart =
+            frigateMonitorStart ?? _defaultFrigateMonitorStart,
         frigateMonitorStop = frigateMonitorStop ?? _defaultFrigateMonitorStop,
-        frigateMonitorActive = frigateMonitorActive ?? _defaultFrigateMonitorActive,
+        frigateMonitorActive =
+            frigateMonitorActive ?? _defaultFrigateMonitorActive,
         chainHeightFn = chainHeightFn ?? getChainHeight,
         networkCheckFn = networkCheckFn ?? checkNetwork,
         syncResultStreamFn = resultStreamFn ?? createSyncResultStream,
@@ -208,10 +214,7 @@ class SyncEngine {
   }
 
   static Future<bool> _defaultFrigateMonitorActive() async {
-    // TDD red state (stub): the rust-side liveness probe
-    // (`frigateMonitorRunning`) lands with the wiring commit; until then
-    // the monitor is never started anyway (ensureFrigateMonitor is a no-op).
-    return false;
+    return frigate_api.frigateMonitorRunning();
   }
 
   // Only used by _onSyncResult (not exercised in the wake acceptance tests;
@@ -281,21 +284,115 @@ class SyncEngine {
   }
 
   /// Phase-2/3 wiring: keep a continuous frigate subscription (the
-  /// [FrigateMonitor]) alive while the foreground service runs, reusing the
-  /// persisted scan-session state (D2/D3) as its liveness marker.
+  /// [FrigateMonitor]) alive while the foreground service runs.
   ///
-  /// TDD red state (stub): a no-op — the monitor has zero call sites and
-  /// never runs. The lifecycle is implemented to green in the wiring commit.
+  /// The monitor delivers the phase-2 mempool tail over the key-bearing
+  /// subscription (decision-record amendment 2026-11-10); the wake-cycle
+  /// one-shot stays the phase-1 catch-up. Liveness reuses the persisted
+  /// scan-session state (D2/D3): the monitor holds the session keys (single
+  /// writer), keeps the beat fresh, and the rust-side task state is the
+  /// cross-isolate truth — a dead task is restarted from the checkpoint, so
+  /// no receipt is ever lost to monitor downtime (its history sweep
+  /// re-discovers anything missed, and confirmed outpoints are idempotent).
   Future<void> ensureFrigateMonitor() async {
-    Logger().d(
-        '[$_logTag] frigate monitor ensure (wiring stub): running=$_frigateMonitorRunning');
+    if (!await walletRepository.hasWallet()) {
+      return;
+    }
+
+    final url = (await settingsRepository.getFrigateUrl())?.trim();
+    final backend = await settingsRepository.getFrigateBackend();
+    final wantMonitor =
+        backend == frigateBackendFrigate && url != null && url.isNotEmpty;
+
+    // D9: a monitor must never outlive its backend selection.
+    if (!wantMonitor) {
+      if (_frigateMonitorRunning) {
+        Logger().i('[$_logTag] backend left frigate, stopping monitor');
+        await stopFrigateMonitor();
+      }
+      return;
+    }
+
+    if (_frigateMonitorRunning) {
+      if (await frigateMonitorActive()) {
+        // held subscription: keep the session beat fresh, do nothing else
+        await walletRepository.touchFrigateScanBeat();
+        return;
+      }
+      Logger().w('[$_logTag] frigate monitor task died, restarting');
+      _frigateMonitorRunning = false;
+    }
+
+    // The monitor needs an initialized checkpoint; the wake one-shot
+    // initializes it from the birthday height first.
+    final lastSync = await walletRepository.readLastSync();
+    if (lastSync == null) {
+      Logger().i('[$_logTag] frigate monitor deferred: checkpoint not '
+          'initialized yet');
+      return;
+    }
+
+    final dustLimit =
+        await settingsRepository.getDustLimit() ?? defaultDustLimit;
+
+    // Single-writer (D2): the monitor isolate owns the session keys while it
+    // holds the subscription.
+    await walletRepository.beginFrigateScan(pid: pid);
+    _frigateScanRunning = true;
+    try {
+      // A monitor start is a subscribe (D7): append the disclosure record.
+      final visibility = await settingsRepository.getFrigateVisibility() ??
+          frigateVisibilityPrivate;
+      await walletRepository.appendFrigateDisclosureRecord(
+          url: url, visibility: visibility);
+
+      final watchedOutputs = await watchedOutputsFn();
+
+      await frigateMonitorStart(
+          frigateUrl: url,
+          fromHeight: lastSync + 1,
+          dustLimit: BigInt.from(dustLimit),
+          watchedOutputs: watchedOutputs);
+
+      _frigateMonitorRunning = true;
+      _startMonitorBeat();
+      Logger().i('[$_logTag] frigate monitor running from ${lastSync + 1}');
+    } catch (e) {
+      await walletRepository.endFrigateScan();
+      _frigateScanRunning = false;
+      Logger().w('[$_logTag] frigate monitor failed to start: $e');
+    }
   }
 
   /// Drop the monitor subscription cleanly: abort the scanner task and clear
   /// the persisted scan-session state.
-  ///
-  /// TDD red state (stub): a no-op, matching the pre-wiring behavior.
-  Future<void> stopFrigateMonitor() async {}
+  Future<void> stopFrigateMonitor() async {
+    _monitorBeatTimer?.cancel();
+    _monitorBeatTimer = null;
+    if (!_frigateMonitorRunning) {
+      return;
+    }
+    try {
+      await frigateMonitorStop();
+    } finally {
+      _frigateMonitorRunning = false;
+      _frigateScanRunning = false;
+      await walletRepository.endFrigateScan();
+    }
+  }
+
+  /// Keeps the persisted scan-session heartbeat fresh while the monitor
+  /// holds the subscription (liveness marker for a killed process, D2).
+  void _startMonitorBeat() {
+    final interval = monitorBeatInterval;
+    if (interval == null) {
+      return;
+    }
+    _monitorBeatTimer?.cancel();
+    _monitorBeatTimer = Timer.periodic(interval, (_) {
+      unawaited(walletRepository.touchFrigateScanBeat());
+    });
+  }
 
   Future<void> trySync() async {
     if (_isSyncing) {
@@ -330,6 +427,17 @@ class SyncEngine {
       int? tip;
       String? probeTipHash;
       if (useFrigate) {
+        // The monitor covers the live tail while it holds the subscription
+        // (phase 2): the wake one-shot must not re-subscribe on top of it
+        // (D3: no duplicate subscription, no wake-cycle re-disclosure). A
+        // dead monitor is restarted by the service's liveness pass, and the
+        // phase-1 recovery path below runs whenever no monitor is live.
+        if (_frigateMonitorRunning) {
+          Logger().i('[$_logTag] frigate monitor live, wake scan skipped');
+          await walletRepository.touchFrigateScanBeat();
+          return;
+        }
+
         // A scan lock present while this engine is not syncing was left by a
         // killed process (D2): clear it and resume from lastSync — the
         // scanner start_height prevents history re-sweeping.
@@ -502,6 +610,7 @@ class SyncEngine {
   }
 
   void dispose() {
+    _monitorBeatTimer?.cancel();
     _syncResultSubscription.cancel();
   }
 }
