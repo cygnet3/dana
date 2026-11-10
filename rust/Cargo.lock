@@ -1912,6 +1912,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "backend-frigate",
  "base64 0.22.1",
  "bip39",
  "flutter_rust_bridge",
