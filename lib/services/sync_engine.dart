@@ -13,6 +13,10 @@ import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/state_update.dart';
 import 'package:danawallet/generated/rust/api/wallet/frigate.dart'
     show WatchedOutput, frigateTipProbe;
+// The engine's own stopFrigateMonitor() method shadows the generated
+// top-level fn inside the class, so the bridge call gets its own prefix.
+import 'package:danawallet/generated/rust/api/wallet/frigate.dart'
+    as frigate_api show stopFrigateMonitor;
 import 'package:danawallet/repositories/mempool_api_repository.dart';
 import 'package:danawallet/repositories/owned_outputs_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
@@ -48,6 +52,22 @@ typedef FrigateScanFn = Future<FrigateScanOutcome> Function({
 /// Watch-set collection (`OwnedOutputsRepository.getWatchedOutputs`) — the
 /// single watch-set disclosure point.
 typedef WatchedOutputsFn = Future<List<WatchedOutput>> Function();
+
+/// Continuous frigate monitor start (`SpWallet.startFrigateMonitor`): opens
+/// the persistent key-bearing subscription for the phase-2 mempool tail.
+typedef FrigateMonitorStartFn = Future<void> Function({
+  required String frigateUrl,
+  required int fromHeight,
+  required BigInt dustLimit,
+  required List<WatchedOutput> watchedOutputs,
+});
+
+/// Continuous frigate monitor stop (`SpWallet.stopFrigateMonitor`).
+typedef FrigateMonitorStopFn = Future<void> Function();
+
+/// Monitor liveness probe (rust `frigateMonitorRunning`): true while the
+/// monitor task holds the subscription.
+typedef FrigateMonitorActiveFn = Future<bool> Function();
 
 /// Blindbit chain height (`getChainHeight`).
 typedef ChainHeightFn = Future<int> Function({required String blindbitUrl});
@@ -89,6 +109,11 @@ class SyncEngine {
   /// rule for the scan-session keys, D2).
   bool _frigateScanRunning = false;
 
+  /// True while the continuous frigate monitor (phase-2 tail) is running in
+  /// this isolate. The rust-side task state ([frigateMonitorActive]) is the
+  /// cross-isolate liveness truth.
+  bool _frigateMonitorRunning = false;
+
   /// Current process id — the scan-lock liveness marker (D2). The background
   /// service isolate shares the app process, so it writes the same pid.
   int get pid => io.pid;
@@ -100,9 +125,16 @@ class SyncEngine {
   final FrigateTipProbeFn frigateProbe;
   final WatchedOutputsFn watchedOutputsFn;
   final FrigateScanFn frigateScanFn;
+  final FrigateMonitorStartFn frigateMonitorStart;
+  final FrigateMonitorStopFn frigateMonitorStop;
+  final FrigateMonitorActiveFn frigateMonitorActive;
   final ChainHeightFn chainHeightFn;
   final NetworkCheckFn networkCheckFn;
   final SyncResultStreamFn syncResultStreamFn;
+
+  /// Heartbeat interval for the monitor's scan-session beat. Null disables
+  /// the timer (tests drive liveness through the session state directly).
+  final Duration? monitorBeatInterval;
 
   SyncEngine({
     required this.onSyncStarted,
@@ -115,6 +147,10 @@ class SyncEngine {
     FrigateTipProbeFn? frigateProbe,
     WatchedOutputsFn? watchedOutputsFn,
     FrigateScanFn? frigateScanFn,
+    FrigateMonitorStartFn? frigateMonitorStart,
+    FrigateMonitorStopFn? frigateMonitorStop,
+    FrigateMonitorActiveFn? frigateMonitorActive,
+    this.monitorBeatInterval = const Duration(seconds: 30),
     ChainHeightFn? chainHeightFn,
     NetworkCheckFn? networkCheckFn,
     SyncResultStreamFn? resultStreamFn,
@@ -123,6 +159,9 @@ class SyncEngine {
         frigateProbe = frigateProbe ?? _defaultFrigateProbe,
         watchedOutputsFn = watchedOutputsFn ?? _defaultWatchedOutputs,
         frigateScanFn = frigateScanFn ?? _defaultFrigateScan,
+        frigateMonitorStart = frigateMonitorStart ?? _defaultFrigateMonitorStart,
+        frigateMonitorStop = frigateMonitorStop ?? _defaultFrigateMonitorStop,
+        frigateMonitorActive = frigateMonitorActive ?? _defaultFrigateMonitorActive,
         chainHeightFn = chainHeightFn ?? getChainHeight,
         networkCheckFn = networkCheckFn ?? checkNetwork,
         syncResultStreamFn = resultStreamFn ?? createSyncResultStream,
@@ -148,6 +187,31 @@ class SyncEngine {
         fromHeight: fromHeight,
         dustLimit: dustLimit,
         watchedOutputs: watchedOutputs);
+  }
+
+  static Future<void> _defaultFrigateMonitorStart({
+    required String frigateUrl,
+    required int fromHeight,
+    required BigInt dustLimit,
+    required List<WatchedOutput> watchedOutputs,
+  }) async {
+    final wallet = await WalletRepository.instance.readWallet();
+    await wallet!.startFrigateMonitor(
+        frigateUrl: frigateUrl,
+        fromHeight: fromHeight,
+        dustLimit: dustLimit,
+        watchedOutputs: watchedOutputs);
+  }
+
+  static Future<void> _defaultFrigateMonitorStop() async {
+    frigate_api.stopFrigateMonitor();
+  }
+
+  static Future<bool> _defaultFrigateMonitorActive() async {
+    // TDD red state (stub): the rust-side liveness probe
+    // (`frigateMonitorRunning`) lands with the wiring commit; until then
+    // the monitor is never started anyway (ensureFrigateMonitor is a no-op).
+    return false;
   }
 
   // Only used by _onSyncResult (not exercised in the wake acceptance tests;
@@ -215,6 +279,23 @@ class SyncEngine {
       await onStateUpdated(true);
     }
   }
+
+  /// Phase-2/3 wiring: keep a continuous frigate subscription (the
+  /// [FrigateMonitor]) alive while the foreground service runs, reusing the
+  /// persisted scan-session state (D2/D3) as its liveness marker.
+  ///
+  /// TDD red state (stub): a no-op — the monitor has zero call sites and
+  /// never runs. The lifecycle is implemented to green in the wiring commit.
+  Future<void> ensureFrigateMonitor() async {
+    Logger().d(
+        '[$_logTag] frigate monitor ensure (wiring stub): running=$_frigateMonitorRunning');
+  }
+
+  /// Drop the monitor subscription cleanly: abort the scanner task and clear
+  /// the persisted scan-session state.
+  ///
+  /// TDD red state (stub): a no-op, matching the pre-wiring behavior.
+  Future<void> stopFrigateMonitor() async {}
 
   Future<void> trySync() async {
     if (_isSyncing) {

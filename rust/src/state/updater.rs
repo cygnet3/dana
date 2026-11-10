@@ -5,13 +5,47 @@ use std::{
 
 use anyhow::Result;
 use spdk_wallet::{
-    bitcoin::{absolute::Height, BlockHash, OutPoint},
+    bitcoin::{absolute::Height, BlockHash, OutPoint, Txid},
     scanner::{DiscoveredOutput, ScanResult},
 };
 
 use crate::api::structs::owned_output::OwnedOutput;
 use crate::api::structs::state_update::StateUpdate;
 use crate::stream::{send_sync_progress, send_sync_update};
+
+/// Destination for emitted [`StateUpdate`]s.
+///
+/// Production sends through the FRB stream sink; tests inject a recorder so
+/// the exact-once guarantee (phase-2/3 contract) is observable without a
+/// stream registration.
+pub trait StateSink: Send {
+    fn send(&self, update: StateUpdate) -> anyhow::Result<()>;
+}
+
+/// Production sink: the FRB state-update stream.
+struct StreamStateSink;
+
+impl StateSink for StreamStateSink {
+    fn send(&self, update: StateUpdate) -> anyhow::Result<()> {
+        send_sync_update(update)
+    }
+}
+
+/// Test sink recording every emitted update (shared via Arc so tests can
+/// hold the handle while the pump owns the sink).
+#[cfg(test)]
+#[derive(Clone, Default)]
+pub struct RecordingSink {
+    pub updates: std::sync::Arc<std::sync::Mutex<Vec<StateUpdate>>>,
+}
+
+#[cfg(test)]
+impl StateSink for RecordingSink {
+    fn send(&self, update: StateUpdate) -> anyhow::Result<()> {
+        self.updates.lock().unwrap().push(update);
+        Ok(())
+    }
+}
 
 const MAX_TIME_BETWEEN_UPDATES: Duration = Duration::from_secs(30);
 
@@ -43,16 +77,37 @@ pub struct SyncUpdatePump {
     last_hash: String,
     /// Spends received before any real height was emitted (see struct docs).
     pending_spends: Vec<HashSet<OutPoint>>,
+    /// Destination for emitted state updates.
+    sink: Box<dyn StateSink>,
+    /// Phase-2 (mempool) candidates: txid → outpoints discovered at
+    /// height <= 0. Never advances the checkpoint and never touches the
+    /// progress bar; the registry is ephemeral per pump instance.
+    mempool_candidates: HashMap<Txid, HashSet<OutPoint>>,
+    /// Outpoints already emitted as wallet state (candidate path or a
+    /// confirmed delivery). Exact-once guard against duplicate state.
+    emitted_outputs: HashSet<OutPoint>,
+    /// Heights pushed to the progress notifier (test observability).
+    #[cfg(test)]
+    progress_log: Vec<u32>,
 }
 
 impl SyncUpdatePump {
     pub fn new(dust_limit: u64) -> Self {
+        Self::with_sink(dust_limit, Box::new(StreamStateSink))
+    }
+
+    #[cfg(test)]
+    pub fn with_sink(dust_limit: u64, sink: Box<dyn StateSink>) -> Self {
         Self {
             last_update: Instant::now(),
             dust_limit,
             last_height: 0,
             last_hash: String::new(),
             pending_spends: Vec::new(),
+            sink,
+            mempool_candidates: HashMap::new(),
+            emitted_outputs: HashSet::new(),
+            progress_log: Vec::new(),
         }
     }
 
@@ -83,10 +138,55 @@ impl SyncUpdatePump {
             // whether we update or not, we always notify the progress notifier
             // note: the scan progress notifyer is purely to show scan progress to
             // the user, it does not affect persistent storage
-            send_sync_progress(height);
+            self.notify_progress(height);
         }
 
         Ok(())
+    }
+
+    /// Register a phase-2 (mempool) discovery: a transaction that entered
+    /// the mempool carrying outputs of our scan key (height <= 0 entry over
+    /// the key-bearing subscription).
+    ///
+    /// Contract (decision-record amendment 2026-11-10): the candidate is
+    /// registered and tracked, but wallet state is created only on the
+    /// confirmation notification (phase 3), the checkpoint is NEVER advanced
+    /// and the progress bar is NEVER touched by mempool activity.
+    pub fn record_mempool(
+        &mut self,
+        txid: Txid,
+        discovered_outputs: HashMap<OutPoint, DiscoveredOutput>,
+    ) -> Result<()> {
+        // TDD red state (stub): mempool discoveries are logged and dropped,
+        // byte-identical to the pre-phase-2 behavior. The candidate
+        // registration is implemented to green in the follow-up commit.
+        let _ = (txid, discovered_outputs);
+        log::debug!("frigate: mempool discovery deferred (candidate pipeline not wired)");
+        Ok(())
+    }
+
+    /// Test observability: number of registered mempool candidates.
+    #[cfg(test)]
+    pub fn mempool_candidate_count(&self) -> usize {
+        self.mempool_candidates.len()
+    }
+
+    /// Test observability: the last emitted (checkpoint) height.
+    #[cfg(test)]
+    pub fn last_emitted_height(&self) -> u32 {
+        self.last_height
+    }
+
+    /// Test observability: heights pushed to the progress notifier.
+    #[cfg(test)]
+    pub fn progress_log(&self) -> &[u32] {
+        &self.progress_log
+    }
+
+    /// Test observability: outpoints already emitted as wallet state.
+    #[cfg(test)]
+    pub fn emitted_output_count(&self) -> usize {
+        self.emitted_outputs.len()
     }
 
     /// Outpoints spent in confirmed transactions (frigate `Spent` events).
@@ -176,13 +276,21 @@ impl SyncUpdatePump {
                 .collect(),
         };
 
-        send_sync_update(update)?;
+        self.sink.send(update)?;
 
         self.last_height = height;
         self.last_hash = hash;
         self.last_update = Instant::now();
 
         Ok(())
+    }
+
+    /// Push a scan-progress height to the notifier (test-observed via
+    /// [`Self::progress_log`]).
+    fn notify_progress(&mut self, height: u32) {
+        #[cfg(test)]
+        self.progress_log.push(height);
+        send_sync_progress(height);
     }
 }
 
