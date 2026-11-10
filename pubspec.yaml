@@ -50,6 +50,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  # test-only: in-memory SharedPreferencesAsync platform mock
+  shared_preferences_platform_interface: ^2.4.0
   ffigen: ^12.0.0
   build_runner: ^2.4.6
   freezed: ^2.4.2

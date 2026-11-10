@@ -91,8 +91,7 @@ void main() {
         () => AmountExtension.parseBtcInput('1.123456789'),
         throwsA(
           predicate<FormatException>(
-            (e) =>
-                e.message == 'Too many decimal places: expected 8, got 9',
+            (e) => e.message == 'Too many decimal places: expected 8, got 9',
           ),
         ),
       );

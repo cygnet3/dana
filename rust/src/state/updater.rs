@@ -235,4 +235,38 @@ mod tests {
         assert!(err.to_string().contains("Stream sink not available"));
         assert!(pump.pending_spends.is_empty());
     }
+
+    /// Checkpoint monotonicity (D10 acceptance): an emit whose height is
+    /// older than the last emitted one is dropped — `Ok(())`, no emission,
+    /// `last_height` unchanged — even when the update carries discoveries.
+    /// Dart persists `saveLastSync(event.blkheight)` for every emitted
+    /// update, so this guard is what keeps the persisted checkpoint from
+    /// ever moving backward.
+    #[test]
+    fn out_of_order_height_is_dropped() {
+        let mut pump = SyncUpdatePump::new(0);
+        pump.last_height = 800_002;
+        pump.last_hash = "h".to_string();
+        let mut older = scan_result(800_001);
+        older.discovered_inputs.insert(outpoint(1));
+        pump.record(older, false).unwrap();
+        assert_eq!(pump.last_height, 800_002);
+    }
+
+    /// Checkpoint monotonicity: `finalize` (frigate `CaughtUp` / blindbit
+    /// range end) never moves the checkpoint backward. A tip older than the
+    /// last emitted height is ignored without attempting an emission — the
+    /// absence of the no-sink emission error proves that.
+    #[test]
+    fn finalize_never_rewinds_checkpoint() {
+        let mut pump = SyncUpdatePump::new(0);
+        pump.last_height = 800_002;
+        pump.last_hash = "h".to_string();
+        pump.finalize(
+            Height::from_consensus(800_001).unwrap(),
+            BlockHash::from_str(&"0".repeat(64)).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(pump.last_height, 800_002);
+    }
 }
