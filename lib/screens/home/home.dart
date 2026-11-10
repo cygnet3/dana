@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:bitcoin_ui/bitcoin_ui.dart';
+import 'package:danawallet/constants.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/states/fiat_exchange_rate_state.dart';
 import 'package:danawallet/states/home_state.dart';
@@ -8,6 +9,7 @@ import 'package:danawallet/screens/contacts/contacts.dart';
 import 'package:danawallet/screens/wallet/wallet.dart';
 import 'package:danawallet/screens/settings/settings_screen.dart';
 import 'package:danawallet/states/permission_state.dart';
+import 'package:danawallet/states/sync_offline_state.dart';
 import 'package:danawallet/widgets/alerts/status_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -37,6 +39,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final homeState = Provider.of<HomeState>(context, listen: true);
     final permissions = Provider.of<PermissionState>(context, listen: true);
+    final syncOffline = Provider.of<SyncOfflineState>(context, listen: true);
 
     return PopScope(
         canPop: false,
@@ -52,6 +55,14 @@ class HomeScreen extends StatelessWidget {
                   onActionPressed: () {
                     unawaited(_onEnableBackgroundSync(context));
                   },
+                ),
+              // Transient neutral banner while the frigate server is
+              // unreachable (D8): cleared on the next successful sync.
+              if (syncOffline.message != null)
+                StatusBanner(
+                  icon: Icons.cloud_off,
+                  message: syncOffline.message!,
+                  backgroundColor: frigateOfflineColor,
                 ),
               Expanded(
                 child: IndexedStack(

@@ -1,14 +1,17 @@
 import 'dart:async';
 
 import 'package:danawallet/generated/rust/api/stream.dart';
+import 'package:danawallet/generated/rust/api/structs/sync_progress_event.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
 import 'package:flutter/material.dart';
 
 /// Tracks sync progress for the UI progress bar.
 ///
-/// Frigate mode note: when syncing via frigate, [SyncEngine] activates the
-/// bar with end == start (the caught-up tip is unknown up front), so progress
-/// events are ignored here and the bar stays indeterminate until deactivate().
+/// Events are tagged [SyncProgressEvent]s: a frigate scan announces the chain
+/// tip first (the determinate bar's end height, superseded by later scanner
+/// tips on reorg), then the pump reports scanner heights. Progress stays
+/// null — indeterminate — until both the tip-driven end and a first scanner
+/// Height have arrived; it is never interpolated (D4).
 class SyncProgressState extends ChangeNotifier {
   bool isSyncing = false;
   Completer? _completer;
@@ -22,22 +25,35 @@ class SyncProgressState extends ChangeNotifier {
   SyncProgressState._();
 
   void _initialize() {
-    syncProgressSubscription = createSyncProgressStream().listen((current) {
+    syncProgressSubscription = createSyncProgressStream().listen((event) {
       // Only update progress while the bar is active. Ignoring events outside
       // of an active scan prevents a trailing Rust event from re-activating the
       // bar after deactivate() has already been called.
       if (!isSyncing) return;
 
-      final start = _startHeight;
-      final end = _endHeight;
-      if (start == null || end == null || end <= start) return;
-
-      final progress = (current - start) / (end - start);
-      if (current != end) {
-        this.progress = progress;
-        notifyListeners();
+      switch (event) {
+        case SyncProgressEvent_Tip(:final height):
+          // Scanner tip supersedes the wake-time probe tip (possible reorg
+          // between probe and scan): the bar's end follows the scanner.
+          _endHeight = height;
+        case SyncProgressEvent_Height(:final field0):
+          _onScannerHeight(field0);
       }
+      notifyListeners();
     });
+  }
+
+  void _onScannerHeight(int current) {
+    final start = _startHeight;
+    final end = _endHeight;
+    // Indeterminate until both the tip-driven end and a scanner Height have
+    // arrived (a degenerate end <= start also stays indeterminate).
+    if (start == null || end == null || end <= start) return;
+
+    // The final height is handled by deactivate() on sync completion.
+    if (current < end) {
+      progress = (current - start) / (end - start);
+    }
   }
 
   static SyncProgressState create() {

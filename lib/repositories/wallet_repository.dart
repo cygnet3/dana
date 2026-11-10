@@ -16,6 +16,15 @@ const String _keyBirthday = "birthday";
 const String _keyNetwork = "network";
 const String _keyLastSync = "lastscan";
 const String _keyDanaAddress = "danaaddress";
+// frigate scan-session state (D2): single-writer (only the isolate running
+// the scan writes it); lives and dies with the wallet via the reset()
+// allowList below. No caught-up flag is persisted — catch-up is derived
+// from the keyless tip probe at every wake.
+const String _keyFrigateScanActive = "frigateScanActive";
+const String _keyFrigateScanPid = "frigateScanPid";
+const String _keyFrigateScanBeat = "frigateScanBeat";
+const String _keyFrigateLastTipHeight = "frigateLastTipHeight";
+const String _keyFrigateLastTipHash = "frigateLastTipHash";
 
 class WalletRepository {
   final secureStorage = const FlutterSecureStorage();
@@ -37,6 +46,11 @@ class WalletRepository {
       _keyLastSync,
       _keyBirthday,
       _keyDanaAddress,
+      _keyFrigateScanActive,
+      _keyFrigateScanPid,
+      _keyFrigateScanBeat,
+      _keyFrigateLastTipHeight,
+      _keyFrigateLastTipHash,
     });
   }
 
@@ -150,4 +164,60 @@ class WalletRepository {
       return null;
     }
   }
+
+  /// Marks a frigate scan as running in [pid] (single-writer: call only from
+  /// the isolate that will run the scan).
+  Future<void> beginFrigateScan({required int pid}) async {
+    await nonSecureStorage.setBool(_keyFrigateScanActive, true);
+    await nonSecureStorage.setInt(_keyFrigateScanPid, pid);
+    await touchFrigateScanBeat();
+  }
+
+  /// Refreshes the scan heartbeat so another wake can tell a live scan from
+  /// a dead lock.
+  Future<void> touchFrigateScanBeat() async {
+    await nonSecureStorage.setInt(
+        _keyFrigateScanBeat, DateTime.now().millisecondsSinceEpoch);
+  }
+
+  /// Records the last tip pair (diagnostics + the D9 "last Confirmed
+  /// boundary" record) and clears the scan lock. Safe to call with no scan
+  /// running.
+  Future<void> endFrigateScan({int? tipHeight, String? tipHash}) async {
+    if (tipHeight != null) {
+      await nonSecureStorage.setInt(_keyFrigateLastTipHeight, tipHeight);
+    }
+    if (tipHash != null) {
+      await nonSecureStorage.setString(_keyFrigateLastTipHash, tipHash);
+    }
+    await nonSecureStorage.remove(_keyFrigateScanActive);
+    await nonSecureStorage.remove(_keyFrigateScanPid);
+    await nonSecureStorage.remove(_keyFrigateScanBeat);
+  }
+
+  Future<FrigateScanLock?> readFrigateScanLock() async {
+    final active = await nonSecureStorage.getBool(_keyFrigateScanActive);
+    final pid = await nonSecureStorage.getInt(_keyFrigateScanPid);
+    final beatMs = await nonSecureStorage.getInt(_keyFrigateScanBeat);
+    if (active != true || pid == null || beatMs == null) {
+      return null;
+    }
+    return FrigateScanLock(
+        pid: pid, beat: DateTime.fromMillisecondsSinceEpoch(beatMs));
+  }
+}
+
+/// Liveness record of a running frigate scan (D2).
+class FrigateScanLock {
+  final int pid;
+  final DateTime beat;
+
+  FrigateScanLock({required this.pid, required this.beat});
+
+  /// Dead if written by another process (pid no longer ours), or if the
+  /// heartbeat is older than 15 minutes (covers pid reuse).
+  bool isStale(
+          {required int currentPid,
+          Duration maxAge = const Duration(minutes: 15)}) =>
+      pid != currentPid || DateTime.now().difference(beat) > maxAge;
 }
