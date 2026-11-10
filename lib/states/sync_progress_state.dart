@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:danawallet/generated/rust/api/stream.dart';
 import 'package:danawallet/generated/rust/api/structs/sync_progress_event.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show ChangeNotifier, visibleForTesting;
 
 /// Tracks sync progress for the UI progress bar.
 ///
@@ -25,22 +25,28 @@ class SyncProgressState extends ChangeNotifier {
   SyncProgressState._();
 
   void _initialize() {
-    syncProgressSubscription = createSyncProgressStream().listen((event) {
-      // Only update progress while the bar is active. Ignoring events outside
-      // of an active scan prevents a trailing Rust event from re-activating the
-      // bar after deactivate() has already been called.
-      if (!isSyncing) return;
+    syncProgressSubscription = createSyncProgressStream().listen(handleEvent);
+  }
 
-      switch (event) {
-        case SyncProgressEvent_Tip(:final height):
-          // Scanner tip supersedes the wake-time probe tip (possible reorg
-          // between probe and scan): the bar's end follows the scanner.
-          _endHeight = height;
-        case SyncProgressEvent_Height(:final field0):
-          _onScannerHeight(field0);
-      }
-      notifyListeners();
-    });
+  /// Maps one tagged progress event to bar state. Public (visible-for-
+  /// testing) so acceptance tests can drive the bar stages without a rust
+  /// library; the live FRB stream feeds the same method.
+  @visibleForTesting
+  void handleEvent(SyncProgressEvent event) {
+    // Only update progress while the bar is active. Ignoring events outside
+    // of an active scan prevents a trailing Rust event from re-activating the
+    // bar after deactivate() has already been called.
+    if (!isSyncing) return;
+
+    switch (event) {
+      case SyncProgressEvent_Tip(:final height):
+        // Scanner tip supersedes the wake-time probe tip (possible reorg
+        // between probe and scan): the bar's end follows the scanner.
+        _endHeight = height;
+      case SyncProgressEvent_Height(:final field0):
+        _onScannerHeight(field0);
+    }
+    notifyListeners();
   }
 
   void _onScannerHeight(int current) {
@@ -61,6 +67,11 @@ class SyncProgressState extends ChangeNotifier {
     instance._initialize();
     return instance;
   }
+
+  /// Test instance: no live FRB stream subscription — events are driven
+  /// through [handleEvent] directly.
+  @visibleForTesting
+  static SyncProgressState forTesting() => SyncProgressState._();
 
   @override
   void dispose() {
