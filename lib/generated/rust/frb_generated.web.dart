@@ -13,6 +13,7 @@ import 'api/stream.dart';
 import 'api/structs/amount.dart';
 import 'api/structs/bip321_uri.dart';
 import 'api/structs/discovered_output.dart';
+import 'api/structs/frigate_scan_outcome.dart';
 import 'api/structs/input_selection.dart';
 import 'api/structs/network.dart';
 import 'api/structs/outpoint.dart';
@@ -20,9 +21,11 @@ import 'api/structs/owned_output.dart';
 import 'api/structs/recipient.dart';
 import 'api/structs/silent_payment_code.dart';
 import 'api/structs/state_update.dart';
+import 'api/structs/sync_progress_event.dart';
 import 'api/structs/unsigned_transaction.dart';
 import 'api/wallet.dart';
 import 'api/wallet/coin_selection.dart';
+import 'api/wallet/frigate.dart';
 import 'api/wallet/setup.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -229,7 +232,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       dynamic raw);
 
   @protected
-  RustStreamSink<int> dco_decode_StreamSink_u_32_Sse(dynamic raw);
+  RustStreamSink<SyncProgressEvent>
+      dco_decode_StreamSink_sync_progress_event_Sse(dynamic raw);
 
   @protected
   String dco_decode_String(dynamic raw);
@@ -268,6 +272,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   double dco_decode_f_32(dynamic raw);
 
   @protected
+  FrigateScanOutcome dco_decode_frigate_scan_outcome(dynamic raw);
+
+  @protected
   int dco_decode_i_32(dynamic raw);
 
   @protected
@@ -298,6 +305,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   List<(OutPoint, DiscoveredOutput)>
       dco_decode_list_record_out_point_discovered_output(dynamic raw);
+
+  @protected
+  List<WatchedOutput> dco_decode_list_watched_output(dynamic raw);
 
   @protected
   LogEntry dco_decode_log_entry(dynamic raw);
@@ -340,7 +350,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       dynamic raw);
 
   @protected
+  (int, String) dco_decode_record_u_32_string(dynamic raw);
+
+  @protected
   StateUpdate dco_decode_state_update(dynamic raw);
+
+  @protected
+  SyncProgressEvent dco_decode_sync_progress_event(dynamic raw);
 
   @protected
   int dco_decode_u_32(dynamic raw);
@@ -365,6 +381,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   WalletSetupType dco_decode_wallet_setup_type(dynamic raw);
+
+  @protected
+  WatchedOutput dco_decode_watched_output(dynamic raw);
 
   @protected
   AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
@@ -525,8 +544,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       SseDeserializer deserializer);
 
   @protected
-  RustStreamSink<int> sse_decode_StreamSink_u_32_Sse(
-      SseDeserializer deserializer);
+  RustStreamSink<SyncProgressEvent>
+      sse_decode_StreamSink_sync_progress_event_Sse(
+          SseDeserializer deserializer);
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
@@ -567,6 +587,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   double sse_decode_f_32(SseDeserializer deserializer);
 
   @protected
+  FrigateScanOutcome sse_decode_frigate_scan_outcome(
+      SseDeserializer deserializer);
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
@@ -598,6 +622,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<(OutPoint, DiscoveredOutput)>
       sse_decode_list_record_out_point_discovered_output(
           SseDeserializer deserializer);
+
+  @protected
+  List<WatchedOutput> sse_decode_list_watched_output(
+      SseDeserializer deserializer);
 
   @protected
   LogEntry sse_decode_log_entry(SseDeserializer deserializer);
@@ -640,7 +668,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       SseDeserializer deserializer);
 
   @protected
+  (int, String) sse_decode_record_u_32_string(SseDeserializer deserializer);
+
+  @protected
   StateUpdate sse_decode_state_update(SseDeserializer deserializer);
+
+  @protected
+  SyncProgressEvent sse_decode_sync_progress_event(
+      SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -665,6 +700,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   WalletSetupType sse_decode_wallet_setup_type(SseDeserializer deserializer);
+
+  @protected
+  WatchedOutput sse_decode_watched_output(SseDeserializer deserializer);
 
   @protected
   void sse_encode_AnyhowException(
@@ -827,8 +865,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       RustStreamSink<StateUpdate> self, SseSerializer serializer);
 
   @protected
-  void sse_encode_StreamSink_u_32_Sse(
-      RustStreamSink<int> self, SseSerializer serializer);
+  void sse_encode_StreamSink_sync_progress_event_Sse(
+      RustStreamSink<SyncProgressEvent> self, SseSerializer serializer);
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
@@ -870,6 +908,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_f_32(double self, SseSerializer serializer);
 
   @protected
+  void sse_encode_frigate_scan_outcome(
+      FrigateScanOutcome self, SseSerializer serializer);
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
@@ -902,6 +944,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_record_out_point_discovered_output(
       List<(OutPoint, DiscoveredOutput)> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_watched_output(
+      List<WatchedOutput> self, SseSerializer serializer);
 
   @protected
   void sse_encode_log_entry(LogEntry self, SseSerializer serializer);
@@ -946,7 +992,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       (OutPoint, DiscoveredOutput) self, SseSerializer serializer);
 
   @protected
+  void sse_encode_record_u_32_string(
+      (int, String) self, SseSerializer serializer);
+
+  @protected
   void sse_encode_state_update(StateUpdate self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_sync_progress_event(
+      SyncProgressEvent self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);
@@ -973,6 +1027,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_wallet_setup_type(
       WalletSetupType self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_watched_output(WatchedOutput self, SseSerializer serializer);
 }
 
 // Section: wire_class
