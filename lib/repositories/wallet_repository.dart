@@ -102,6 +102,10 @@ class WalletRepository {
     }
   }
 
+  Future<bool> hasSeedPhrase() async {
+    return await secureStorage.containsKey(key: _keySeedPhrase);
+  }
+
   Future<String?> readSeedPhrase() async {
     return await secureStorage.read(key: _keySeedPhrase);
   }
