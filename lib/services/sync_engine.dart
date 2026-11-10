@@ -8,10 +8,11 @@ import 'package:danawallet/extensions/outpoint.dart';
 import 'package:danawallet/generated/rust/api/chain.dart';
 import 'package:danawallet/generated/rust/api/stream.dart';
 import 'package:danawallet/generated/rust/api/structs/frigate_scan_outcome.dart';
+import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/state_update.dart';
 import 'package:danawallet/generated/rust/api/wallet/frigate.dart'
-    show frigateTipProbe;
+    show WatchedOutput, frigateTipProbe;
 import 'package:danawallet/repositories/mempool_api_repository.dart';
 import 'package:danawallet/repositories/owned_outputs_repository.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
@@ -26,6 +27,40 @@ import 'package:logger/logger.dart';
 /// UI state refreshes) are injected as callbacks so this class stays free of
 /// Flutter and android-plugin dependencies and can run safely in both the
 /// main isolate and a background isolate.
+///
+/// External effects (rust probe/scan calls, watch-set collection, blindbit
+/// chain calls) are injected as functions defaulting to the real
+/// implementations, so acceptance tests can drive the wake flow with
+/// counting fakes and no rust library.
+
+/// Keyless tip probe (`frigateTipProbe` in the rust layer).
+typedef FrigateTipProbeFn = Future<(int, String)> Function(
+    {required String url});
+
+/// One-shot frigate scan (`SpWallet.syncViaFrigate`).
+typedef FrigateScanFn = Future<FrigateScanOutcome> Function({
+  required String frigateUrl,
+  required int fromHeight,
+  required BigInt dustLimit,
+  required List<WatchedOutput> watchedOutputs,
+});
+
+/// Watch-set collection (`OwnedOutputsRepository.getWatchedOutputs`) — the
+/// single watch-set disclosure point.
+typedef WatchedOutputsFn = Future<List<WatchedOutput>> Function();
+
+/// Blindbit chain height (`getChainHeight`).
+typedef ChainHeightFn = Future<int> Function({required String blindbitUrl});
+
+/// Blindbit network check (`checkNetwork`).
+typedef NetworkCheckFn = Future<bool> Function({
+  required String blindbitUrl,
+  required Network network,
+});
+
+/// Sync-result stream factory (`createSyncResultStream`).
+typedef SyncResultStreamFn = Stream<StateUpdate> Function();
+
 class SyncEngine {
   /// Called just before [wallet.syncToHeight] or [wallet.syncViaFrigate]
   /// begins.
@@ -60,9 +95,14 @@ class SyncEngine {
 
   late final StreamSubscription _syncResultSubscription;
 
-  final _ownedOutputsRepository = OwnedOutputsRepository.instance;
-  final _transactionsRepository = TransactionsRepository.instance;
-  final _walletRepository = WalletRepository.instance;
+  final WalletStore walletRepository;
+  final SettingsStore settingsRepository;
+  final FrigateTipProbeFn frigateProbe;
+  final WatchedOutputsFn watchedOutputsFn;
+  final FrigateScanFn frigateScanFn;
+  final ChainHeightFn chainHeightFn;
+  final NetworkCheckFn networkCheckFn;
+  final SyncResultStreamFn syncResultStreamFn;
 
   SyncEngine({
     required this.onSyncStarted,
@@ -70,9 +110,50 @@ class SyncEngine {
     required this.onStateUpdated,
     this.onTransientOffline,
     String logTag = 'sync',
-  }) : _logTag = logTag {
-    _syncResultSubscription = createSyncResultStream().listen(_onSyncResult);
+    WalletStore? walletRepository,
+    SettingsStore? settingsRepository,
+    FrigateTipProbeFn? frigateProbe,
+    WatchedOutputsFn? watchedOutputsFn,
+    FrigateScanFn? frigateScanFn,
+    ChainHeightFn? chainHeightFn,
+    NetworkCheckFn? networkCheckFn,
+    SyncResultStreamFn? resultStreamFn,
+  })  : walletRepository = walletRepository ?? WalletRepository.instance,
+        settingsRepository = settingsRepository ?? SettingsRepository.instance,
+        frigateProbe = frigateProbe ?? _defaultFrigateProbe,
+        watchedOutputsFn = watchedOutputsFn ?? _defaultWatchedOutputs,
+        frigateScanFn = frigateScanFn ?? _defaultFrigateScan,
+        chainHeightFn = chainHeightFn ?? getChainHeight,
+        networkCheckFn = networkCheckFn ?? checkNetwork,
+        syncResultStreamFn = resultStreamFn ?? createSyncResultStream,
+        _logTag = logTag {
+    _syncResultSubscription = syncResultStreamFn().listen(_onSyncResult);
   }
+
+  static Future<(int, String)> _defaultFrigateProbe({required String url}) =>
+      frigateTipProbe(url: url);
+
+  static Future<List<WatchedOutput>> _defaultWatchedOutputs() =>
+      OwnedOutputsRepository.instance.getWatchedOutputs();
+
+  static Future<FrigateScanOutcome> _defaultFrigateScan({
+    required String frigateUrl,
+    required int fromHeight,
+    required BigInt dustLimit,
+    required List<WatchedOutput> watchedOutputs,
+  }) async {
+    final wallet = await WalletRepository.instance.readWallet();
+    return wallet!.syncViaFrigate(
+        frigateUrl: frigateUrl,
+        fromHeight: fromHeight,
+        dustLimit: dustLimit,
+        watchedOutputs: watchedOutputs);
+  }
+
+  // Only used by _onSyncResult (not exercised in the wake acceptance tests;
+  // singletons are fine here since no rust call is involved).
+  final _ownedOutputsRepository = OwnedOutputsRepository.instance;
+  final _transactionsRepository = TransactionsRepository.instance;
 
   Future<void> _onSyncResult(StateUpdate event) async {
     // Process found outputs (new UTXOs we own)
@@ -121,11 +202,11 @@ class SyncEngine {
       );
     }
 
-    await _walletRepository.saveLastSync(event.blkheight);
+    await walletRepository.saveLastSync(event.blkheight);
 
     // keep the scan-session heartbeat fresh while a frigate scan is running
     if (_frigateScanRunning) {
-      await _walletRepository.touchFrigateScanBeat();
+      await walletRepository.touchFrigateScanBeat();
     }
 
     if (event.foundOutputs.isNotEmpty || event.foundInputs.isNotEmpty) {
@@ -142,21 +223,28 @@ class SyncEngine {
     }
     _isSyncing = true;
     try {
-      final wallet = await _walletRepository.readWallet();
-      if (wallet == null) {
+      if (!await walletRepository.hasWallet()) {
         Logger().i('[$_logTag] no wallet, skipping');
         return;
       }
 
-      final network = await _walletRepository.readNetwork();
-      final settings = SettingsRepository.instance;
-      final blindbitUrl =
-          await settings.getBlindbitUrl() ?? network.defaultBlindbitUrl;
+      final network = await walletRepository.readNetwork();
+      final blindbitUrl = await settingsRepository.getBlindbitUrl() ??
+          network.defaultBlindbitUrl;
 
-      // Frigate backend override: an unset or empty frigate URL keeps the
-      // blindbit backend as the default.
-      final frigateUrl = (await settings.getFrigateUrl())?.trim();
-      final useFrigate = frigateUrl != null && frigateUrl.isNotEmpty;
+      // Explicit backend selection (D9): the frigate backend runs only when
+      // the user picked it AND a URL is configured. An unset backend or an
+      // unset/empty URL keeps the blindbit path byte-identical (blindbit
+      // stays the default).
+      final frigateUrl = (await settingsRepository.getFrigateUrl())?.trim();
+      final backend = await settingsRepository.getFrigateBackend();
+      final useFrigate = backend == frigateBackendFrigate &&
+          frigateUrl != null &&
+          frigateUrl.isNotEmpty;
+      if (backend == frigateBackendFrigate && !useFrigate) {
+        Logger().w('[$_logTag] frigate backend selected but no url '
+            'configured, falling back to blindbit');
+      }
 
       int? tip;
       String? probeTipHash;
@@ -172,7 +260,7 @@ class SyncEngine {
         // subscribe, no scan, no watch-set disclosure, checkpoint untouched;
         // the next wake auto-resumes.
         try {
-          final probe = await frigateTipProbe(url: frigateUrl);
+          final probe = await frigateProbe(url: frigateUrl);
           tip = probe.$1;
           probeTipHash = probe.$2;
         } catch (e) {
@@ -182,20 +270,20 @@ class SyncEngine {
         }
       } else {
         final correctNetwork =
-            await checkNetwork(blindbitUrl: blindbitUrl, network: network);
+            await networkCheckFn(blindbitUrl: blindbitUrl, network: network);
         if (!correctNetwork) {
           Logger().w('[$_logTag] wrong network, skipping');
           return;
         }
 
-        tip = await getChainHeight(blindbitUrl: blindbitUrl);
+        tip = await chainHeightFn(blindbitUrl: blindbitUrl);
       }
 
-      var lastSync = await _walletRepository.readLastSync();
+      var lastSync = await walletRepository.readLastSync();
 
       if (lastSync == null) {
         lastSync = await _heightFromBirthday(network);
-        await _walletRepository.saveLastSync(lastSync);
+        await walletRepository.saveLastSync(lastSync);
         Logger()
             .i('[$_logTag] initialized lastSync to birthday height $lastSync');
       }
@@ -208,10 +296,10 @@ class SyncEngine {
         return;
       }
 
-      Logger()
-          .i('[$_logTag] syncing $lastSync -> $tip');
+      Logger().i('[$_logTag] syncing $lastSync -> $tip');
 
-      final dustLimit = await settings.getDustLimit() ?? defaultDustLimit;
+      final dustLimit =
+          await settingsRepository.getDustLimit() ?? defaultDustLimit;
 
       // The probe/getChainHeight tip gives the bar a real end height up
       // front, so it can become determinate as soon as scanner Heights
@@ -221,17 +309,24 @@ class SyncEngine {
       if (useFrigate) {
         // Single-writer (D2): only this isolate, which runs the scan, writes
         // the session keys.
-        await _walletRepository.beginFrigateScan(pid: pid);
+        await walletRepository.beginFrigateScan(pid: pid);
         _frigateScanRunning = true;
         try {
+          // D7 disclosure record: every subscribe appends {url, visibility,
+          // date} to the wallet's append-only record list. The list never
+          // drives a dialog; visibility defaults to private (D5).
+          final visibility = await settingsRepository.getFrigateVisibility() ??
+              frigateVisibilityPrivate;
+          await walletRepository.appendFrigateDisclosureRecord(
+              url: frigateUrl, visibility: visibility);
+
           // Watched outputs carry script bytes so the scanner re-subscribes
           // them on start: unspent + unconfirmed-spent outputs, mirroring the
           // blindbit scan list. This is the single disclosure point —
           // reached only when a scan will actually run (D3).
-          final watchedOutputs =
-              await _ownedOutputsRepository.getWatchedOutputs();
+          final watchedOutputs = await watchedOutputsFn();
 
-          final outcome = await wallet.syncViaFrigate(
+          final outcome = await frigateScanFn(
               frigateUrl: frigateUrl,
               fromHeight: lastSync + 1,
               dustLimit: BigInt.from(dustLimit),
@@ -240,7 +335,7 @@ class SyncEngine {
           // Persist the last tip pair (diagnostics + the D9 boundary record;
           // never drives the checkpoint) and clear the lock whatever the
           // outcome was.
-          await _walletRepository.endFrigateScan(
+          await walletRepository.endFrigateScan(
               tipHeight: tip, tipHash: probeTipHash);
 
           switch (outcome) {
@@ -254,13 +349,18 @@ class SyncEngine {
               onTransientOffline?.call(frigateOfflineMsg);
           }
         } catch (_) {
-          await _walletRepository.endFrigateScan(
+          await walletRepository.endFrigateScan(
               tipHeight: tip, tipHash: probeTipHash);
           rethrow;
         } finally {
           _frigateScanRunning = false;
         }
       } else {
+        final wallet = await walletRepository.readWallet();
+        if (wallet == null) {
+          Logger().w('[$_logTag] wallet vanished mid-wake, skipping');
+          return;
+        }
         final unconfirmedSpentOutpoints =
             await _transactionsRepository.getUnconfirmedSpentOutpoints();
         final unspentOutpoints =
@@ -294,11 +394,11 @@ class SyncEngine {
   /// scan synchronously in this isolate, any lock present here is by
   /// construction orphaned (its process died, or its beat went stale).
   Future<void> _clearStaleFrigateScanLock() async {
-    final lock = await _walletRepository.readFrigateScanLock();
+    final lock = await walletRepository.readFrigateScanLock();
     if (lock == null) return;
     Logger().w('[$_logTag] clearing stale frigate scan lock '
         '(pid=${lock.pid}, stale=${lock.isStale(currentPid: pid)})');
-    await _walletRepository.endFrigateScan();
+    await walletRepository.endFrigateScan();
   }
 
   /// Waits until any active [trySync] call has fully unwound, including its
@@ -314,7 +414,7 @@ class SyncEngine {
   }
 
   Future<int> _heightFromBirthday(network) async {
-    final birthday = await _walletRepository.readBirthday() ?? defaultBirthday;
+    final birthday = await walletRepository.readBirthday() ?? defaultBirthday;
     final mempoolApi = MempoolApiRepository(network: network);
     final block = await mempoolApi.getBlockFromTimestamp(birthday.toSeconds());
     return block.height;

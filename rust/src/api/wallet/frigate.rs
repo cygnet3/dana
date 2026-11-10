@@ -4,6 +4,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use anyhow::Result;
+use futures::Stream;
 use futures::StreamExt as _;
 use lazy_static::lazy_static;
 use spdk_wallet::bitcoin::absolute::Height;
@@ -114,47 +115,10 @@ impl SpWallet {
         let scanner = self
             .build_frigate_scanner(frigate_url, watched_outputs)
             .await?;
-        let mut handle = scanner.start(Height::from_consensus(from_height)?);
+        let handle = scanner.start(Height::from_consensus(from_height)?);
         let mut pump = SyncUpdatePump::new(dust_limit);
         let mut tip: Option<(Height, BlockHash)> = None;
-
-        while let Some(event) = handle.next().await {
-            if !KEEP_SYNCING.load(Ordering::Relaxed) {
-                // interrupted: no finalize; the checkpoint stays at the last
-                // Confirmed boundary and the next backend resumes from there.
-                return Ok(FrigateScanOutcome::Disconnected {
-                    reason: "interrupted".to_string(),
-                });
-            }
-            match event {
-                FrigateEvent::Tip { height, hash } => {
-                    tip = Some((height, hash));
-                    send_sync_tip(height.to_consensus_u32());
-                }
-                FrigateEvent::Confirmed(scan_result) => pump.record(scan_result, false)?,
-                FrigateEvent::Spent(spent) => pump.record_spent(spent)?,
-                FrigateEvent::CaughtUp => {
-                    if let Some((height, hash)) = tip {
-                        pump.finalize(height, hash)?;
-                    }
-                    return Ok(FrigateScanOutcome::Completed);
-                }
-                FrigateEvent::Disconnected(reason) => {
-                    return Ok(FrigateScanOutcome::Disconnected { reason });
-                }
-                FrigateEvent::Unconfirmed { txid, .. } => {
-                    // mempool discoveries are re-reported as Confirmed once
-                    // mined; Dana's state layer only tracks confirmed outputs
-                    log::debug!("frigate: mempool discovery {txid} deferred until confirmation");
-                }
-            }
-        }
-
-        // Silent channel close before CaughtUp (D8): a dead connection must
-        // not look like a completed sync.
-        Ok(FrigateScanOutcome::Disconnected {
-            reason: "connection closed".to_string(),
-        })
+        drive_frigate_events(handle, &mut pump, &mut tip).await
     }
 
     /// Continuous frigate monitor for the foreground service: keeps the
@@ -184,6 +148,58 @@ impl SpWallet {
 
         Ok(())
     }
+}
+
+/// Drives the scanner event stream to a typed outcome (D8).
+///
+/// Split out from [`SpWallet::sync_via_frigate`] so the outcome mapping can
+/// be unit-tested against synthetic event streams; a live [`FrigateHandle`]
+/// is just another `Stream<Item = FrigateEvent>` and behaves identically.
+async fn drive_frigate_events<S>(
+    mut events: S,
+    pump: &mut SyncUpdatePump,
+    tip: &mut Option<(Height, BlockHash)>,
+) -> Result<FrigateScanOutcome>
+where
+    S: Stream<Item = FrigateEvent> + Unpin,
+{
+    while let Some(event) = events.next().await {
+        if !KEEP_SYNCING.load(Ordering::Relaxed) {
+            // interrupted: no finalize; the checkpoint stays at the last
+            // Confirmed boundary and the next backend resumes from there.
+            return Ok(FrigateScanOutcome::Disconnected {
+                reason: "interrupted".to_string(),
+            });
+        }
+        match event {
+            FrigateEvent::Tip { height, hash } => {
+                *tip = Some((height, hash));
+                send_sync_tip(height.to_consensus_u32());
+            }
+            FrigateEvent::Confirmed(scan_result) => pump.record(scan_result, false)?,
+            FrigateEvent::Spent(spent) => pump.record_spent(spent)?,
+            FrigateEvent::CaughtUp => {
+                if let Some((height, hash)) = *tip {
+                    pump.finalize(height, hash)?;
+                }
+                return Ok(FrigateScanOutcome::Completed);
+            }
+            FrigateEvent::Disconnected(reason) => {
+                return Ok(FrigateScanOutcome::Disconnected { reason });
+            }
+            FrigateEvent::Unconfirmed { txid, .. } => {
+                // mempool discoveries are re-reported as Confirmed once
+                // mined; Dana's state layer only tracks confirmed outputs
+                log::debug!("frigate: mempool discovery {txid} deferred until confirmation");
+            }
+        }
+    }
+
+    // Silent channel close before CaughtUp (D8): a dead connection must
+    // not look like a completed sync.
+    Ok(FrigateScanOutcome::Disconnected {
+        reason: "connection closed".to_string(),
+    })
 }
 
 /// Stop the background frigate monitor (no-op if none is running).
@@ -230,5 +246,131 @@ async fn monitor_pump(mut handle: FrigateHandle, dust_limit: u64) {
             }
             FrigateEvent::Unconfirmed { .. } => {}
         }
+    }
+}
+
+#[cfg(test)]
+// FLAG_LOCK deliberately serializes the global KEEP_SYNCING static across
+// test runtimes; the std MutexGuard is intentionally held across the drives
+// so no other test can flip the flag mid-run.
+#[allow(clippy::await_holding_lock)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+    use std::sync::Mutex as StdMutex;
+
+    /// Serialises tests that touch the global `KEEP_SYNCING` flag.
+    static FLAG_LOCK: StdMutex<()> = StdMutex::new(());
+
+    fn test_height(v: u32) -> Height {
+        Height::from_consensus(v).unwrap()
+    }
+
+    fn test_hash() -> BlockHash {
+        BlockHash::from_str(&"0".repeat(64)).unwrap()
+    }
+
+    /// Silent channel close before CaughtUp maps to `Disconnected`, never to
+    /// a success-looking outcome (D8).
+    #[tokio::test]
+    async fn silent_close_maps_to_disconnected() {
+        let _guard = FLAG_LOCK.lock().unwrap();
+        KEEP_SYNCING.store(true, Ordering::Relaxed);
+        let mut pump = SyncUpdatePump::new(0);
+        let mut tip = None;
+        let outcome = drive_frigate_events(
+            futures::stream::iter(Vec::<FrigateEvent>::new()),
+            &mut pump,
+            &mut tip,
+        )
+        .await
+        .unwrap();
+        match outcome {
+            FrigateScanOutcome::Disconnected { reason } => {
+                assert_eq!(reason, "connection closed");
+            }
+            FrigateScanOutcome::Completed => panic!("silent close must not look like success"),
+        }
+    }
+
+    /// `CaughtUp` maps to `Completed` and finalizes at the tip. No stream sink
+    /// is registered in tests, so `pump.finalize` fails with "Stream sink not
+    /// available" — the error proves the Completed mapping reached the
+    /// finalize call (a Disconnected mapping would have returned `Ok`).
+    #[tokio::test]
+    async fn caught_up_maps_to_completed_and_finalizes() {
+        let _guard = FLAG_LOCK.lock().unwrap();
+        KEEP_SYNCING.store(true, Ordering::Relaxed);
+        let mut pump = SyncUpdatePump::new(0);
+        let mut tip = None;
+        let events = futures::stream::iter(vec![
+            FrigateEvent::Tip {
+                height: test_height(800_002),
+                hash: test_hash(),
+            },
+            FrigateEvent::CaughtUp,
+        ]);
+        let err = drive_frigate_events(events, &mut pump, &mut tip)
+            .await
+            .expect_err("finalize must be attempted on CaughtUp");
+        assert!(err.to_string().contains("Stream sink not available"));
+    }
+
+    /// A `Disconnected` event maps to the typed outcome carrying its reason.
+    #[tokio::test]
+    async fn disconnected_event_maps_to_disconnected() {
+        let _guard = FLAG_LOCK.lock().unwrap();
+        KEEP_SYNCING.store(true, Ordering::Relaxed);
+        let mut pump = SyncUpdatePump::new(0);
+        let mut tip = None;
+        let events = futures::stream::iter(vec![
+            FrigateEvent::Tip {
+                height: test_height(800_002),
+                hash: test_hash(),
+            },
+            FrigateEvent::Disconnected("boom".to_string()),
+        ]);
+        let outcome = drive_frigate_events(events, &mut pump, &mut tip)
+            .await
+            .unwrap();
+        match outcome {
+            FrigateScanOutcome::Disconnected { reason } => assert_eq!(reason, "boom"),
+            FrigateScanOutcome::Completed => panic!("disconnect must not look like success"),
+        }
+    }
+
+    /// An interrupt (existing `KEEP_SYNCING` path) returns `Disconnected`
+    /// *without* finalize: the `Ok` return (not the no-sink finalize error)
+    /// proves no finalize was attempted, so the checkpoint stays at the last
+    /// Confirmed boundary (D9 mid-scan switch).
+    #[tokio::test]
+    async fn interrupt_returns_disconnected_without_finalize() {
+        let _guard = FLAG_LOCK.lock().unwrap();
+        KEEP_SYNCING.store(false, Ordering::Relaxed);
+        let mut pump = SyncUpdatePump::new(0);
+        let mut tip = None;
+        let events = futures::stream::iter(vec![
+            FrigateEvent::Tip {
+                height: test_height(800_002),
+                hash: test_hash(),
+            },
+            FrigateEvent::CaughtUp,
+        ]);
+        let outcome = drive_frigate_events(events, &mut pump, &mut tip)
+            .await
+            .unwrap();
+        match outcome {
+            FrigateScanOutcome::Disconnected { reason } => assert_eq!(reason, "interrupted"),
+            FrigateScanOutcome::Completed => panic!("interrupt must not finalize"),
+        }
+    }
+
+    /// D10 URL validation: a malformed URL fails at socket-addr parsing
+    /// before any I/O — the keyless probe never reaches the network with a
+    /// typo'd endpoint (and it carries no scan key at all).
+    #[tokio::test]
+    async fn probe_rejects_bad_url_before_any_io() {
+        assert!(frigate_tip_probe("not a url".to_string()).await.is_err());
+        assert!(frigate_tip_probe(String::new()).await.is_err());
     }
 }

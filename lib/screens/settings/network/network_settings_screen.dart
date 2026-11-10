@@ -1,6 +1,7 @@
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
+import 'package:danawallet/screens/settings/network/frigate_settings_screen.dart';
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:danawallet/states/chain_state.dart';
@@ -20,6 +21,12 @@ class NetworkSettingsScreen extends StatelessWidget {
         title: 'Set backend url',
         subtitle: 'Configure blindbit server endpoint',
         onTap: () => _onSetBlindbitUrl(context),
+      ),
+      _NetworkSettingsItem(
+        icon: Icons.radar,
+        title: 'Frigate backend',
+        subtitle: 'Optional frigate sync server & visibility',
+        onTap: () => goToScreen(context, const FrigateSettingsScreen()),
       ),
       if (isDevEnv)
         _NetworkSettingsItem(
