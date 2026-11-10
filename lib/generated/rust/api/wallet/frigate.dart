@@ -28,6 +28,13 @@ Future<(int, String)> frigateTipProbe({required String url}) =>
 void stopFrigateMonitor() =>
     RustLib.instance.api.crateApiWalletFrigateStopFrigateMonitor();
 
+/// Liveness probe for the background monitor: true while a monitor task is
+/// spawned AND still running (holding the subscription). A finished task —
+/// connection death included — reports false, so the Dart side restarts the
+/// monitor from the persisted checkpoint instead of trusting a dead tail.
+bool frigateMonitorRunning() =>
+    RustLib.instance.api.crateApiWalletFrigateFrigateMonitorRunning();
+
 /// An owned output the frigate scanner keeps watching for spends.
 ///
 /// Frigate re-delivers silent payment history only from the requested start
