@@ -96,7 +96,9 @@ impl SyncUpdatePump {
         Self::with_sink(dust_limit, Box::new(StreamStateSink))
     }
 
-    #[cfg(test)]
+    /// Test/edge constructor with an injected state sink. Production always
+    /// uses [`Self::new`]; the injection seam makes the exact-once guarantee
+    /// observable without a stream registration.
     pub fn with_sink(dust_limit: u64, sink: Box<dyn StateSink>) -> Self {
         Self {
             last_update: Instant::now(),
@@ -107,6 +109,7 @@ impl SyncUpdatePump {
             sink,
             mempool_candidates: HashMap::new(),
             emitted_outputs: HashSet::new(),
+            #[cfg(test)]
             progress_log: Vec::new(),
         }
     }
@@ -119,20 +122,28 @@ impl SyncUpdatePump {
         let height = scan_result.blkheight.to_consensus_u32();
         let hash = scan_result.blkhash.to_string();
 
+        // phase-2/3 exact-once: outputs already emitted as wallet state (via
+        // the candidate pipeline or an earlier Confirmed delivery) are
+        // stripped, so the phase-1 re-report of an already-created output
+        // cannot duplicate wallet state.
+        let mut discovered_outputs = scan_result.discovered_outputs;
+        discovered_outputs
+            .retain(|outpoint, _| !self.emitted_outputs.contains(outpoint));
+        let discovered_inputs = scan_result.discovered_inputs;
+
         // we send a state update in 3 cases:
         // - we have found new spent inputs or discovered outputs
         // - the maximum delay between updates has been reached
         // - we're sending the final update
-        let new_discoveries = !scan_result.discovered_inputs.is_empty()
-            || !scan_result.discovered_outputs.is_empty();
+        let new_discoveries = !discovered_inputs.is_empty() || !discovered_outputs.is_empty();
         let max_delay_reached = self.last_update.elapsed() > MAX_TIME_BETWEEN_UPDATES;
 
         if new_discoveries || max_delay_reached || is_final {
             self.emit(
                 height,
                 hash,
-                scan_result.discovered_inputs,
-                scan_result.discovered_outputs,
+                discovered_inputs,
+                discovered_outputs,
             )?;
         } else {
             // whether we update or not, we always notify the progress notifier
@@ -151,17 +162,25 @@ impl SyncUpdatePump {
     /// Contract (decision-record amendment 2026-11-10): the candidate is
     /// registered and tracked, but wallet state is created only on the
     /// confirmation notification (phase 3), the checkpoint is NEVER advanced
-    /// and the progress bar is NEVER touched by mempool activity.
+    /// and the progress bar is NEVER touched by mempool activity. The
+    /// confirmation arrives as the scanner's re-delivery of the mined
+    /// transaction ([`Self::record`] at a real height) — the candidate
+    /// registry is ephemeral and deduped against confirmed state via
+    /// `emitted_outputs`.
     pub fn record_mempool(
         &mut self,
         txid: Txid,
         discovered_outputs: HashMap<OutPoint, DiscoveredOutput>,
     ) -> Result<()> {
-        // TDD red state (stub): mempool discoveries are logged and dropped,
-        // byte-identical to the pre-phase-2 behavior. The candidate
-        // registration is implemented to green in the follow-up commit.
-        let _ = (txid, discovered_outputs);
-        log::debug!("frigate: mempool discovery deferred (candidate pipeline not wired)");
+        if discovered_outputs.is_empty() {
+            return Ok(());
+        }
+        let outpoints: HashSet<OutPoint> = discovered_outputs.keys().copied().collect();
+        self.mempool_candidates.insert(txid, outpoints);
+        log::debug!(
+            "frigate: mempool candidate registered ({} output(s))",
+            self.mempool_candidates[&txid].len()
+        );
         Ok(())
     }
 
@@ -257,6 +276,8 @@ impl SyncUpdatePump {
         // scanner we apply the same cut client-side
         discovered_outputs.retain(|_, d| d.txout.value.to_sat() >= self.dust_limit);
 
+        let emitted: HashSet<OutPoint> = discovered_outputs.keys().copied().collect();
+
         let update = StateUpdate {
             blkheight: height,
             blkhash: hash.clone(),
@@ -277,6 +298,11 @@ impl SyncUpdatePump {
         };
 
         self.sink.send(update)?;
+
+        // exact-once bookkeeping happens only after a successful send: a
+        // failed emission leaves the outputs unmarked so the delivery can be
+        // retried by the next report.
+        self.emitted_outputs.extend(emitted);
 
         self.last_height = height;
         self.last_hash = hash;

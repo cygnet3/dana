@@ -163,7 +163,9 @@ void main() {
           reason: 'the monitor covers the live tail; the wake one-shot '
               'must not re-subscribe on top of it');
       expect(probeCalls, 0);
-      expect(watchCalls, 0);
+      expect(watchCalls, 1,
+          reason: 'exactly the monitor start watch-set collection — the '
+              'wake adds no extra disclosure');
       expect(wallet.disclosures.length, disclosuresAtMonitorStart,
           reason: 'no extra disclosure for an idle wake');
     });
