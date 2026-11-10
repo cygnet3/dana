@@ -1,9 +1,11 @@
 pub mod amount;
 pub mod bip321_uri;
 pub mod discovered_output;
+pub mod frigate_scan_outcome;
 pub mod network;
 pub mod outpoint;
 pub mod owned_output;
 pub mod recipient;
 pub mod state_update;
+pub mod sync_progress_event;
 pub mod unsigned_transaction;

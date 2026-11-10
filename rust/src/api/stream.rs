@@ -1,4 +1,5 @@
 use crate::api::structs::state_update::StateUpdate;
+use crate::api::structs::sync_progress_event::SyncProgressEvent;
 use crate::logger::{LogEntry, LogLevel};
 use crate::{frb_generated::StreamSink, stream};
 
@@ -9,7 +10,7 @@ pub fn create_log_stream(s: StreamSink<LogEntry>, level: LogLevel, log_dependenc
 }
 
 #[flutter_rust_bridge::frb(sync)]
-pub fn create_sync_progress_stream(s: StreamSink<u32>) {
+pub fn create_sync_progress_stream(s: StreamSink<SyncProgressEvent>) {
     stream::create_sync_progress_stream(s);
 }
 

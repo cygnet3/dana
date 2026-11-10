@@ -1,16 +1,18 @@
 use std::sync::Mutex;
 
 use crate::api::structs::state_update::StateUpdate;
+use crate::api::structs::sync_progress_event::SyncProgressEvent;
 use crate::frb_generated::StreamSink;
 
 use lazy_static::lazy_static;
 
 lazy_static! {
-    static ref SCAN_PROGRESS_STREAM_SINK: Mutex<Option<StreamSink<u32>>> = Mutex::new(None);
+    static ref SCAN_PROGRESS_STREAM_SINK: Mutex<Option<StreamSink<SyncProgressEvent>>> =
+        Mutex::new(None);
     static ref STATE_UPDATE_STREAM_SINK: Mutex<Option<StreamSink<StateUpdate>>> = Mutex::new(None);
 }
 
-pub fn create_sync_progress_stream(s: StreamSink<u32>) {
+pub fn create_sync_progress_stream(s: StreamSink<SyncProgressEvent>) {
     let mut stream_sink = SCAN_PROGRESS_STREAM_SINK.lock().unwrap();
     *stream_sink = Some(s);
 }
@@ -21,13 +23,26 @@ pub fn create_sync_update_stream(s: StreamSink<StateUpdate>) {
 }
 
 pub(crate) fn send_sync_progress(scan_progress: u32) {
+    send_sync_event(SyncProgressEvent::Height(scan_progress));
+}
+
+/// Tip announcement from the frigate server. Tagged separately from scan
+/// positions so Dart can distinguish "the chain tip" from "where the scanner
+/// is right now" (D4).
+pub(crate) fn send_sync_tip(tip_height: u32) {
+    send_sync_event(SyncProgressEvent::Tip {
+        height: tip_height,
+    });
+}
+
+fn send_sync_event(event: SyncProgressEvent) {
     let stream_sink = SCAN_PROGRESS_STREAM_SINK.lock().unwrap();
     if let Some(stream_sink) = stream_sink.as_ref() {
         // Silently ignore send errors: the main isolate may have died (app closed
         // while service kept running) and its port is now closed.  The sink will
         // be replaced with a fresh one the next time the main isolate calls
         // create_sync_progress_stream().
-        let _ = stream_sink.add(scan_progress);
+        let _ = stream_sink.add(event);
     }
 }
 

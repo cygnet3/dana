@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::Ordering;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use anyhow::Result;
 use futures::StreamExt as _;
@@ -7,16 +9,41 @@ use lazy_static::lazy_static;
 use spdk_wallet::bitcoin::absolute::Height;
 use spdk_wallet::bitcoin::{BlockHash, OutPoint, ScriptBuf};
 
+use crate::api::structs::frigate_scan_outcome::FrigateScanOutcome;
 use crate::state::SyncUpdatePump;
-use crate::stream::send_sync_progress;
+use crate::stream::{send_sync_progress, send_sync_tip};
+use crate::wallet::KEEP_SYNCING;
 
 use super::SpWallet;
+use backend_frigate::FrigateClient;
 use frigate::{FrigateEvent, FrigateHandle, FrigateScanner};
+
+/// Request timeout for the keyless tip probe. Short on purpose: a hung
+/// server must surface as a probe failure (D8 offline banner) instead of a
+/// stalled wake.
+const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 
 lazy_static! {
     /// Background monitor task; aborting it drops the `FrigateHandle`, which
     /// aborts the scanner worker and closes the frigate connection.
     static ref FRIGATE_MONITOR: Mutex<Option<tokio::task::JoinHandle<()>>> = Mutex::new(None);
+}
+
+/// Keyless chain-tip probe for a frigate server: connect, negotiate the
+/// protocol version, fetch the tip via `blockchain.headers.subscribe`, drop
+/// the connection.
+///
+/// Key-safe by construction (D10): no wallet receiver, no scan key material,
+/// and the key-bearing silent-payments `subscribe` is unreachable from this
+/// path — only public chain data crosses the wire. Also serves as the URL
+/// validation primitive (parse + reachability) for the settings UI. The tip
+/// notifications the headers subscription leaves flowing die with the
+/// dropped client.
+pub async fn frigate_tip_probe(url: String) -> Result<(u32, String)> {
+    let client = FrigateClient::connect(&url, Some(PROBE_TIMEOUT)).await?;
+    let (height, hash) = client.block_height().await?;
+    drop(client);
+    Ok((height.to_consensus_u32(), hash.to_string()))
 }
 
 /// An owned output the frigate scanner keeps watching for spends.
@@ -61,6 +88,17 @@ impl SpWallet {
     /// discoveries and spends through the sync streams, and return once the
     /// historical catch-up completes (checkpoint advanced to the tip).
     ///
+    /// Returns a typed outcome instead of an error for connection loss: a
+    /// death before `CaughtUp` (including a silent channel close) maps to
+    /// [`FrigateScanOutcome::Disconnected`], not to `Err` — the checkpoint
+    /// already reflects every confirmed block the pump emitted (D8).
+    ///
+    /// Cancellation reuses the existing `KEEP_SYNCING` flag: the flag is
+    /// armed at entry and checked each loop iteration, so `interrupt_sync()`
+    /// (and its whole existing interrupt plumbing, IPC included) stops a
+    /// frigate scan without any new API. An interrupt returns
+    /// `Disconnected` *without* finalize.
+    ///
     /// Drop-in for the hourly wake cycle; the scanner connection is closed on
     /// return. The frigate server only learns the scan key — no address or
     /// spend key ever crosses the wire.
@@ -70,7 +108,9 @@ impl SpWallet {
         from_height: u32,
         dust_limit: u64,
         watched_outputs: Vec<WatchedOutput>,
-    ) -> Result<()> {
+    ) -> Result<FrigateScanOutcome> {
+        KEEP_SYNCING.store(true, Ordering::Relaxed);
+
         let scanner = self
             .build_frigate_scanner(frigate_url, watched_outputs)
             .await?;
@@ -79,10 +119,17 @@ impl SpWallet {
         let mut tip: Option<(Height, BlockHash)> = None;
 
         while let Some(event) = handle.next().await {
+            if !KEEP_SYNCING.load(Ordering::Relaxed) {
+                // interrupted: no finalize; the checkpoint stays at the last
+                // Confirmed boundary and the next backend resumes from there.
+                return Ok(FrigateScanOutcome::Disconnected {
+                    reason: "interrupted".to_string(),
+                });
+            }
             match event {
                 FrigateEvent::Tip { height, hash } => {
                     tip = Some((height, hash));
-                    send_sync_progress(height.to_consensus_u32());
+                    send_sync_tip(height.to_consensus_u32());
                 }
                 FrigateEvent::Confirmed(scan_result) => pump.record(scan_result, false)?,
                 FrigateEvent::Spent(spent) => pump.record_spent(spent)?,
@@ -90,10 +137,10 @@ impl SpWallet {
                     if let Some((height, hash)) = tip {
                         pump.finalize(height, hash)?;
                     }
-                    break;
+                    return Ok(FrigateScanOutcome::Completed);
                 }
                 FrigateEvent::Disconnected(reason) => {
-                    anyhow::bail!("frigate connection ended: {reason}");
+                    return Ok(FrigateScanOutcome::Disconnected { reason });
                 }
                 FrigateEvent::Unconfirmed { txid, .. } => {
                     // mempool discoveries are re-reported as Confirmed once
@@ -103,7 +150,11 @@ impl SpWallet {
             }
         }
 
-        Ok(())
+        // Silent channel close before CaughtUp (D8): a dead connection must
+        // not look like a completed sync.
+        Ok(FrigateScanOutcome::Disconnected {
+            reason: "connection closed".to_string(),
+        })
     }
 
     /// Continuous frigate monitor for the foreground service: keeps the
