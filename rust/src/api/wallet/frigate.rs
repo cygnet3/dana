@@ -373,4 +373,177 @@ mod tests {
         assert!(frigate_tip_probe("not a url".to_string()).await.is_err());
         assert!(frigate_tip_probe(String::new()).await.is_err());
     }
+
+    // ---- phase-2/3 acceptance tests (decision-record amendment 2026-11-10) ----
+
+    use crate::state::RecordingSink;
+    use spdk_wallet::bitcoin::secp256k1::Scalar;
+    use spdk_wallet::bitcoin::{Amount, ScriptBuf, TxOut, Txid};
+    use spdk_wallet::scanner::{DiscoveredOutput, ScanResult};
+
+    fn test_txid(v: u8) -> Txid {
+        Txid::from_str(&format!("{v:064x}")).unwrap()
+    }
+
+    fn discovered_output(v: u8) -> (OutPoint, DiscoveredOutput) {
+        (
+            OutPoint::new(test_txid(v), 0),
+            DiscoveredOutput {
+                txout: TxOut {
+                    value: Amount::from_sat(50_000),
+                    script_pubkey: ScriptBuf::new(),
+                },
+                tweak: Scalar::ONE,
+                label: None,
+            },
+        )
+    }
+
+    fn confirmed_result(
+        outpoint: OutPoint,
+        output: &DiscoveredOutput,
+        height: u32,
+    ) -> FrigateEvent {
+        FrigateEvent::Confirmed(ScanResult {
+            blkheight: test_height(height),
+            blkhash: test_hash(),
+            discovered_inputs: HashSet::new(),
+            discovered_outputs: HashMap::from([(outpoint, output.clone())]),
+        })
+    }
+
+    /// Acceptance (a): mempool → notify exact-once. A height<=0 entry
+    /// registers a candidate (never wallet state); the confirmation
+    /// notification (scanner re-delivery at a real height) creates the state
+    /// exactly once; the phase-1 re-report of the same output must not
+    /// duplicate it.
+    #[tokio::test]
+    async fn mempool_to_notify_exact_once() {
+        let _guard = FLAG_LOCK.lock().unwrap();
+        KEEP_SYNCING.store(true, Ordering::Relaxed);
+        let sink = RecordingSink::default();
+        let mut pump = SyncUpdatePump::with_sink(0, Box::new(sink.clone()));
+        let mut tip = None;
+
+        let (outpoint, output) = discovered_output(1);
+        let outputs = HashMap::from([(outpoint, output.clone())]);
+
+        // phase 2: the mempool entry arrives over the key-bearing subscription
+        let events = futures::stream::iter(vec![
+            FrigateEvent::Tip {
+                height: test_height(800_002),
+                hash: test_hash(),
+            },
+            FrigateEvent::Unconfirmed {
+                txid: test_txid(1),
+                discovered_outputs: outputs.clone(),
+            },
+        ]);
+        drive_frigate_events(events, &mut pump, &mut tip).await.unwrap();
+
+        assert_eq!(
+            pump.mempool_candidate_count(),
+            1,
+            "mempool discovery must register a candidate, not be dropped"
+        );
+        assert!(
+            sink.updates.lock().unwrap().is_empty(),
+            "a candidate must not create wallet state before confirmation"
+        );
+
+        // phase 3: confirmation notification — the scanner re-delivers the
+        // mined transaction as a Confirmed event at the real height
+        let events = futures::stream::iter(vec![confirmed_result(
+            outpoint,
+            &output,
+            800_003,
+        )]);
+        drive_frigate_events(events, &mut pump, &mut tip).await.unwrap();
+
+        let updates = sink.updates.lock().unwrap();
+        assert_eq!(updates.len(), 1, "state must be created exactly once");
+        assert_eq!(
+            updates[0].blkheight, 800_003,
+            "candidate state carries the confirmation height"
+        );
+        assert_eq!(updates[0].found_outputs.len(), 1);
+        drop(updates);
+
+        // the next phase-1 scan re-reports the same output as Confirmed
+        let events =
+            futures::stream::iter(vec![confirmed_result(outpoint, &output, 800_003)]);
+        drive_frigate_events(events, &mut pump, &mut tip).await.unwrap();
+
+        let updates = sink.updates.lock().unwrap();
+        assert_eq!(
+            updates.len(),
+            1,
+            "phase-1 re-report must not duplicate wallet state (exact-once)"
+        );
+        drop(updates);
+        assert_eq!(pump.emitted_output_count(), 1);
+    }
+
+    /// Acceptance (c): a mempool candidate never advances the checkpoint and
+    /// never touches the progress bar; confirmation emits at the real height.
+    #[tokio::test]
+    async fn mempool_candidate_never_advances_checkpoint_or_bar() {
+        let _guard = FLAG_LOCK.lock().unwrap();
+        KEEP_SYNCING.store(true, Ordering::Relaxed);
+        let sink = RecordingSink::default();
+        let mut pump = SyncUpdatePump::with_sink(0, Box::new(sink.clone()));
+        let mut tip = None;
+
+        let (outpoint, output) = discovered_output(2);
+
+        let events = futures::stream::iter(vec![
+            FrigateEvent::Tip {
+                height: test_height(800_002),
+                hash: test_hash(),
+            },
+            FrigateEvent::Unconfirmed {
+                txid: test_txid(2),
+                discovered_outputs: HashMap::from([(outpoint, output)]),
+            },
+        ]);
+        drive_frigate_events(events, &mut pump, &mut tip).await.unwrap();
+
+        assert_eq!(
+            pump.mempool_candidate_count(),
+            1,
+            "candidate must be registered (not dropped)"
+        );
+        assert!(
+            sink.updates.lock().unwrap().is_empty(),
+            "mempool activity must not create wallet state"
+        );
+        assert_eq!(
+            pump.last_emitted_height(),
+            0,
+            "mempool activity must not advance the checkpoint"
+        );
+        assert!(
+            pump.progress_log().is_empty(),
+            "mempool activity must not touch the progress bar"
+        );
+
+        // confirmation: state emitted at the real height only
+        let (outpoint, output) = discovered_output(2);
+        let events =
+            futures::stream::iter(vec![confirmed_result(outpoint, &output, 800_003)]);
+        drive_frigate_events(events, &mut pump, &mut tip).await.unwrap();
+
+        let updates = sink.updates.lock().unwrap();
+        assert_eq!(updates.len(), 1);
+        assert_eq!(
+            updates[0].blkheight, 800_003,
+            "candidate state is created at the confirmation height, never a mempool sentinel"
+        );
+        drop(updates);
+        assert_eq!(pump.last_emitted_height(), 800_003);
+        assert!(
+            pump.progress_log().iter().all(|h| *h > 0),
+            "the progress bar never rewinds to a mempool sentinel height"
+        );
+    }
 }
