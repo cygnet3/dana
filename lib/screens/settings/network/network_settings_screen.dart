@@ -4,7 +4,6 @@ import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/screens/settings/network/frigate_settings_screen.dart';
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
-import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/services/sync_orchestrator.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter/material.dart';
@@ -17,14 +16,8 @@ class NetworkSettingsScreen extends StatelessWidget {
   List<_NetworkSettingsItem> _buildItems(BuildContext context) {
     return [
       _NetworkSettingsItem(
-        icon: Icons.dns_outlined,
-        title: 'Set backend url',
-        subtitle: 'Configure blindbit server endpoint',
-        onTap: () => _onSetBlindbitUrl(context),
-      ),
-      _NetworkSettingsItem(
         icon: Icons.radar,
-        title: 'Frigate backend',
+        title: 'Set backend url',
         subtitle: 'Optional frigate sync server & visibility',
         onTap: () => goToScreen(context, const FrigateSettingsScreen()),
       ),
@@ -69,30 +62,6 @@ class NetworkSettingsScreen extends StatelessWidget {
     await orchestrator.start();
 
     if (context.mounted) goToHomeScreen(context);
-  }
-
-  Future<void> _onSetBlindbitUrl(BuildContext context) async {
-    SettingsRepository settings = SettingsRepository.instance;
-    final chainState = Provider.of<ChainState>(context, listen: false);
-    final controller = TextEditingController();
-    controller.text = await settings.getBlindbitUrl() ?? '';
-
-    final value = await showInputAlertDialog(controller, TextInputType.url,
-        'Set blindbit url', 'Only blindbit is currently supported');
-
-    if (value is String) {
-      final success = await chainState.updateBlindbitUrl(value);
-      if (success) {
-        displayNotification("Setting blindbit url to $value");
-        await settings.setBlindbitUrl(value);
-      } else {
-        displayWarning("Failed to update blindbit url");
-      }
-    } else if (value is bool && value) {
-      Logger().i("resetting blindbit url to default");
-      await settings.setBlindbitUrl(null);
-      await chainState.resetBlindbitUrl();
-    }
   }
 
   Future<void> _onSetDustLimit(BuildContext context) async {
