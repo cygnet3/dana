@@ -62,6 +62,8 @@ class SynchronizationTaskHandler extends TaskHandler {
       },
       onStateUpdated: (lastSyncOnly) async =>
           FlutterForegroundTask.sendDataToMain({bgKeyRefresh: lastSyncOnly}),
+      onTransientOffline: (message) =>
+          FlutterForegroundTask.sendDataToMain({bgKeyFrigateOffline: message}),
     );
     unawaited(_engine!.trySync());
   }
