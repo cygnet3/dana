@@ -12,7 +12,7 @@ import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/structs/outpoint.dart';
 import 'package:danawallet/generated/rust/api/structs/state_update.dart';
 import 'package:danawallet/generated/rust/api/wallet/frigate.dart'
-    show WatchedOutput, frigateTipProbe;
+    show FrigateTipProbe, WatchedOutput, frigateTipProbe;
 // The engine's own stopFrigateMonitor() method shadows the generated
 // top-level fn inside the class, so the bridge call gets its own prefix.
 import 'package:danawallet/generated/rust/api/wallet/frigate.dart'
@@ -37,8 +37,10 @@ import 'package:logger/logger.dart';
 /// implementations, so acceptance tests can drive the wake flow with
 /// counting fakes and no rust library.
 
-/// Keyless tip probe (`frigateTipProbe` in the rust layer).
-typedef FrigateTipProbeFn = Future<(int, String)> Function(
+/// Keyless tip probe (`frigateTipProbe` in the rust layer). Returns the tip
+/// pair AND the chain the backend follows (genesis identification), so the
+/// wake flow can refuse a foreign-chain backend before any scan.
+typedef FrigateTipProbeFn = Future<FrigateTipProbe> Function(
     {required String url});
 
 /// One-shot frigate scan (`SpWallet.syncViaFrigate`).
@@ -175,7 +177,7 @@ class SyncEngine {
     _syncResultSubscription = syncResultStreamFn().listen(_onSyncResult);
   }
 
-  static Future<(int, String)> _defaultFrigateProbe({required String url}) =>
+  static Future<FrigateTipProbe> _defaultFrigateProbe({required String url}) =>
       frigateTipProbe(url: url);
 
   static Future<List<WatchedOutput>> _defaultWatchedOutputs() =>
@@ -450,8 +452,8 @@ class SyncEngine {
         // the next wake auto-resumes.
         try {
           final probe = await frigateProbe(url: frigateUrl);
-          tip = probe.$1;
-          probeTipHash = probe.$2;
+          tip = probe.tipHeight;
+          probeTipHash = probe.tipHash;
         } catch (e) {
           Logger().w('[$_logTag] frigate unreachable: $e');
           onTransientOffline?.call(frigateOfflineMsg);

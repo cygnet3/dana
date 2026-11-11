@@ -6,7 +6,7 @@ import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/structs/state_update.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart' show SpWallet;
 import 'package:danawallet/generated/rust/api/wallet/frigate.dart'
-    show WatchedOutput;
+    show FrigateTipProbe, WatchedOutput;
 import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
 import 'package:danawallet/services/sync_engine.dart';
@@ -30,8 +30,17 @@ void main() {
   bool? completedWith;
 
   // Probe tip the fakes report (server-authoritative tip, D3); null = unreachable.
-  void setProbeTip(int? height) =>
-      settings.probeTip = height == null ? null : (height, 'deadbeef');
+  // The probe also reports the backend's chain (chain-consistency fix):
+  // probeNetwork is the chain the fake backend follows, signet = the fake
+  // wallet's own network.
+  void setProbeTip(int? height) => settings.probeTip =
+      height == null
+          ? null
+          : FrigateTipProbe(
+              tipHeight: height,
+              tipHash: 'deadbeef',
+              network: settings.probeNetwork,
+            );
 
   SyncEngine buildEngine() => SyncEngine(
         onSyncStarted: (start, end) => syncStartedEnd = end,
@@ -61,7 +70,7 @@ void main() {
         },
         chainHeightFn: ({required blindbitUrl}) async {
           chainHeightCalls++;
-          return settings.probeTip?.$1 ?? 500;
+          return settings.probeTip?.tipHeight ?? 500;
         },
         networkCheckFn: ({required blindbitUrl, required network}) async {
           networkCheckCalls++;
@@ -158,7 +167,12 @@ void main() {
         onTransientOffline: (message) => banners.add(message),
         walletRepository: wallet,
         settingsRepository: settings,
-        frigateProbe: ({required url}) async => (600, 'deadbeef'),
+        frigateProbe: ({required url}) async =>
+            FrigateTipProbe(
+              tipHeight: 600,
+              tipHash: 'deadbeef',
+              network: Network.signet,
+            ),
         watchedOutputsFn: () async => const <WatchedOutput>[],
         frigateScanFn: (
             {required frigateUrl,
@@ -180,6 +194,29 @@ void main() {
       expect(completedWith, true,
           reason: 'Disconnected is a normal outcome, not an error path');
       expect(wallet.lock, isNull, reason: 'scan lock cleared');
+    });
+  });
+
+  group('chain-consistency (probe genesis vs wallet network)', () {
+    test('probe on a foreign chain -> no scan, explicit banner, checkpoint untouched',
+        () async {
+      wallet.lastSync = 599;
+      settings.probeNetwork = Network.mainnet; // fake wallet is signet
+
+      await buildEngine().trySync();
+
+      expect(probeCalls, 1);
+      expect(scanCalls, 0,
+          reason: 'a backend indexing another chain must never be scanned');
+      expect(watchCalls, 0, reason: 'no subscribe -> no watch-set disclosure');
+      expect(wallet.disclosures, isEmpty,
+          reason: 'no subscribe -> no disclosure record');
+      expect(wallet.savedHeights, isEmpty,
+          reason: 'checkpoint must not advance onto a foreign chain');
+      expect(banners, isNotEmpty,
+          reason: 'the wallet must tell the user the backend is on another chain');
+      expect(banners.single, contains('chain'),
+          reason: 'explicit mismatch message, not a generic offline note');
     });
   });
 
@@ -287,7 +324,9 @@ class FakeSettingsStore implements SettingsStore {
   String? frigateUrl;
   String? backend;
   String? visibility;
-  (int, String)? probeTip;
+  FrigateTipProbe? probeTip;
+  /// The chain the fake frigate backend follows; the fake wallet is signet.
+  Network probeNetwork = Network.signet;
 
   @override
   Future<String?> getBlindbitUrl() async => blindbitUrl;
