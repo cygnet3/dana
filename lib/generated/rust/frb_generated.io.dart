@@ -273,6 +273,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   FrigateScanOutcome dco_decode_frigate_scan_outcome(dynamic raw);
 
   @protected
+  FrigateTipProbe dco_decode_frigate_tip_probe(dynamic raw);
+
+  @protected
   int dco_decode_i_32(dynamic raw);
 
   @protected
@@ -346,9 +349,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   (OutPoint, DiscoveredOutput) dco_decode_record_out_point_discovered_output(
       dynamic raw);
-
-  @protected
-  (int, String) dco_decode_record_u_32_string(dynamic raw);
 
   @protected
   StateUpdate dco_decode_state_update(dynamic raw);
@@ -589,6 +589,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       SseDeserializer deserializer);
 
   @protected
+  FrigateTipProbe sse_decode_frigate_tip_probe(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
@@ -664,9 +667,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   (OutPoint, DiscoveredOutput) sse_decode_record_out_point_discovered_output(
       SseDeserializer deserializer);
-
-  @protected
-  (int, String) sse_decode_record_u_32_string(SseDeserializer deserializer);
 
   @protected
   StateUpdate sse_decode_state_update(SseDeserializer deserializer);
@@ -910,6 +910,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       FrigateScanOutcome self, SseSerializer serializer);
 
   @protected
+  void sse_encode_frigate_tip_probe(
+      FrigateTipProbe self, SseSerializer serializer);
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
@@ -988,10 +992,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_record_out_point_discovered_output(
       (OutPoint, DiscoveredOutput) self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_record_u_32_string(
-      (int, String) self, SseSerializer serializer);
 
   @protected
   void sse_encode_state_update(StateUpdate self, SseSerializer serializer);
