@@ -1,9 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::Ordering;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use anyhow::Result;
+use futures::channel::mpsc::unbounded;
 use futures::Stream;
 use futures::StreamExt as _;
 use lazy_static::lazy_static;
@@ -11,6 +12,7 @@ use spdk_wallet::bitcoin::absolute::Height;
 use spdk_wallet::bitcoin::{BlockHash, OutPoint, ScriptBuf};
 
 use crate::api::structs::frigate_scan_outcome::FrigateScanOutcome;
+use crate::api::wallet::frigate_confirm::run_confirmation_tracker;
 use crate::state::SyncUpdatePump;
 use crate::stream::{send_sync_progress, send_sync_tip};
 use crate::wallet::KEEP_SYNCING;
@@ -134,7 +136,7 @@ impl SpWallet {
         watched_outputs: Vec<WatchedOutput>,
     ) -> Result<()> {
         let scanner = self
-            .build_frigate_scanner(frigate_url, watched_outputs)
+            .build_frigate_scanner(frigate_url.clone(), watched_outputs)
             .await?;
         let handle = scanner.start(Height::from_consensus(from_height)?);
 
@@ -143,7 +145,7 @@ impl SpWallet {
             old.abort();
         }
         *guard = Some(tokio::spawn(async move {
-            monitor_pump(handle, dust_limit).await;
+            monitor_pump(handle, dust_limit, frigate_url).await;
         }));
 
         Ok(())
@@ -227,17 +229,40 @@ pub fn frigate_monitor_running() -> bool {
         .map_or(false, |handle| !handle.is_finished())
 }
 
-async fn monitor_pump(mut handle: FrigateHandle, dust_limit: u64) {
-    let mut pump = SyncUpdatePump::new(dust_limit);
-    let mut caught_up = false;
+async fn monitor_pump(handle: FrigateHandle, dust_limit: u64, electrum_url: String) {
+    let pump = Arc::new(Mutex::new(SyncUpdatePump::new(dust_limit)));
+    run_monitor(handle, pump, electrum_url).await;
+}
 
+/// Monitor event loop over a pump shared with the phase-3 confirmation
+/// tracker: every mempool discovery registers its output scripts with the
+/// regular electrum server (decision-record amendment 2026-11-10, phase 3)
+/// while the pump keeps the exact-once dedup against phase-1 `Confirmed`
+/// re-reports.
+///
+/// Split out from [`monitor_pump`] so tests can inject a recording pump.
+pub(crate) async fn run_monitor(
+    handle: FrigateHandle,
+    pump: Arc<Mutex<SyncUpdatePump>>,
+    electrum_url: String,
+) {
+    let mut handle = handle;
+    let (registrations_tx, registrations_rx) =
+        unbounded::<(ScriptBuf, spdk_wallet::bitcoin::Txid)>();
+    tokio::spawn(run_confirmation_tracker(
+        electrum_url,
+        pump.clone(),
+        registrations_rx,
+    ));
+
+    let mut caught_up = false;
     while let Some(event) = handle.next().await {
         match event {
             FrigateEvent::Tip { height, hash } => {
                 // before CaughtUp the tip is progress only; afterwards each new
                 // tip keeps the wallet checkpoint advancing live
                 let result = if caught_up {
-                    pump.finalize(height, hash)
+                    pump.lock().unwrap().finalize(height, hash)
                 } else {
                     send_sync_progress(height.to_consensus_u32());
                     Ok(())
@@ -247,12 +272,12 @@ async fn monitor_pump(mut handle: FrigateHandle, dust_limit: u64) {
                 }
             }
             FrigateEvent::Confirmed(scan_result) => {
-                if let Err(err) = pump.record(scan_result, false) {
+                if let Err(err) = pump.lock().unwrap().record(scan_result, false) {
                     log::warn!("frigate monitor: discovery handling failed: {err}");
                 }
             }
             FrigateEvent::Spent(spent) => {
-                if let Err(err) = pump.record_spent(spent) {
+                if let Err(err) = pump.lock().unwrap().record_spent(spent) {
                     log::warn!("frigate monitor: spend handling failed: {err}");
                 }
             }
@@ -267,14 +292,21 @@ async fn monitor_pump(mut handle: FrigateHandle, dust_limit: u64) {
             } => {
                 // phase-2 contract: mempool candidates never create wallet
                 // state directly, never advance the checkpoint and never
-                // touch the progress bar; the mined transaction is
-                // re-delivered as Confirmed (real height) and created once.
-                if let Err(err) = pump.record_mempool(txid, discovered_outputs) {
+                // touch the progress bar. Phase-3: every output script is
+                // registered with the regular electrum server; the
+                // confirmation notification creates the state exactly once
+                // (deduped against the phase-1 re-report).
+                for output in discovered_outputs.values() {
+                    let _ = registrations_tx
+                        .unbounded_send((output.txout.script_pubkey.clone(), txid));
+                }
+                if let Err(err) = pump.lock().unwrap().record_mempool(txid, discovered_outputs) {
                     log::warn!("frigate monitor: mempool candidate failed: {err}");
                 }
             }
         }
     }
+    // The monitor is over; dropping `registrations_tx` ends the tracker.
 }
 
 #[cfg(test)]
@@ -745,6 +777,540 @@ mod tests {
             matched,
             HashSet::from([test_txid(7)]),
             "only the watched, confirmed txid confirms"
+        );
+    }
+
+    // ---- Sub-C gate: regtest-rig end-to-end (acceptance (a), electrum leg) ----
+
+    /// Minimal electrum server for the phase-3 leg, speaking the exact wire
+    /// subset the confirmation tracker uses: server.version handshake,
+    /// blockchain.scripthash.subscribe (+ status notifications),
+    /// blockchain.scripthash.get_history, blockchain.block.header.
+    ///
+    /// Why a mock: frigate 1.4.1 rejects scripthash.subscribe without a
+    /// configured backendElectrumServer and no regtest electrs exists on
+    /// this rig. The tracker only needs the electrum PROTOCOL, so the mock
+    /// stands in for the regular electrum server (server selection is an
+    /// implementation decision per the amendment) while frigate keeps
+    /// serving phases 1-2 for real.
+    struct MockElectrum {
+        addr: std::net::SocketAddr,
+        state: Arc<Mutex<MockElectrumState>>,
+        clients: Arc<Mutex<Vec<std::sync::mpsc::Sender<String>>>>,
+    }
+
+    struct MockElectrumState {
+        subscribed: Vec<String>,
+        /// (txid, height, raw 80-byte header hex) served by get_history /
+        /// blockchain.block.header once the test has mined the block.
+        confirmed: Option<(String, u32, String)>,
+    }
+
+    impl MockElectrum {
+        fn spawn() -> Self {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let addr = listener.local_addr().unwrap();
+            let state = Arc::new(Mutex::new(MockElectrumState {
+                subscribed: Vec::new(),
+                confirmed: None,
+            }));
+            let clients: Arc<Mutex<Vec<std::sync::mpsc::Sender<String>>>> =
+                Arc::new(Mutex::new(Vec::new()));
+            {
+                let state = state.clone();
+                let clients = clients.clone();
+                std::thread::spawn(move || {
+                    for stream in listener.incoming().flatten() {
+                        let (tx, rx) = std::sync::mpsc::channel::<String>();
+                        clients.lock().unwrap().push(tx.clone());
+                        let mut writer = match stream.try_clone() {
+                            Ok(w) => w,
+                            Err(_) => continue,
+                        };
+                        // writer: responses and notifications share the
+                        // queue, so per-connection ordering holds
+                        std::thread::spawn(move || {
+                            use std::io::Write as _;
+                            for line in rx {
+                                let _ = writeln!(writer, "{line}");
+                            }
+                        });
+                        let state = state.clone();
+                        std::thread::spawn(move || {
+                            use std::io::BufRead as _;
+                            let mut reader = std::io::BufReader::new(stream);
+                            let mut line = String::new();
+                            while reader.read_line(&mut line).unwrap_or(0) > 0 {
+                                if let Ok(req) =
+                                    serde_json::from_str::<serde_json::Value>(&line)
+                                {
+                                    let _ = tx.send(mock_handle_request(&state, &req));
+                                }
+                                line.clear();
+                            }
+                            // reader gone: dropping `tx` ends the writer
+                        });
+                    }
+                });
+            }
+            MockElectrum {
+                addr,
+                state,
+                clients,
+            }
+        }
+
+        fn subscribed_count(&self) -> usize {
+            self.state.lock().unwrap().subscribed.len()
+        }
+
+        fn set_confirmed(&self, txid: String, height: u32, header_hex: String) {
+            self.state.lock().unwrap().confirmed = Some((txid, height, header_hex));
+        }
+
+        /// Pushes a scripthash status notification to every connected
+        /// client: the electrum signal that the transaction made it into a
+        /// block, driving the tracker into get_history.
+        fn notify_subscribed(&self) {
+            let shashes = self.state.lock().unwrap().subscribed.clone();
+            for shash in shashes {
+                let notification = serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "method": "blockchain.scripthash.subscribe",
+                    // 64-hex fake status: sha256 of the new history (the
+                    // content itself is never interpreted by the client)
+                    "params": [shash, "aa".repeat(32)],
+                });
+                for client in self.clients.lock().unwrap().iter() {
+                    let _ = client.send(notification.to_string());
+                }
+            }
+        }
+    }
+
+    fn mock_handle_request(
+        state: &Mutex<MockElectrumState>,
+        req: &serde_json::Value,
+    ) -> String {
+        let method = req["method"].as_str().unwrap_or("");
+        let result: serde_json::Value = match method {
+            // protocol-version negotiation from FrigateClient::connect
+            "server.version" => serde_json::json!(["MockElectrum", "1.4"]),
+            "blockchain.scripthash.subscribe" => {
+                state
+                    .lock()
+                    .unwrap()
+                    .subscribed
+                    .push(req["params"][0].as_str().unwrap_or_default().to_string());
+                serde_json::Value::Null
+            }
+            "blockchain.scripthash.get_history" => {
+                let guard = state.lock().unwrap();
+                match &guard.confirmed {
+                    Some((txid, height, _)) => {
+                        serde_json::json!([{ "tx_hash": txid, "height": height }])
+                    }
+                    None => serde_json::json!([]),
+                }
+            }
+            "blockchain.block.header" => {
+                let guard = state.lock().unwrap();
+                match &guard.confirmed {
+                    Some((_, _, header_hex)) => serde_json::json!(header_hex),
+                    None => serde_json::Value::Null,
+                }
+            }
+            _ => serde_json::Value::Null,
+        };
+        serde_json::json!({ "jsonrpc": "2.0", "id": req["id"].clone(), "result": result })
+            .to_string()
+    }
+
+    /// Full phase-2→3 pipeline against the live regtest rig: the frigate
+    /// monitor delivers the payment as a height<=0 mempool entry → candidate
+    /// registered (no wallet state) → the output script is registered by its
+    /// scripthash with the regular electrum server → the block is mined →
+    /// the electrum status notification (racing the phase-1 Confirmed
+    /// re-delivery) creates the wallet state exactly once.
+    ///
+    /// Rig-only: needs frigate on 127.0.0.1:50002, the regtest bitcoind
+    /// datadir, bitcoin-cli on PATH and /tmp/sp-pay (SP_PAY_NO_MINE switch).
+    /// Run on the code host with:
+    /// `FRIGATE_E2E=1 cargo test -p rust_lib_danawallet e2e_regtest -- --ignored`
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    #[ignore = "regtest rig e2e: FRIGATE_E2E=1 cargo test -p rust_lib_danawallet e2e_regtest -- --ignored"]
+    async fn e2e_regtest_mempool_entry_to_electrum_confirmation_state() {
+        if std::env::var("FRIGATE_E2E").as_deref() != Ok("1") {
+            return;
+        }
+        use std::process::Command;
+        use std::time::Instant;
+
+        // mini logger: surface spdk/frigate-crate `log` output in the test
+        struct E2eLogger;
+        impl log::Log for E2eLogger {
+            fn enabled(&self, m: &log::Metadata) -> bool {
+                m.level() <= log::Level::Info
+            }
+            fn log(&self, r: &log::Record) {
+                eprintln!("[e2e-log:{}] {}", r.level(), r.args());
+            }
+            fn flush(&self) {}
+        }
+        let _ = log::set_boxed_logger(Box::new(E2eLogger));
+        log::set_max_level(log::LevelFilter::Info);
+
+        use spdk_wallet::bitcoin::secp256k1::SecretKey;
+        use spdk_wallet::bitcoin::Network;
+        use spdk_wallet::client::{SpClient, SpendKey};
+
+        let frigate_url =
+            std::env::var("FRIGATE_E2E_URL").unwrap_or_else(|_| "127.0.0.1:50002".into());
+        let bitcoind_datadir = std::env::var("FRIGATE_E2E_BITCOIND_DATADIR")
+            .unwrap_or_else(|_| "/home/hermes/regtest-frigate/bitcoind".into());
+        let sp_pay = std::env::var("FRIGATE_E2E_SP_PAY")
+            .unwrap_or_else(|_| "/tmp/sp-pay/target/release/sp-pay".into());
+        let rpc_wallet =
+            std::env::var("FRIGATE_E2E_RPC_WALLET").unwrap_or_else(|_| "miner".into());
+
+        fn btc_cli(datadir: &str, wallet: &str, args: &[&str]) -> String {
+            let out = Command::new("bitcoin-cli")
+                .arg("-regtest")
+                .arg(format!("-datadir={datadir}"))
+                .arg(format!("-rpcwallet={wallet}"))
+                .args(args)
+                .output()
+                .expect("bitcoin-cli runnable");
+            assert!(
+                out.status.success(),
+                "bitcoin-cli {args:?} failed: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            String::from_utf8_lossy(&out.stdout).trim().to_string()
+        }
+
+        // Rig hygiene: a prior failed run leaks its NO_MINE payment into
+        // the mempool (that run never mines it), which would break this
+        // run's single-payment mempool assertion. Mine any leftover off
+        // before starting.
+        let leftovers: Vec<String> =
+            serde_json::from_str(&btc_cli(&bitcoind_datadir, &rpc_wallet, &["getrawmempool"]))
+                .unwrap();
+        if !leftovers.is_empty() {
+            let addr = btc_cli(&bitcoind_datadir, &rpc_wallet, &["getnewaddress"]);
+            btc_cli(&bitcoind_datadir, &rpc_wallet, &["generatetoaddress", "1", &addr]);
+        }
+
+        // Per-run throwaway keys: the rig chain persists between e2e runs,
+        // so earlier runs' payments (fixed keys) would otherwise pollute
+        // this run's phase-1 history. xorshift64* seeded from time+pid is
+        // plenty for a rig test key.
+        fn random_key(seed: &mut u64) -> SecretKey {
+            let mut buf = [0u8; 32];
+            for chunk in buf.chunks_mut(8) {
+                *seed ^= *seed >> 12;
+                *seed ^= *seed << 25;
+                *seed ^= *seed >> 27;
+                let v = seed.wrapping_mul(0x2545_F491_4F6C_DD1D);
+                chunk.copy_from_slice(&v.to_be_bytes()[..chunk.len()]);
+            }
+            SecretKey::from_slice(&buf).expect("valid secret key")
+        }
+        let mut seed = (std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .subsec_nanos() as u64)
+            ^ ((std::process::id() as u64) << 32)
+            ^ 0x9E37_79B9_7F4A_7C15;
+        let scan_sk = random_key(&mut seed);
+        let spend_sk = random_key(&mut seed);
+        let client =
+            SpClient::new(scan_sk, SpendKey::Secret(spend_sk), Network::Regtest).unwrap();
+        let address = client.receiving_code().to_string();
+
+        let frigate_bin = std::env::var("FRIGATE_E2E_FRIGATE_BIN")
+            .unwrap_or_else(|_| "/home/hermes/tools/frigate-1.4.1/frigate/bin/frigate".into());
+        let frigate_args: Vec<String> = std::env::var("FRIGATE_E2E_FRIGATE_ARGS")
+            .unwrap_or_else(|_| "--dir /home/hermes/.frigate-regtest -n regtest -l INFO".into())
+            .split_whitespace()
+            .map(str::to_string)
+            .collect();
+        let frigate_marker = std::env::var("FRIGATE_E2E_FRIGATE_MARKER")
+            .unwrap_or_else(|_| "frigate --dir /home/hermes/.frigate-regtest".into());
+        let frigate_log = std::env::var("FRIGATE_E2E_FRIGATE_LOG")
+            .unwrap_or_else(|_| "/tmp/frigate-e2e.log".into());
+
+        // kill + relaunch + wait-for-port. `marker` matches only the
+        // regtest instance (the frigate.service unit cmdline carries no
+        // --dir). setsid detaches the rig from the test process group so
+        // it survives the test; the log is captured for post-mortem.
+        async fn restart_frigate(
+            bin: &str,
+            args: &[String],
+            marker: &str,
+            url: &str,
+            log_path: &str,
+        ) {
+            let _ = Command::new("pkill").args(["-f", marker]).output();
+            for _ in 0..50 {
+                let alive = Command::new("pgrep")
+                    .args(["-f", marker])
+                    .output()
+                    .map(|o| !o.stdout.is_empty())
+                    .unwrap_or(false);
+                if !alive {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(200));
+            }
+            let log_file = std::fs::File::create(log_path).expect("frigate log file");
+            let log_err = log_file.try_clone().expect("frigate log clone");
+            let child = Command::new("setsid")
+                .arg(bin)
+                .args(args)
+                .stdout(std::process::Stdio::from(log_file))
+                .stderr(std::process::Stdio::from(log_err))
+                .spawn()
+                .expect("frigate restart");
+            std::mem::forget(child);
+            let mut up = false;
+            for _ in 0..150 {
+                if tokio::net::TcpStream::connect(url).await.is_ok() {
+                    up = true;
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
+            assert!(up, "frigate did not come back on {url}");
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+
+        // bootstrap: the rig must be reachable before the initial probe
+        // (a prior run rig dies with that run process group)
+        if tokio::net::TcpStream::connect(&frigate_url).await.is_err() {
+            eprintln!("[e2e] rig down at bootstrap; starting it");
+            restart_frigate(
+                &frigate_bin,
+                &frigate_args,
+                &frigate_marker,
+                &frigate_url,
+                &frigate_log,
+            )
+            .await;
+        }
+
+        // Chain tip before anything happens: the monitor subscribes from
+        // the tip after the payment, so the mined block lands above it.
+        let probe = FrigateClient::connect(&frigate_url, None).await.unwrap();
+        let (tip_height, _tip_hash) = probe.block_height().await.unwrap();
+        let tip = tip_height.to_consensus_u32();
+        eprintln!("[e2e] subscribe-from tip = {tip}");
+
+        // phase 2: the payment enters the mempool and STAYS there
+        // (SP_PAY_NO_MINE=1: this test mines the confirming block itself,
+        // preserving a real mempool window for the height<=0 entry)
+        let out = Command::new(&sp_pay)
+            .args([&address, "0.0001"])
+            .env("SP_PAY_NO_MINE", "1")
+            .output()
+            .expect("sp-pay runnable");
+        assert!(
+            out.status.success(),
+            "sp-pay failed: {} {}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        eprintln!("[e2e] sp-pay: {}", String::from_utf8_lossy(&out.stdout).trim());
+
+        // frigate 1.4.1 does NOT push new mempool entries to a held
+        // subscription, and it indexes mempool transactions ONLY at
+        // startup (empirical 2026-11-11: a running instance polls new
+        // blocks every ~35s but never re-scans the mempool - a payment
+        // broadcast after startup is never indexed and never shows up in
+        // a subscribe response). The rig is therefore restarted AFTER the
+        // payment enters the mempool so the startup index picks it up.
+        // Mempool entries (height <= 0) reach the client only in the
+        // silentpayments SUBSCRIBE RESPONSE - so keep re-subscribing
+        // until the indexed entry comes back as an Unconfirmed event.
+        // Each attempt gets a fresh pump/monitor/tracker; earlier
+        // attempts created no state and are aborted cleanly.
+        restart_frigate(
+            &frigate_bin,
+            &frigate_args,
+            &frigate_marker,
+            &frigate_url,
+            &frigate_log,
+        )
+        .await;
+        // the initial probe connection died with the killed instance;
+        // reconnect once to confirm the restarted instance is serving
+        let _reconnect = FrigateClient::connect(&frigate_url, None).await.unwrap();
+
+        let mempool_now: Vec<String> = serde_json::from_str(&btc_cli(
+            &bitcoind_datadir,
+            &rpc_wallet,
+            &["getrawmempool"],
+        ))
+        .unwrap();
+        eprintln!("[e2e] mempool before subscribe loop: {mempool_now:?}");
+
+        let mock = MockElectrum::spawn();
+        let start = Instant::now();
+        let mut attempt = 0u32;
+        let (_monitor_task, pump, sink) = loop {
+            attempt += 1;
+            assert!(
+                attempt <= 15,
+                "frigate never delivered the mempool entry via subscribe ({} attempts, {:.0}s)",
+                attempt,
+                start.elapsed().as_secs_f32()
+            );
+            let sink = RecordingSink::default();
+            let pump = Arc::new(Mutex::new(SyncUpdatePump::with_sink(
+                0,
+                Box::new(sink.clone()),
+            )));
+            let scanner = FrigateScanner::new(
+                frigate_url.clone(),
+                client.scan_key(),
+                client.receiver(),
+                None,
+                HashMap::new(),
+            )
+            .await
+            .unwrap();
+            let handle = scanner.start(tip_height);
+            let monitor_task =
+                tokio::spawn(run_monitor(handle, pump.clone(), mock.addr.to_string()));
+
+            // the subscribe response has ~20s to carry the mempool entry
+            let got = tokio::time::timeout(Duration::from_secs(20), async {
+                loop {
+                    if pump.lock().unwrap().mempool_candidate_count() > 0 {
+                        break;
+                    }
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+                }
+            })
+            .await;
+            if got.is_ok() {
+                eprintln!(
+                    "[e2e] attempt {attempt}: mempool candidate delivered in {:.0}s",
+                    start.elapsed().as_secs_f32()
+                );
+                break (monitor_task, pump, sink);
+            }
+            eprintln!(
+                "[e2e] attempt {attempt}: no mempool candidate ({:.0}s); pump candidates={}, sink updates={}",
+                start.elapsed().as_secs_f32(),
+                pump.lock().unwrap().mempool_candidate_count(),
+                sink.updates.lock().unwrap().len()
+            );
+            // abort the monitor: dropping it ends the scanner worker and
+            // closes the registration channel, so the tracker task exits
+            monitor_task.abort();
+        };
+        assert!(
+            sink.updates.lock().unwrap().is_empty(),
+            "candidate registration must not create wallet state"
+        );
+
+        // the phase-3 tracker must have registered the candidate
+        // scripthash with the regular electrum server
+        let deadline = Instant::now() + Duration::from_secs(60);
+        loop {
+            if mock.subscribed_count() > 0 {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "tracker never registered the candidate scripthash with the electrum server"
+            );
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+
+        // the mempool now holds exactly the SP payment: its txid is the
+        // candidate the electrum server will report as mined
+        let mempool: Vec<String> = serde_json::from_str(&btc_cli(
+            &bitcoind_datadir,
+            &rpc_wallet,
+            &["getrawmempool"],
+        ))
+        .unwrap();
+        assert_eq!(mempool.len(), 1, "expected only the SP payment in mempool");
+        let sp_txid = mempool[0].clone();
+
+        // mine the confirming block
+        // frigate's height is eventually consistent (it polls new blocks
+        // every ~35s), and the hygiene sweep + the funding mine can both
+        // land between two polls — so the authoritative pre-mine tip
+        // comes from bitcoind, not from frigate.
+        let pre_mine_tip: u32 =
+            serde_json::from_str(&btc_cli(&bitcoind_datadir, &rpc_wallet, &["getblockcount"]))
+                .unwrap();
+        assert!(
+            pre_mine_tip > tip,
+            "sp-pay must have mined at least its funding block (subscribe tip {tip}, pre-mine tip {pre_mine_tip})"
+        );
+        let mining_addr = btc_cli(&bitcoind_datadir, &rpc_wallet, &["getnewaddress"]);
+        let blocks: Vec<String> = serde_json::from_str(&btc_cli(
+            &bitcoind_datadir,
+            &rpc_wallet,
+            &["generatetoaddress", "1", &mining_addr],
+        ))
+        .unwrap();
+        let mined_height = pre_mine_tip + 1;
+        // raw block hex: the first 80 bytes are the header the mock serves.
+        // This rig bitcoin-cli prints verbosity-0 results as a BARE hex
+        // string (no JSON quotes), so no serde parse here.
+        let block_hex: String =
+            btc_cli(&bitcoind_datadir, &rpc_wallet, &["getblock", &blocks[0], "0"]);
+        let header_hex = block_hex[..160].to_string();
+
+        // phase 3: the electrum server reports the mined block for the
+        // watched scripthash (status notification -> get_history ->
+        // block.header), racing the phase-1 Confirmed re-delivery
+        mock.set_confirmed(sp_txid, mined_height, header_hex);
+        mock.notify_subscribed();
+
+        // the confirmation (whichever leg wins the race) creates the state
+        // exactly once
+        let deadline = Instant::now() + Duration::from_secs(180);
+        let (conf_count, conf_height, conf_outputs) = loop {
+            let guard = sink.updates.lock().unwrap();
+            let with_outputs: Vec<&crate::api::structs::state_update::StateUpdate> = guard
+                .iter()
+                .filter(|u| !u.found_outputs.is_empty())
+                .collect();
+            if !with_outputs.is_empty() {
+                let first = with_outputs[0];
+                break (
+                    with_outputs.len(),
+                    first.blkheight,
+                    first.found_outputs.len(),
+                );
+            }
+            drop(guard);
+            assert!(
+                Instant::now() < deadline,
+                "no confirmation state update within budget"
+            );
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        };
+
+        assert_eq!(
+            conf_count, 1,
+            "the confirmation must create wallet state exactly once"
+        );
+        assert_eq!(
+            conf_height, mined_height,
+            "candidate state carries the mined height, never a mempool sentinel"
+        );
+        assert_eq!(conf_outputs, 1);
+        assert_eq!(
+            pump.lock().unwrap().emitted_output_count(),
+            1,
+            "exact-once across the electrum notification and the phase-1 re-report"
         );
     }
 }

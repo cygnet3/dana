@@ -15,6 +15,10 @@ frigate = { git = "https://github.com/Sosthene00/spdk", branch = "feat/frigate-b
 # keyless tip probe: FrigateClient (connect + block_height) lives in the
 # backend-frigate crate; the `frigate` scanner crate does not re-export it
 backend-frigate = { git = "https://github.com/Sosthene00/spdk", branch = "feat/frigate-backend" }
+# phase-3 electrum confirmation tracking (Sub-C): response types
+# (Tx::Confirmed/Mempool) + ElectrumScriptHash. Same rev the frigate backend
+# stack already pins (single version in the tree).
+electrum_streaming_client = { git = "https://github.com/bitcoindevkit/electrum_streaming_client", rev = "01a6d42aac33f86b2bc647e7fc702067be99c9c7" }
 lazy_static = "1.4"
 anyhow = "1.0"
 serde = { version = "1.0.188", features = ["derive"] }
