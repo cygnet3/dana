@@ -80,9 +80,11 @@ pub struct SyncUpdatePump {
     /// Destination for emitted state updates.
     sink: Box<dyn StateSink>,
     /// Phase-2 (mempool) candidates: txid → outpoints discovered at
-    /// height <= 0. Never advances the checkpoint and never touches the
-    /// progress bar; the registry is ephemeral per pump instance.
-    mempool_candidates: HashMap<Txid, HashSet<OutPoint>>,
+    /// height <= 0, with their full payload (the phase-3 electrum
+    /// confirmation emits this payload as wallet state). Never advances the
+    /// checkpoint and never touches the progress bar; the registry is
+    /// ephemeral per pump instance.
+    mempool_candidates: HashMap<Txid, HashMap<OutPoint, DiscoveredOutput>>,
     /// Outpoints already emitted as wallet state (candidate path or a
     /// confirmed delivery). Exact-once guard against duplicate state.
     emitted_outputs: HashSet<OutPoint>,
@@ -175,13 +177,69 @@ impl SyncUpdatePump {
         if discovered_outputs.is_empty() {
             return Ok(());
         }
-        let outpoints: HashSet<OutPoint> = discovered_outputs.keys().copied().collect();
-        self.mempool_candidates.insert(txid, outpoints);
+        self.mempool_candidates.insert(txid, discovered_outputs);
         log::debug!(
             "frigate: mempool candidate registered ({} output(s))",
             self.mempool_candidates[&txid].len()
         );
         Ok(())
+    }
+
+    /// Phase-3 registration view: every (script, txid) pair across the
+    /// mempool candidates. The confirmation tracker registers each distinct
+    /// script's scripthash with the regular electrum server and watches the
+    /// paired txid for a confirmed history entry (decision-record amendment
+    /// 2026-11-10, phase 3).
+    #[cfg(test)]
+    pub fn candidate_script_txids(
+        &self,
+    ) -> Vec<(spdk_wallet::bitcoin::ScriptBuf, Txid)> {
+        let mut pairs: Vec<(spdk_wallet::bitcoin::ScriptBuf, Txid)> = self
+            .mempool_candidates
+            .iter()
+            .flat_map(|(txid, outputs)| {
+                outputs
+                    .values()
+                    .map(move |output| (output.txout.script_pubkey.clone(), *txid))
+            })
+            .collect();
+        pairs.sort();
+        pairs.dedup();
+        pairs
+    }
+
+    /// Phase-3 confirmation delivery: the regular electrum server reports
+    /// the candidate transactions in `txids` mined at `height`. Creates
+    /// wallet state for every still-unemitted candidate output — exactly
+    /// once: a duplicate electrum notification and the phase-1 `Confirmed`
+    /// re-report both dedupe via `emitted_outputs`. Returns the number of
+    /// state updates emitted.
+    pub fn confirm_candidates(
+        &mut self,
+        txids: &HashSet<Txid>,
+        height: u32,
+        blkhash: &str,
+    ) -> Result<usize> {
+        let mut emitted_updates = 0usize;
+        for txid in txids {
+            let Some(candidate) = self.mempool_candidates.get(txid) else {
+                continue;
+            };
+            let mut outputs: HashMap<OutPoint, DiscoveredOutput> = candidate.clone();
+            outputs.retain(|outpoint, _| !self.emitted_outputs.contains(outpoint));
+            if outputs.is_empty() {
+                continue;
+            }
+            let before = self.emitted_outputs.len();
+            self.emit(height, blkhash.to_string(), HashSet::new(), outputs)?;
+            if self.emitted_outputs.len() > before {
+                emitted_updates += 1;
+                log::info!(
+                    "frigate: electrum confirmation created state for candidate tx at height {height}"
+                );
+            }
+        }
+        Ok(emitted_updates)
     }
 
     /// Test observability: number of registered mempool candidates.

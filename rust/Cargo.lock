@@ -1913,6 +1913,7 @@ dependencies = [
  "backend-frigate",
  "base64 0.22.1",
  "bip39",
+ "electrum_streaming_client",
  "flutter_rust_bridge",
  "frigate",
  "futures",
