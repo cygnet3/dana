@@ -41,7 +41,7 @@ void main() async {
     databaseFactory = databaseFactoryFfi;
   } else if (Platform.isAndroid) {
     ForegroundSyncService.initialize();
-  } else {
+  } else if (!Platform.isIOS) {
     Logger().e('Dana wallet is not supported on this platform');
     exit(1);
   }
