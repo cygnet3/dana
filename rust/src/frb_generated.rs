@@ -3626,6 +3626,20 @@ impl SseDecode for crate::api::structs::frigate_scan_outcome::FrigateScanOutcome
     }
 }
 
+impl SseDecode for crate::api::wallet::frigate::FrigateTipProbe {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_tipHeight = <u32>::sse_decode(deserializer);
+        let mut var_tipHash = <String>::sse_decode(deserializer);
+        let mut var_network = <crate::api::structs::network::Network>::sse_decode(deserializer);
+        return crate::api::wallet::frigate::FrigateTipProbe {
+            tip_height: var_tipHeight,
+            tip_hash: var_tipHash,
+            network: var_network,
+        };
+    }
+}
+
 impl SseDecode for i32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -3909,15 +3923,6 @@ impl SseDecode
         let mut var_field0 = <crate::api::structs::outpoint::OutPoint>::sse_decode(deserializer);
         let mut var_field1 =
             <crate::api::structs::discovered_output::DiscoveredOutput>::sse_decode(deserializer);
-        return (var_field0, var_field1);
-    }
-}
-
-impl SseDecode for (u32, String) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_field0 = <u32>::sse_decode(deserializer);
-        let mut var_field1 = <String>::sse_decode(deserializer);
         return (var_field0, var_field1);
     }
 }
@@ -4459,6 +4464,28 @@ impl
     for crate::api::structs::frigate_scan_outcome::FrigateScanOutcome
 {
     fn into_into_dart(self) -> crate::api::structs::frigate_scan_outcome::FrigateScanOutcome {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::wallet::frigate::FrigateTipProbe {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.tip_height.into_into_dart().into_dart(),
+            self.tip_hash.into_into_dart().into_dart(),
+            self.network.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::wallet::frigate::FrigateTipProbe
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::wallet::frigate::FrigateTipProbe>
+    for crate::api::wallet::frigate::FrigateTipProbe
+{
+    fn into_into_dart(self) -> crate::api::wallet::frigate::FrigateTipProbe {
         self
     }
 }
@@ -5036,6 +5063,15 @@ impl SseEncode for crate::api::structs::frigate_scan_outcome::FrigateScanOutcome
     }
 }
 
+impl SseEncode for crate::api::wallet::frigate::FrigateTipProbe {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u32>::sse_encode(self.tip_height, serializer);
+        <String>::sse_encode(self.tip_hash, serializer);
+        <crate::api::structs::network::Network>::sse_encode(self.network, serializer);
+    }
+}
+
 impl SseEncode for i32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -5284,14 +5320,6 @@ impl SseEncode
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <crate::api::structs::outpoint::OutPoint>::sse_encode(self.0, serializer);
         <crate::api::structs::discovered_output::DiscoveredOutput>::sse_encode(self.1, serializer);
-    }
-}
-
-impl SseEncode for (u32, String) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <u32>::sse_encode(self.0, serializer);
-        <String>::sse_encode(self.1, serializer);
     }
 }
 

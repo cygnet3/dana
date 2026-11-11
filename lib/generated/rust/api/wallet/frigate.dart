@@ -4,24 +4,15 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../../frb_generated.dart';
+import '../structs/network.dart';
 import '../structs/outpoint.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `build_frigate_scanner`, `drive_frigate_events`, `monitor_pump`
+// These functions are ignored because they are not marked as `pub`: `build_frigate_scanner`, `drive_frigate_events`, `ensure_backend_chain_matches`, `ensure_chain_matches`, `monitor_pump`, `network_from_genesis_hash`, `run_monitor`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `FRIGATE_MONITOR`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `deref`, `fmt`, `initialize`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `deref`, `fmt`, `fmt`, `initialize`
 
-/// Keyless chain-tip probe for a frigate server: connect, negotiate the
-/// protocol version, fetch the tip via `blockchain.headers.subscribe`, drop
-/// the connection.
-///
-/// Key-safe by construction (D10): no wallet receiver, no scan key material,
-/// and the key-bearing silent-payments `subscribe` is unreachable from this
-/// path — only public chain data crosses the wire. Also serves as the URL
-/// validation primitive (parse + reachability) for the settings UI. The tip
-/// notifications the headers subscription leaves flowing die with the
-/// dropped client.
-Future<(int, String)> frigateTipProbe({required String url}) =>
+Future<FrigateTipProbe> frigateTipProbe({required String url}) =>
     RustLib.instance.api.crateApiWalletFrigateFrigateTipProbe(url: url);
 
 /// Stop the background frigate monitor (no-op if none is running).
@@ -34,6 +25,45 @@ void stopFrigateMonitor() =>
 /// monitor from the persisted checkpoint instead of trusting a dead tail.
 bool frigateMonitorRunning() =>
     RustLib.instance.api.crateApiWalletFrigateFrigateMonitorRunning();
+
+/// Keyless chain-tip probe for a frigate server: connect, negotiate the
+/// protocol version, identify the chain the backend follows (genesis block
+/// header at height 0), fetch the tip via `blockchain.headers.subscribe`,
+/// drop the connection.
+///
+/// Key-safe by construction (D10): no wallet receiver, no scan key material,
+/// and the key-bearing silent-payments `subscribe` is unreachable from this
+/// path — only public chain data crosses the wire. Also serves as the URL
+/// validation primitive (parse + reachability + CHAIN CONSISTENCY) for the
+/// settings UI: the returned network must equal the wallet's network before
+/// the URL is persisted (a frigate indexing another chain silently wedges
+/// payment discovery otherwise). The tip notifications the headers
+/// subscription leaves flowing die with the dropped client.
+class FrigateTipProbe {
+  final int tipHeight;
+  final String tipHash;
+
+  /// The chain the backend follows, identified from its genesis hash.
+  final Network network;
+
+  const FrigateTipProbe({
+    required this.tipHeight,
+    required this.tipHash,
+    required this.network,
+  });
+
+  @override
+  int get hashCode => tipHeight.hashCode ^ tipHash.hashCode ^ network.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FrigateTipProbe &&
+          runtimeType == other.runtimeType &&
+          tipHeight == other.tipHeight &&
+          tipHash == other.tipHash &&
+          network == other.network;
+}
 
 /// An owned output the frigate scanner keeps watching for spends.
 ///

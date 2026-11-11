@@ -311,7 +311,7 @@ abstract class RustLibApi extends BaseApi {
 
   bool crateApiWalletFrigateFrigateMonitorRunning();
 
-  Future<(int, String)> crateApiWalletFrigateFrigateTipProbe(
+  Future<FrigateTipProbe> crateApiWalletFrigateFrigateTipProbe(
       {required String url});
 
   Future<int> crateApiChainGetChainHeight({required String blindbitUrl});
@@ -2262,7 +2262,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<(int, String)> crateApiWalletFrigateFrigateTipProbe(
+  Future<FrigateTipProbe> crateApiWalletFrigateFrigateTipProbe(
       {required String url}) {
     return handler.executeNormal(NormalTask(
       callFfi: (port_) {
@@ -2272,7 +2272,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             funcId: 66, port: port_);
       },
       codec: SseCodec(
-        decodeSuccessData: sse_decode_record_u_32_string,
+        decodeSuccessData: sse_decode_frigate_tip_probe,
         decodeErrorData: sse_decode_AnyhowException,
       ),
       constMeta: kCrateApiWalletFrigateFrigateTipProbeConstMeta,
@@ -2915,6 +2915,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  FrigateTipProbe dco_decode_frigate_tip_probe(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return FrigateTipProbe(
+      tipHeight: dco_decode_u_32(arr[0]),
+      tipHash: dco_decode_String(arr[1]),
+      network: dco_decode_network(arr[2]),
+    );
+  }
+
+  @protected
   int dco_decode_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -3095,19 +3108,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return (
       dco_decode_out_point(arr[0]),
       dco_decode_discovered_output(arr[1]),
-    );
-  }
-
-  @protected
-  (int, String) dco_decode_record_u_32_string(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 2) {
-      throw Exception('Expected 2 elements, got ${arr.length}');
-    }
-    return (
-      dco_decode_u_32(arr[0]),
-      dco_decode_String(arr[1]),
     );
   }
 
@@ -3635,6 +3635,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  FrigateTipProbe sse_decode_frigate_tip_probe(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_tipHeight = sse_decode_u_32(deserializer);
+    var var_tipHash = sse_decode_String(deserializer);
+    var var_network = sse_decode_network(deserializer);
+    return FrigateTipProbe(
+        tipHeight: var_tipHeight, tipHash: var_tipHash, network: var_network);
+  }
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getInt32();
@@ -3872,14 +3882,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_field0 = sse_decode_out_point(deserializer);
     var var_field1 = sse_decode_discovered_output(deserializer);
-    return (var_field0, var_field1);
-  }
-
-  @protected
-  (int, String) sse_decode_record_u_32_string(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_field0 = sse_decode_u_32(deserializer);
-    var var_field1 = sse_decode_String(deserializer);
     return (var_field0, var_field1);
   }
 
@@ -4422,6 +4424,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_frigate_tip_probe(
+      FrigateTipProbe self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.tipHeight, serializer);
+    sse_encode_String(self.tipHash, serializer);
+    sse_encode_network(self.network, serializer);
+  }
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putInt32(self);
@@ -4620,14 +4631,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_out_point(self.$1, serializer);
     sse_encode_discovered_output(self.$2, serializer);
-  }
-
-  @protected
-  void sse_encode_record_u_32_string(
-      (int, String) self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_u_32(self.$1, serializer);
-    sse_encode_String(self.$2, serializer);
   }
 
   @protected
