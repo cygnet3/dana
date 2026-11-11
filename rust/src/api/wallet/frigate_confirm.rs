@@ -43,6 +43,12 @@ const RECONNECT_BACKOFF: Duration = Duration::from_secs(5);
 /// Confirmation matcher: the watched candidate txids that appear as
 /// CONFIRMED history entries (height > 0). Mempool entries (not yet mined)
 /// and foreign txids never count — only a real block height confirms.
+///
+/// `#[frb(ignore)]`: pure Rust helper (tests + tracker internals), never
+/// called from Dart. Exposing it would drag `Txid` into the bridge, whose
+/// generated codecs do not compile (auto-opaque Txid); the frigate scanner
+/// delivers txids as strings across the bridge instead.
+#[flutter_rust_bridge::frb(ignore)]
 pub fn matched_confirmations(
     history: &[HistoryTx],
     watched: &HashSet<Txid>,

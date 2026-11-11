@@ -34,19 +34,36 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Maps a genesis block hash to the network it belongs to. `None` for a
 /// genesis hash outside the known networks (custom signets included).
-fn network_from_genesis_hash(
-    _genesis_hash: &BlockHash,
-) -> Option<spdk_wallet::bitcoin::Network> {
-    None // TDD red stub: every chain-detection test fails against this.
+fn network_from_genesis_hash(genesis_hash: &BlockHash) -> Option<spdk_wallet::bitcoin::Network> {
+    use spdk_wallet::bitcoin::blockdata::constants::genesis_block;
+    use spdk_wallet::bitcoin::Network;
+    const KNOWN: [Network; 5] = [
+        Network::Bitcoin,
+        Network::Testnet,
+        Network::Testnet4,
+        Network::Signet,
+        Network::Regtest,
+    ];
+    KNOWN.into_iter()
+        .find(|net| &genesis_block(*net).header.block_hash() == genesis_hash)
 }
 
-/// The scan-path chain guard: refuses when the backend follows a different
-/// chain than the wallet. The error must name both networks.
+/// The chain guard: refuses when the backend follows a different chain than
+/// the wallet. The error names both networks so the user can tell which side
+/// is wrong.
 fn ensure_chain_matches(
-    _wallet_network: spdk_wallet::bitcoin::Network,
-    _backend_network: spdk_wallet::bitcoin::Network,
+    wallet_network: spdk_wallet::bitcoin::Network,
+    backend_network: spdk_wallet::bitcoin::Network,
 ) -> Result<()> {
-    Ok(()) // TDD red stub: the mismatch-refusal test fails against this.
+    if wallet_network != backend_network {
+        anyhow::bail!(
+            "frigate server is on {backend_network} but the wallet is on \
+             {wallet_network} — pointing the wallet at a frigate indexing \
+             another chain would wedge payment discovery; use a frigate url \
+             for the wallet's own network"
+        );
+    }
+    Ok(())
 }
 
 lazy_static! {
@@ -56,20 +73,49 @@ lazy_static! {
 }
 
 /// Keyless chain-tip probe for a frigate server: connect, negotiate the
-/// protocol version, fetch the tip via `blockchain.headers.subscribe`, drop
-/// the connection.
+/// protocol version, identify the chain the backend follows (genesis block
+/// header at height 0), fetch the tip via `blockchain.headers.subscribe`,
+/// drop the connection.
 ///
 /// Key-safe by construction (D10): no wallet receiver, no scan key material,
 /// and the key-bearing silent-payments `subscribe` is unreachable from this
 /// path — only public chain data crosses the wire. Also serves as the URL
-/// validation primitive (parse + reachability) for the settings UI. The tip
-/// notifications the headers subscription leaves flowing die with the
-/// dropped client.
-pub async fn frigate_tip_probe(url: String) -> Result<(u32, String)> {
+/// validation primitive (parse + reachability + CHAIN CONSISTENCY) for the
+/// settings UI: the returned network must equal the wallet's network before
+/// the URL is persisted (a frigate indexing another chain silently wedges
+/// payment discovery otherwise). The tip notifications the headers
+/// subscription leaves flowing die with the dropped client.
+#[derive(Debug, Clone)]
+pub struct FrigateTipProbe {
+    pub tip_height: u32,
+    pub tip_hash: String,
+    /// The chain the backend follows, identified from its genesis hash.
+    pub network: crate::api::structs::network::Network,
+}
+
+pub async fn frigate_tip_probe(url: String) -> Result<FrigateTipProbe> {
     let client = FrigateClient::connect(&url, Some(PROBE_TIMEOUT)).await?;
+    // Chain identification first: the header at height 0 is the genesis
+    // block, and its hash identifies the network the backend follows.
+    let genesis_hash = client
+        .get_block_header(0)
+        .await?
+        .header
+        .block_hash();
+    let network = crate::api::structs::network::Network::from(
+        network_from_genesis_hash(&genesis_hash).ok_or_else(|| {
+            anyhow::anyhow!(
+                "frigate server follows an unrecognized chain (genesis hash {genesis_hash})"
+            )
+        })?,
+    );
     let (height, hash) = client.block_height().await?;
     drop(client);
-    Ok((height.to_consensus_u32(), hash.to_string()))
+    Ok(FrigateTipProbe {
+        tip_height: height.to_consensus_u32(),
+        tip_hash: hash.to_string(),
+        network,
+    })
 }
 
 /// An owned output the frigate scanner keeps watching for spends.
@@ -85,6 +131,21 @@ pub struct WatchedOutput {
 }
 
 impl SpWallet {
+    /// Keyless chain-consistency gate for the scan paths: identifies the
+    /// backend's chain from its genesis hash and refuses — before any key
+    /// material crosses the wire — when it differs from the wallet's network.
+    async fn ensure_backend_chain_matches(&self, frigate_url: &str) -> Result<()> {
+        let client = FrigateClient::connect(frigate_url, Some(PROBE_TIMEOUT)).await?;
+        let genesis = client.get_block_header(0).await?.header.block_hash();
+        drop(client);
+        let backend = network_from_genesis_hash(&genesis).ok_or_else(|| {
+            anyhow::anyhow!(
+                "frigate server follows an unrecognized chain (genesis hash {genesis})"
+            )
+        })?;
+        ensure_chain_matches(self.network, backend)
+    }
+
     async fn build_frigate_scanner(
         &self,
         frigate_url: String,
@@ -137,6 +198,10 @@ impl SpWallet {
     ) -> Result<FrigateScanOutcome> {
         KEEP_SYNCING.store(true, Ordering::Relaxed);
 
+        // Chain-consistency gate (before any subscribe: no scan key leaves
+        // the wallet when the backend indexes another chain).
+        self.ensure_backend_chain_matches(&frigate_url).await?;
+
         let scanner = self
             .build_frigate_scanner(frigate_url, watched_outputs)
             .await?;
@@ -158,6 +223,9 @@ impl SpWallet {
         dust_limit: u64,
         watched_outputs: Vec<WatchedOutput>,
     ) -> Result<()> {
+        // Chain-consistency gate (before any subscribe: no scan key leaves
+        // the wallet when the backend indexes another chain).
+        self.ensure_backend_chain_matches(&frigate_url).await?;
         let scanner = self
             .build_frigate_scanner(frigate_url.clone(), watched_outputs)
             .await?;
