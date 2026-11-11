@@ -26,6 +26,29 @@ use frigate::{FrigateEvent, FrigateHandle, FrigateScanner};
 /// stalled wake.
 const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 
+// ---- chain-consistency (probe genesis vs wallet network) — TDD red stubs ----
+// These two are the deliverable API of the chain-consistency fix; the red
+// commit ships them as stubs so the acceptance tests fail for the right
+// reason (assertion, not compile noise). The green commit replaces the
+// bodies in place.
+
+/// Maps a genesis block hash to the network it belongs to. `None` for a
+/// genesis hash outside the known networks (custom signets included).
+fn network_from_genesis_hash(
+    _genesis_hash: &BlockHash,
+) -> Option<spdk_wallet::bitcoin::Network> {
+    None // TDD red stub: every chain-detection test fails against this.
+}
+
+/// The scan-path chain guard: refuses when the backend follows a different
+/// chain than the wallet. The error must name both networks.
+fn ensure_chain_matches(
+    _wallet_network: spdk_wallet::bitcoin::Network,
+    _backend_network: spdk_wallet::bitcoin::Network,
+) -> Result<()> {
+    Ok(()) // TDD red stub: the mismatch-refusal test fails against this.
+}
+
 lazy_static! {
     /// Background monitor task; aborting it drops the `FrigateHandle`, which
     /// aborts the scanner worker and closes the frigate connection.
@@ -432,6 +455,103 @@ mod tests {
     async fn probe_rejects_bad_url_before_any_io() {
         assert!(frigate_tip_probe("not a url".to_string()).await.is_err());
         assert!(frigate_tip_probe(String::new()).await.is_err());
+    }
+
+    // ---- chain-consistency: probe genesis vs wallet network ----
+
+    use spdk_wallet::bitcoin::blockdata::constants::genesis_block;
+    use spdk_wallet::bitcoin::hashes::Hash;
+    use spdk_wallet::bitcoin::Network;
+
+    /// Every known network's genesis block hash maps back to exactly that
+    /// network — the primitive the probe and the scan guard both use.
+    #[test]
+    fn genesis_hashes_map_to_their_networks() {
+        let networks = [
+            Network::Bitcoin,
+            Network::Testnet,
+            Network::Testnet4,
+            Network::Signet,
+            Network::Regtest,
+        ];
+        for net in networks {
+            let hash = genesis_block(net).header.block_hash();
+            assert_eq!(
+                network_from_genesis_hash(&hash),
+                Some(net),
+                "genesis hash of {net:?} must map back to {net:?}"
+            );
+        }
+    }
+
+    /// A genesis hash outside the known networks (custom signet, foreign
+    /// chain) is rejected instead of guessed.
+    #[test]
+    fn unknown_genesis_hash_maps_to_none() {
+        assert_eq!(network_from_genesis_hash(&BlockHash::all_zeros()), None);
+    }
+
+    /// The scan-path guard refuses a backend on another chain, naming BOTH
+    /// networks in the error so the user can tell which side is wrong.
+    #[test]
+    fn chain_mismatch_is_refused_with_explicit_error() {
+        let err = ensure_chain_matches(Network::Regtest, Network::Bitcoin)
+            .expect_err("a mainnet backend must be refused for a regtest wallet");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("regtest"),
+            "error must name the wallet network: {msg}"
+        );
+        assert!(
+            msg.contains("bitcoin"),
+            "error must name the backend network: {msg}"
+        );
+    }
+
+    /// A backend on the wallet's own chain passes the guard.
+    #[test]
+    fn chain_match_is_accepted() {
+        ensure_chain_matches(Network::Regtest, Network::Regtest)
+            .expect("matching networks must be accepted");
+    }
+
+    /// Rig e2e for the wire half of the fix: frigate 1.4.1 serves
+    /// `blockchain.block.header(0)`, its genesis hash identifies regtest,
+    /// and the guard refuses a mainnet wallet against the detected chain.
+    /// Run on the code host with:
+    /// `FRIGATE_CHAIN_E2E=1 cargo test -p rust_lib_danawallet e2e_regtest_chain_consistency -- --ignored`
+    #[tokio::test]
+    #[ignore = "regtest rig e2e: FRIGATE_CHAIN_E2E=1 cargo test -p rust_lib_danawallet e2e_regtest_chain_consistency -- --ignored"]
+    async fn e2e_regtest_chain_consistency_probe_and_guard() {
+        if std::env::var("FRIGATE_CHAIN_E2E").as_deref() != Ok("1") {
+            return;
+        }
+        let url =
+            std::env::var("FRIGATE_E2E_URL").unwrap_or_else(|_| "127.0.0.1:50002".into());
+        let client = FrigateClient::connect(&url, None)
+            .await
+            .expect("regtest rig frigate must be reachable");
+        let genesis = client
+            .get_block_header(0)
+            .await
+            .expect("frigate must serve blockchain.block.header(0)")
+            .header
+            .block_hash();
+        let detected = network_from_genesis_hash(&genesis).expect(
+            "the rig genesis hash must map to a known network (wire half of the fix)",
+        );
+        assert_eq!(
+            detected,
+            Network::Regtest,
+            "the rig frigate indexes regtest"
+        );
+        let err = ensure_chain_matches(Network::Bitcoin, detected)
+            .expect_err("a mainnet wallet pointed at the regtest rig must be refused");
+        assert!(
+            err.to_string().contains("regtest"),
+            "refusal must name the detected chain: {err}"
+        );
+        drop(client);
     }
 
     // ---- phase-2/3 acceptance tests (decision-record amendment 2026-11-10) ----
