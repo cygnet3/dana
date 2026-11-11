@@ -5,7 +5,7 @@ import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/structs/state_update.dart';
 import 'package:danawallet/generated/rust/api/wallet.dart' show SpWallet;
 import 'package:danawallet/generated/rust/api/wallet/frigate.dart'
-    show WatchedOutput;
+    show FrigateTipProbe, WatchedOutput;
 import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
 import 'package:danawallet/services/sync_engine.dart';
@@ -40,7 +40,8 @@ void main() {
         settingsRepository: settings,
         frigateProbe: ({required url}) async {
           probeCalls++;
-          return (600, 'deadbeef');
+          return const FrigateTipProbe(
+              tipHeight: 600, tipHash: 'deadbeef', network: Network.signet);
         },
         watchedOutputsFn: () async {
           watchCalls++;

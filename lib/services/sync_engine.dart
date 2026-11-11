@@ -452,6 +452,20 @@ class SyncEngine {
         // the next wake auto-resumes.
         try {
           final probe = await frigateProbe(url: frigateUrl);
+          // Chain-consistency: a backend indexing another chain must never
+          // be scanned and must never advance the checkpoint — refuse with
+          // an explicit message naming both networks (the user-facing fix
+          // for the wedged-discovery finding).
+          if (probe.network != network) {
+            Logger().w('[$_logTag] frigate backend on a foreign chain '
+                '(backend=${probe.network.name}, wallet=${network.name}), '
+                'refusing to scan');
+            onTransientOffline?.call('Frigate backend is on a different chain '
+                '(${probe.network.name}) — this wallet is on '
+                '${network.name}. Nothing was scanned; set a frigate url '
+                "for the wallet's own network.");
+            return;
+          }
           tip = probe.tipHeight;
           probeTipHash = probe.tipHash;
         } catch (e) {

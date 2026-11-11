@@ -168,7 +168,7 @@ void main() {
         walletRepository: wallet,
         settingsRepository: settings,
         frigateProbe: ({required url}) async =>
-            FrigateTipProbe(
+            const FrigateTipProbe(
               tipHeight: 600,
               tipHash: 'deadbeef',
               network: Network.signet,
@@ -202,6 +202,7 @@ void main() {
         () async {
       wallet.lastSync = 599;
       settings.probeNetwork = Network.mainnet; // fake wallet is signet
+      setProbeTip(600); // rebuild the probe result on the foreign chain
 
       await buildEngine().trySync();
 
