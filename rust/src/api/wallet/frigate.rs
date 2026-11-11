@@ -574,4 +574,177 @@ mod tests {
             "the progress bar never rewinds to a mempool sentinel height"
         );
     }
+
+    // ---- phase-3 electrum confirmation tracking (Sub-C) ----
+
+    use crate::api::wallet::frigate_confirm::matched_confirmations;
+    use electrum_streaming_client::response::{ConfirmedTx, MempoolTx, Tx as HistoryTx};
+
+    fn test_script() -> ScriptBuf {
+        ScriptBuf::from_hex("00140000000000000000000000000000000000000000").unwrap()
+    }
+
+    /// The candidate registry exposes (script, txid) pairs so the phase-3
+    /// confirmation tracker can register every distinct mempool-discovered
+    /// output script with the regular electrum server.
+    #[test]
+    fn mempool_candidate_exposes_scripts_for_registration() {
+        let mut pump = SyncUpdatePump::with_sink(0, Box::new(RecordingSink::default()));
+        let (outpoint, mut output) = discovered_output(3);
+        output.txout.script_pubkey = test_script();
+        pump.record_mempool(test_txid(3), HashMap::from([(outpoint, output)]))
+            .unwrap();
+
+        let pairs = pump.candidate_script_txids();
+        assert_eq!(
+            pairs.len(),
+            1,
+            "one candidate output script must be exposed for registration"
+        );
+        assert_eq!(pairs[0], (test_script(), test_txid(3)));
+    }
+
+    /// Acceptance (a) electrum leg: the confirmation notification (candidate
+    /// txid matched in the electrum scripthash history at a real height)
+    /// creates wallet state exactly once; a duplicate electrum notification
+    /// and the phase-1 Confirmed re-report both dedupe to nothing.
+    #[tokio::test]
+    // FLAG_LOCK: drive_frigate_events reads the global KEEP_SYNCING flag.
+    #[allow(clippy::await_holding_lock)]
+    async fn electrum_confirmation_creates_state_exactly_once() {
+        let _guard = FLAG_LOCK.lock().unwrap();
+        KEEP_SYNCING.store(true, Ordering::Relaxed);
+        let sink = RecordingSink::default();
+        let mut pump = SyncUpdatePump::with_sink(0, Box::new(sink.clone()));
+        let mut tip = None;
+
+        let (outpoint, output) = discovered_output(4);
+        pump.record_mempool(
+            test_txid(4),
+            HashMap::from([(outpoint, output.clone())]),
+        )
+        .unwrap();
+        assert!(
+            sink.updates.lock().unwrap().is_empty(),
+            "registration must not create wallet state"
+        );
+
+        // electrum: the candidate txid shows up mined at 800_003
+        let emitted = pump
+            .confirm_candidates(&HashSet::from([test_txid(4)]), 800_003, "blkhash")
+            .unwrap();
+        assert_eq!(emitted, 1, "the confirmation must emit one state update");
+
+        let updates = sink.updates.lock().unwrap();
+        assert_eq!(updates.len(), 1);
+        assert_eq!(
+            updates[0].blkheight, 800_003,
+            "candidate state carries the mined height from the electrum history"
+        );
+        assert_eq!(updates[0].found_outputs.len(), 1);
+        assert_eq!(
+            updates[0].found_outputs[0].outpoint.txid,
+            test_txid(4).to_string()
+        );
+        drop(updates);
+
+        // duplicate electrum notification for the same txid: nothing emitted
+        let emitted = pump
+            .confirm_candidates(&HashSet::from([test_txid(4)]), 800_003, "blkhash")
+            .unwrap();
+        assert_eq!(emitted, 0, "duplicate confirmation must not re-emit");
+
+        // the next phase-1 scan re-reports the same output as Confirmed
+        let events =
+            futures::stream::iter(vec![confirmed_result(outpoint, &output, 800_003)]);
+        drive_frigate_events(events, &mut pump, &mut tip).await.unwrap();
+        assert_eq!(
+            sink.updates.lock().unwrap().len(),
+            1,
+            "phase-1 re-report must not duplicate wallet state (exact-once)"
+        );
+        assert_eq!(pump.emitted_output_count(), 1);
+    }
+
+    /// A candidate output already emitted by a racing phase-1 Confirmed
+    /// report is not re-emitted when the electrum notification lands; only
+    /// the still-unemitted outputs of the same candidate are emitted
+    /// (per-outpoint exact-once).
+    #[test]
+    fn electrum_confirmation_emits_only_unemitted_outputs() {
+        let sink = RecordingSink::default();
+        let mut pump = SyncUpdatePump::with_sink(0, Box::new(sink.clone()));
+
+        let (o1, mut out1) = discovered_output(5);
+        out1.txout.script_pubkey = test_script();
+        let (o2, mut out2) = discovered_output(6);
+        out2.txout.script_pubkey = test_script();
+
+        pump.record_mempool(
+            test_txid(5),
+            HashMap::from([(o1, out1.clone()), (o2, out2.clone())]),
+        )
+        .unwrap();
+
+        // phase-1 Confirmed delivery wins the race for o2
+        pump.record(
+            ScanResult {
+                blkheight: test_height(800_003),
+                blkhash: test_hash(),
+                discovered_inputs: HashSet::new(),
+                discovered_outputs: HashMap::from([(o2, out2)]),
+            },
+            false,
+        )
+        .unwrap();
+        assert_eq!(sink.updates.lock().unwrap().len(), 1);
+
+        // the electrum confirmation covers the whole candidate txid: only o1
+        // is still unemitted, so only o1 is emitted now
+        let emitted = pump
+            .confirm_candidates(&HashSet::from([test_txid(5)]), 800_003, "blkhash")
+            .unwrap();
+        assert_eq!(emitted, 1);
+
+        let updates = sink.updates.lock().unwrap();
+        assert_eq!(updates.len(), 2);
+        assert_eq!(
+            updates[1].found_outputs.len(),
+            1,
+            "the already-emitted output must not be re-emitted"
+        );
+        assert_eq!(
+            updates[1].found_outputs[0].outpoint.txid,
+            test_txid(5).to_string()
+        );
+    }
+
+    /// The electrum history matcher: only CONFIRMED entries (height > 0)
+    /// whose txid is a watched candidate count as confirmations; mempool
+    /// entries (not yet mined) and foreign txids never do.
+    #[test]
+    fn history_matcher_only_confirms_watched_confirmed_txids() {
+        let watched = HashSet::from([test_txid(7), test_txid(8)]);
+        let history = vec![
+            HistoryTx::Confirmed(ConfirmedTx {
+                txid: test_txid(7),
+                height: Height::from_consensus(800_004).unwrap(),
+            }),
+            HistoryTx::Confirmed(ConfirmedTx {
+                txid: test_txid(9),
+                height: Height::from_consensus(800_004).unwrap(),
+            }),
+            HistoryTx::Mempool(MempoolTx {
+                txid: test_txid(8),
+                fee: Amount::from_sat(1000),
+                confirmed_inputs: true,
+            }),
+        ];
+        let matched = matched_confirmations(&history, &watched);
+        assert_eq!(
+            matched,
+            HashSet::from([test_txid(7)]),
+            "only the watched, confirmed txid confirms"
+        );
+    }
 }
