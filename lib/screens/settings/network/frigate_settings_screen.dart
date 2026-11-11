@@ -12,10 +12,12 @@ import 'package:provider/provider.dart';
 
 /// Frigate sync backend settings (D5, D6, D7, D9, D10).
 ///
-/// Save flow (D10): parse -> keyless tip probe -> inline error on failure,
-/// do not persist. The probe is `frigateTipProbe` — connect + version
-/// handshake + `blockchain.headers.subscribe` only, no scan key anywhere on
-/// that path. [SyncEngine]'s `syncViaFrigate` is never reachable from here.
+/// Save flow (D10): parse -> keyless tip probe -> chain-consistency check
+/// (backend network must equal the wallet's network) -> inline error on any
+/// failure, do not persist. The probe is `frigateTipProbe` — connect +
+/// version handshake + `blockchain.block.header(0)` (genesis identification)
+/// + `blockchain.headers.subscribe` only, no scan key anywhere on that path.
+/// [SyncEngine]'s `syncViaFrigate` is never reachable from here.
 class FrigateSettingsScreen extends StatelessWidget {
   const FrigateSettingsScreen({super.key});
 
@@ -152,10 +154,20 @@ class FrigateSettingsScreen extends StatelessWidget {
     }
 
     // D10 reachability probe — keyless by construction. On failure the URL
-    // is NOT persisted.
+    // is NOT persisted. The probe also identifies the chain the backend
+    // follows (genesis hash); a backend on another chain is refused with an
+    // explicit error — a foreign-chain frigate silently wedges payment
+    // discovery until the sync height is manually reset.
     try {
-      final (tip, _) = await frigateTipProbe(url: value.trim());
-      Logger().i('frigate probe ok, tip at $tip');
+      final probe = await frigateTipProbe(url: value.trim());
+      final walletNetwork = await walletRepository.readNetwork();
+      if (probe.network != walletNetwork) {
+        displayWarning('Frigate server is on ${probe.network.name} but this '
+            'wallet is on ${walletNetwork.name} — url not saved');
+        return;
+      }
+      Logger().i('frigate probe ok, tip at ${probe.tipHeight} on '
+          '${probe.network.name}');
     } catch (e) {
       displayWarning('Frigate unreachable ($e) — url not saved');
       return;
