@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:danawallet/services/sync_engine.dart';
 import 'package:danawallet/states/sync_offline_state.dart';
 import 'package:danawallet/states/sync_progress_state.dart';
@@ -26,7 +28,21 @@ class InProcessSyncService {
           onTransientOffline: (message) => syncOffline?.setOffline(message),
         );
 
+  /// Test/alternate-host seam: run with a pre-built engine (injected fakes).
+  InProcessSyncService.withEngine(this._engine);
+
+  /// Ordered startup (owner ruling 2026-11-12): resolve the backend and
+  /// start the frigate monitor (frigate resolution only) BEFORE the chain
+  /// poller can fire any one-shot [trySync]. On a blindbit resolution this
+  /// is a no-op — a monitor must never outlive its backend selection (D9).
+  Future<void> start() => _engine.ensureFrigateMonitor();
+
   Future<void> trySync() => _engine.trySync();
 
-  void dispose() => _engine.dispose();
+  void dispose() {
+    // Drop the monitor subscription (no-op on a blindbit resolution); the
+    // engine's dispose cancels the beat timer and the result subscription.
+    unawaited(_engine.stopFrigateMonitor());
+    _engine.dispose();
+  }
 }

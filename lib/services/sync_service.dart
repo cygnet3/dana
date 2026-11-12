@@ -60,18 +60,20 @@ class SyncService {
     return false;
   }
 
-  void startInProcess() {
+  Future<void> startInProcess() async {
     _inProcessSyncService = InProcessSyncService(
       syncProgress: _syncProgress,
       walletState: _walletState,
       syncOffline: syncOffline,
     );
+    // Ordered startup (owner ruling 2026-11-12): the backend/monitor
+    // resolution completes before the poller fires any one-shot trySync.
+    await _inProcessSyncService!.start();
     _chainState.startChainPoller(
       true,
       onTipUpdated: _inProcessSyncService!.trySync,
       shouldSkipTick: () => _syncProgress.isSyncing,
     );
-    return;
   }
 
   void _onServiceData(Object data) {

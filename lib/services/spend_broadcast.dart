@@ -16,9 +16,12 @@ class SpendBroadcastTarget {
   final String url;
 }
 
-/// Decides how the spend flow broadcasts, mirroring the sync engine's D9
-/// rule: the frigate backend runs only when the user picked it AND a URL is
-/// configured; blindbit (configured or default) stays the default.
+/// Decides how the spend flow broadcasts, consuming the same frigate-
+/// exclusive rule as the sync engine's per-cycle resolution (owner ruling
+/// 2026-11-12): frigate when the user selected it AND a url is configured;
+/// blindbit only as the default backend; frigate-selected-but-unconfigured
+/// throws an explicit [SpendBroadcastBackendError] — never a silent
+/// blindbit fallback (a different third party, different disclosure).
 SpendBroadcastTarget resolveSpendBroadcastTarget({
   required String? frigateBackend,
   required String? frigateUrl,
@@ -26,13 +29,26 @@ SpendBroadcastTarget resolveSpendBroadcastTarget({
   required String defaultBlindbitUrl,
 }) {
   final url = frigateUrl?.trim();
-  if (frigateBackend == frigateBackendFrigate &&
-      url != null &&
-      url.isNotEmpty) {
+  if (frigateBackend == frigateBackendFrigate) {
+    if (url == null || url.isEmpty) {
+      throw const SpendBroadcastBackendError(
+          'Frigate backend selected but no frigate url is configured — set '
+          'one in settings. Nothing was broadcast.');
+    }
     return SpendBroadcastTarget.frigate(url);
   }
   return SpendBroadcastTarget.blindbit(
       configuredBlindbitUrl ?? defaultBlindbitUrl);
+}
+
+/// The selected backend cannot carry the broadcast (e.g. frigate selected
+/// with no url configured). Surfaced verbatim to the user — never a silent
+/// fallback to another backend.
+class SpendBroadcastBackendError implements Exception {
+  final String message;
+  const SpendBroadcastBackendError(this.message);
+  @override
+  String toString() => message;
 }
 
 /// Broadcast a raw transaction to a frigate (Electrum-protocol) server.
