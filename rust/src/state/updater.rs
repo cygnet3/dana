@@ -214,6 +214,15 @@ impl SyncUpdatePump {
     /// once: a duplicate electrum notification and the phase-1 `Confirmed`
     /// re-report both dedupe via `emitted_outputs`. Returns the number of
     /// state updates emitted.
+    ///
+    /// Late confirmation: when the notification arrives after the checkpoint
+    /// has already advanced past `height` (late electrum notify, or tracker
+    /// reconnect after downtime), emitting at `height` would hit the
+    /// monotonic guard in [`Self::emit`] and silently drop the receipt, and
+    /// the next phase-1 scan starts after that height so it could never
+    /// re-discover the output. The outputs are re-emitted at the checkpoint
+    /// instead — same shape as [`Self::record_spent`], which is keyed by
+    /// outpoint, not block height.
     pub fn confirm_candidates(
         &mut self,
         txids: &HashSet<Txid>,
@@ -231,11 +240,18 @@ impl SyncUpdatePump {
                 continue;
             }
             let before = self.emitted_outputs.len();
-            self.emit(height, blkhash.to_string(), HashSet::new(), outputs)?;
+            // Late confirmation rides the checkpoint so the monotonic guard
+            // cannot drop it; a timely one keeps the real mined height.
+            let (emit_height, emit_hash) = if self.last_height > height {
+                (self.last_height, self.last_hash.clone())
+            } else {
+                (height, blkhash.to_string())
+            };
+            self.emit(emit_height, emit_hash, HashSet::new(), outputs)?;
             if self.emitted_outputs.len() > before {
                 emitted_updates += 1;
                 log::info!(
-                    "frigate: electrum confirmation created state for candidate tx at height {height}"
+                    "frigate: electrum confirmation created state for candidate tx mined at {height} (emitted at {emit_height})"
                 );
             }
         }
@@ -460,5 +476,83 @@ mod tests {
         )
         .unwrap();
         assert_eq!(pump.last_height, 800_002);
+    }
+
+    fn test_txid(v: u8) -> Txid {
+        Txid::from_str(&format!("{v:064x}")).unwrap()
+    }
+
+    fn candidate_output(v: u8) -> (OutPoint, DiscoveredOutput) {
+        use spdk_wallet::bitcoin::{Amount, ScriptBuf, TxOut};
+        (
+            outpoint(v),
+            DiscoveredOutput {
+                txout: TxOut {
+                    value: Amount::from_sat(50_000),
+                    script_pubkey: ScriptBuf::new(),
+                },
+                tweak: spdk_wallet::bitcoin::secp256k1::Scalar::ONE,
+                label: None,
+            },
+        )
+    }
+
+    /// Late electrum confirmation: the notification arrives for mined height
+    /// H after the checkpoint already advanced past H (late notify or
+    /// tracker reconnect after downtime). Emitting at H is dropped by the
+    /// monotonic guard in `emit`, and the next phase-1 scan starts after H,
+    /// so the receipt would be permanently invisible. The candidate outputs
+    /// must be re-emitted at the checkpoint height instead (same shape as
+    /// `record_spent`), without moving the checkpoint backward.
+    #[test]
+    fn late_confirmation_reemits_candidate_at_checkpoint() {
+        let sink = RecordingSink::default();
+        let mut pump = SyncUpdatePump::with_sink(0, Box::new(sink.clone()));
+        pump.record_mempool(test_txid(1), HashMap::from([candidate_output(1)]))
+            .unwrap();
+
+        // Checkpoint advances to 800_005 before the confirmation arrives.
+        pump.finalize(
+            Height::from_consensus(800_005).unwrap(),
+            BlockHash::from_str(&"0".repeat(64)).unwrap(),
+        )
+        .unwrap();
+
+        let emitted = pump
+            .confirm_candidates(&HashSet::from([test_txid(1)]), 800_001, "blkhash")
+            .unwrap();
+        assert_eq!(emitted, 1, "late confirmation must create wallet state");
+        assert_eq!(pump.emitted_output_count(), 1);
+        assert_eq!(pump.last_emitted_height(), 800_005);
+        let updates = sink.updates.lock().unwrap();
+        assert_eq!(updates.len(), 2);
+        let late = updates.last().unwrap();
+        assert_eq!(late.blkheight, 800_005);
+        assert_eq!(late.found_outputs.len(), 1);
+    }
+
+    /// A confirmation at a height at/after the checkpoint still emits at the
+    /// real mined height — the late-confirmation fallback must not fire.
+    #[test]
+    fn timely_confirmation_emits_at_real_height() {
+        let sink = RecordingSink::default();
+        let mut pump = SyncUpdatePump::with_sink(0, Box::new(sink.clone()));
+        pump.record_mempool(test_txid(1), HashMap::from([candidate_output(1)]))
+            .unwrap();
+        pump.finalize(
+            Height::from_consensus(800_005).unwrap(),
+            BlockHash::from_str(&"0".repeat(64)).unwrap(),
+        )
+        .unwrap();
+        let emitted = pump
+            .confirm_candidates(&HashSet::from([test_txid(1)]), 800_006, "blkhash6")
+            .unwrap();
+        assert_eq!(emitted, 1);
+        assert_eq!(pump.last_emitted_height(), 800_006);
+        let updates = sink.updates.lock().unwrap();
+        let timely = updates.last().unwrap();
+        assert_eq!(timely.blkheight, 800_006);
+        assert_eq!(timely.blkhash, "blkhash6");
+        assert_eq!(timely.found_outputs.len(), 1);
     }
 }
