@@ -49,6 +49,8 @@ abstract class SpWallet implements RustOpaqueInterface {
       RustLib.instance.api.crateApiWalletSpWalletBroadcastUsingBlindbit(
           blindbitUrl: blindbitUrl, tx: tx);
 
+  SilentPaymentCode changeCode();
+
   Uint8List commitSpOutputs({required List<int> psbt});
 
   /// Builds a BIP-375 PSBT (v2) for a previously chosen [InputSelection].
@@ -73,18 +75,14 @@ abstract class SpWallet implements RustOpaqueInterface {
   /// Builds each input's final scriptSig and witness from its signatures.
   Uint8List finalizeInputs({required List<int> psbt});
 
-  SilentPaymentCode getChangeAddress();
-
-  Network getNetwork();
-
-  SilentPaymentCode getReceivingAddress();
-
   ApiScanKey getScanKey();
 
   ApiSpendKey getSpendKey();
 
   static void interruptSync() =>
       RustLib.instance.api.crateApiWalletSpWalletInterruptSync();
+
+  Network network();
 
   factory SpWallet(
           {required ApiScanKey scanKey,
@@ -98,6 +96,8 @@ abstract class SpWallet implements RustOpaqueInterface {
           network: network,
           fingerprint: fingerprint,
           derivationPath: derivationPath);
+
+  SilentPaymentCode receivingCode();
 
   /// Scan a signed transaction for silent-payment outputs belonging to this wallet.
   ///

@@ -647,11 +647,10 @@ mod tests {
         let created = sender
             .create_psbt(
                 vec![utxo.clone()],
-                vec![Recipient {
-                    payment_code: recipient.get_receiving_address(),
-                    amount: ApiAmount(SEND_SAT),
-                }],
-                single_payment_selection(&[utxo], SEND_SAT, FEE_SAT),
+                vec![
+                    Recipient::new(&recipient.receiving_code().into(), ApiAmount(SEND_SAT)),
+                ],
+                &single_payment_selection(&[utxo], SEND_SAT, FEE_SAT),
                 network,
             )
             .expect("create psbt");
@@ -678,10 +677,13 @@ mod tests {
     #[test]
     fn test_seed_payment_codes_are_pinned() {
         assert_eq!(
-            recipient(Network::Signet).get_receiving_address(),
+            recipient(Network::Signet).receiving_code().encode(),
             RECIPIENT_CODE
         );
-        assert_eq!(sender(Network::Signet).get_receiving_address(), SENDER_CODE);
+        assert_eq!(
+            sender(Network::Signet).receiving_code().encode(),
+            SENDER_CODE
+        );
     }
 
     /// BIP-376 updater role: every SP input must carry the per-output tweak in
@@ -697,11 +699,11 @@ mod tests {
         let created = sender
             .create_psbt(
                 vec![utxo.clone()],
-                vec![Recipient {
-                    payment_code: recipient.get_receiving_address(),
-                    amount: ApiAmount(SEND_SAT),
-                }],
-                single_payment_selection(std::slice::from_ref(&utxo), SEND_SAT, FEE_SAT),
+                vec![Recipient::new(
+                    &recipient.receiving_code().into(),
+                    ApiAmount(SEND_SAT),
+                )],
+                &single_payment_selection(std::slice::from_ref(&utxo), SEND_SAT, FEE_SAT),
                 network,
             )
             .expect("create psbt");
@@ -748,11 +750,11 @@ mod tests {
         let created = sender
             .create_psbt(
                 vec![utxo.clone()],
-                vec![Recipient {
-                    payment_code: recipient.get_receiving_address(),
-                    amount: ApiAmount(SEND_SAT),
-                }],
-                single_payment_selection(std::slice::from_ref(&utxo), SEND_SAT, FEE_SAT),
+                vec![Recipient::new(
+                    &recipient.receiving_code().into(),
+                    ApiAmount(SEND_SAT),
+                )],
+                &single_payment_selection(std::slice::from_ref(&utxo), SEND_SAT, FEE_SAT),
                 network,
             )
             .expect("create psbt");
@@ -760,8 +762,8 @@ mod tests {
         let psbt = Psbt::deserialize(&created.psbt).expect("psbt deserializes");
         assert_eq!(psbt.outputs.len(), 2, "payment plus change");
 
-        let payment_info = sp_info(&recipient.get_receiving_address());
-        let change_info = sp_info(&sender.get_change_address());
+        let payment_info = sp_info(&recipient.receiving_code().encode());
+        let change_info = sp_info(&sender.change_code().encode());
         let mut seen = [false; 2];
         for output in &psbt.outputs {
             assert!(
@@ -787,17 +789,17 @@ mod tests {
         let recipient = recipient(network.clone());
         let utxo = sender_utxo(&sender, UTXO_SAT, scalar(1), 1);
         let recipients = || {
-            vec![Recipient {
-                payment_code: recipient.get_receiving_address(),
-                amount: ApiAmount(SEND_SAT),
-            }]
+            vec![Recipient::new(
+                &recipient.receiving_code().into(),
+                ApiAmount(SEND_SAT),
+            )]
         };
 
         let mut selection =
             single_payment_selection(std::slice::from_ref(&utxo), SEND_SAT, FEE_SAT);
         selection.sent = ApiAmount(SEND_SAT + 1);
         let err = sender
-            .create_psbt(vec![utxo.clone()], recipients(), selection, network.clone())
+            .create_psbt(vec![utxo.clone()], recipients(), &selection, network.clone())
             .expect_err("amount mismatch must fail");
         assert!(err.to_string().contains("Amount mismatch"), "{err}");
 
@@ -805,7 +807,7 @@ mod tests {
             single_payment_selection(std::slice::from_ref(&utxo), SEND_SAT, FEE_SAT);
         selection.n_sent_outputs = 2;
         let err = sender
-            .create_psbt(vec![utxo.clone()], recipients(), selection, network.clone())
+            .create_psbt(vec![utxo.clone()], recipients(), &selection, network.clone())
             .expect_err("count mismatch must fail");
         assert!(
             err.to_string().contains("Number of outputs mismatch"),
@@ -819,7 +821,7 @@ mod tests {
             vout: 99,
         }];
         let err = sender
-            .create_psbt(vec![utxo.clone()], recipients(), selection, network)
+            .create_psbt(vec![utxo.clone()], recipients(), &selection, network)
             .expect_err("unknown outpoint must fail");
         assert!(err.to_string().contains("not found"), "{err}");
     }
@@ -833,11 +835,11 @@ mod tests {
         let err = sender
             .create_psbt(
                 vec![utxo.clone()],
-                vec![Recipient {
-                    payment_code: mainnet_recipient.get_receiving_address(),
-                    amount: ApiAmount(SEND_SAT),
-                }],
-                single_payment_selection(&[utxo], SEND_SAT, FEE_SAT),
+                vec![Recipient::new(
+                    &mainnet_recipient.receiving_code().into(),
+                    ApiAmount(SEND_SAT),
+                )],
+                &single_payment_selection(&[utxo], SEND_SAT, FEE_SAT),
                 Network::Signet,
             )
             .expect_err("mainnet code on signet must fail");
@@ -961,11 +963,11 @@ mod tests {
         let created = sender
             .create_psbt(
                 vec![utxo1.clone(), utxo2.clone()],
-                vec![Recipient {
-                    payment_code: recipient.get_receiving_address(),
-                    amount: ApiAmount(SEND_SAT),
-                }],
-                single_payment_selection(&[utxo1, utxo2], SEND_SAT, FEE_SAT),
+                vec![Recipient::new(
+                    &recipient.receiving_code().into(),
+                    ApiAmount(SEND_SAT),
+                )],
+                &single_payment_selection(&[utxo1, utxo2], SEND_SAT, FEE_SAT),
                 network,
             )
             .expect("create psbt");
