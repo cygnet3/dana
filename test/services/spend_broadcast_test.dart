@@ -30,17 +30,21 @@ Future<void> main() async {
     });
 
     test(
-        'falls back to blindbit when the backend is frigate but no url is '
-        'configured (D9: url unset means the feature is off)', () {
+        'frigate selected but no url -> explicit error, never blindbit '
+        '(frigate-exclusive, owner ruling 2026-11-12)', () {
       for (final frigateUrl in [null, '', '   ']) {
-        final target = resolveSpendBroadcastTarget(
-          frigateBackend: frigateBackendFrigate,
-          frigateUrl: frigateUrl,
-          configuredBlindbitUrl: configuredBlindbit,
-          defaultBlindbitUrl: defaultRegtestBlindbit,
+        expect(
+          () => resolveSpendBroadcastTarget(
+            frigateBackend: frigateBackendFrigate,
+            frigateUrl: frigateUrl,
+            configuredBlindbitUrl: configuredBlindbit,
+            defaultBlindbitUrl: defaultRegtestBlindbit,
+          ),
+          throwsA(isA<SpendBroadcastBackendError>()),
+          reason: 'the user selected frigate: spending must block with an '
+              'explicit error, not silently broadcast via blindbit (a '
+              'different third party)',
         );
-        expect(target.isFrigate, isFalse);
-        expect(target.url, configuredBlindbit);
       }
     });
 

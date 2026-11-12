@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:danawallet/constants.dart' show frigateOfflineMsg;
+import 'package:danawallet/constants.dart'
+    show frigateNoUrlMsg, frigateOfflineMsg;
 import 'package:danawallet/generated/rust/api/structs/frigate_scan_outcome.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/structs/state_update.dart';
@@ -33,14 +34,13 @@ void main() {
   // The probe also reports the backend's chain (chain-consistency fix):
   // probeNetwork is the chain the fake backend follows, signet = the fake
   // wallet's own network.
-  void setProbeTip(int? height) => settings.probeTip =
-      height == null
-          ? null
-          : FrigateTipProbe(
-              tipHeight: height,
-              tipHash: 'deadbeef',
-              network: settings.probeNetwork,
-            );
+  void setProbeTip(int? height) => settings.probeTip = height == null
+      ? null
+      : FrigateTipProbe(
+          tipHeight: height,
+          tipHash: 'deadbeef',
+          network: settings.probeNetwork,
+        );
 
   SyncEngine buildEngine() => SyncEngine(
         onSyncStarted: (start, end) => syncStartedEnd = end,
@@ -167,12 +167,11 @@ void main() {
         onTransientOffline: (message) => banners.add(message),
         walletRepository: wallet,
         settingsRepository: settings,
-        frigateProbe: ({required url}) async =>
-            const FrigateTipProbe(
-              tipHeight: 600,
-              tipHash: 'deadbeef',
-              network: Network.signet,
-            ),
+        frigateProbe: ({required url}) async => const FrigateTipProbe(
+          tipHeight: 600,
+          tipHash: 'deadbeef',
+          network: Network.signet,
+        ),
         watchedOutputsFn: () async => const <WatchedOutput>[],
         frigateScanFn: (
             {required frigateUrl,
@@ -198,7 +197,8 @@ void main() {
   });
 
   group('chain-consistency (probe genesis vs wallet network)', () {
-    test('probe on a foreign chain -> no scan, explicit banner, checkpoint untouched',
+    test(
+        'probe on a foreign chain -> no scan, explicit banner, checkpoint untouched',
         () async {
       wallet.lastSync = 599;
       settings.probeNetwork = Network.mainnet; // fake wallet is signet
@@ -215,7 +215,8 @@ void main() {
       expect(wallet.savedHeights, isEmpty,
           reason: 'checkpoint must not advance onto a foreign chain');
       expect(banners, isNotEmpty,
-          reason: 'the wallet must tell the user the backend is on another chain');
+          reason:
+              'the wallet must tell the user the backend is on another chain');
       expect(banners.single, contains('chain'),
           reason: 'explicit mismatch message, not a generic offline note');
     });
@@ -239,7 +240,7 @@ void main() {
     });
   });
 
-  group('explicit backend selection (D9)', () {
+  group('frigate-exclusive backend (owner ruling 2026-11-12)', () {
     test('backend blindbit (or unset) with frigate url set -> probe never runs',
         () async {
       wallet.lastSync = 599;
@@ -254,7 +255,7 @@ void main() {
           reason: 'blindbit scan needs the wallet object, absent in tests');
     });
 
-    test('backend frigate with no url -> falls back to blindbit, no probe',
+    test('backend frigate + no url -> explicit idle, blindbit never consulted',
         () async {
       wallet.lastSync = 599;
       settings.frigateUrl = null;
@@ -262,8 +263,44 @@ void main() {
       await buildEngine().trySync();
 
       expect(probeCalls, 0);
-      expect(chainHeightCalls, 1);
+      expect(chainHeightCalls, 0,
+          reason: 'the user selected frigate: a blindbit scan (different '
+              'third party, different disclosure) is never a fallback');
+      expect(networkCheckCalls, 0,
+          reason: 'no blindbit wake logic may run either');
       expect(scanCalls, 0);
+      expect(watchCalls, 0);
+      expect(wallet.disclosures, isEmpty);
+      expect(wallet.savedHeights, isEmpty,
+          reason: 'checkpoint untouched in the explicit idle state');
+      expect(wallet.lock, isNull);
+      expect(banners, [frigateNoUrlMsg],
+          reason: 'the idle state must be user-visible (D8 transient path)');
+    });
+
+    test('backend frigate + probe failure -> idle, blindbit never consulted',
+        () async {
+      wallet.lastSync = 599;
+      setProbeTip(null); // probe will throw
+
+      await buildEngine().trySync();
+
+      expect(banners, [frigateOfflineMsg]);
+      expect(scanCalls, 0);
+      expect(watchCalls, 0);
+      expect(wallet.disclosures, isEmpty);
+      expect(chainHeightCalls, 0,
+          reason: 'frigate-selected means frigate-exclusive: an unreachable '
+              'server is an explicit idle, never a blindbit scan');
+      expect(networkCheckCalls, 0);
+      expect(wallet.lock, isNull);
+      expect(wallet.savedHeights, isEmpty);
+
+      // Auto-resume: the next wake (tip reachable again) scans normally.
+      setProbeTip(600);
+      await buildEngine().trySync();
+      expect(scanCalls, 1);
+      expect(scanCallsWith.single.fromHeight, 600);
     });
   });
 }
@@ -326,6 +363,7 @@ class FakeSettingsStore implements SettingsStore {
   String? backend;
   String? visibility;
   FrigateTipProbe? probeTip;
+
   /// The chain the fake frigate backend follows; the fake wallet is signet.
   Network probeNetwork = Network.signet;
 

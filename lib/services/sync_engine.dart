@@ -83,6 +83,39 @@ typedef NetworkCheckFn = Future<bool> Function({
 /// Sync-result stream factory (`createSyncResultStream`).
 typedef SyncResultStreamFn = Stream<StateUpdate> Function();
 
+/// Definitive per-cycle backend decision (owner ruling 2026-11-12).
+///
+/// Resolved ONCE per wake/startup cycle via [SyncEngine.resolveBackend] and
+/// consumed by every backend consumer ([SyncEngine.trySync],
+/// [SyncEngine.ensureFrigateMonitor], the spend broadcast) — no independent
+/// re-derivation, no silent fallback.
+sealed class BackendResolution {
+  const BackendResolution();
+}
+
+/// The default backend: blindbit scans/broadcasts with the configured or
+/// network-default url.
+class BlindbitBackend extends BackendResolution {
+  final String blindbitUrl;
+  const BlindbitBackend(this.blindbitUrl);
+}
+
+/// The frigate backend with a usable url: frigate-exclusive — never falls
+/// back to blindbit, on any failure.
+class FrigateBackend extends BackendResolution {
+  final String url;
+  const FrigateBackend(this.url);
+}
+
+/// The user selected frigate but it is unusable right now (no url
+/// configured): an explicit idle state — no scan, no blindbit, a
+/// user-visible transient message (D8 path). Reachability failures map to
+/// the same idle at the consumer (probe failure / failed monitor start).
+class FrigateUnavailable extends BackendResolution {
+  final String reason;
+  const FrigateUnavailable(this.reason);
+}
+
 class SyncEngine {
   /// Called just before [wallet.syncToHeight] or [wallet.syncViaFrigate]
   /// begins.
@@ -285,6 +318,27 @@ class SyncEngine {
     }
   }
 
+  /// Single backend resolution per wake/startup cycle (owner ruling
+  /// 2026-11-12): frigate when the user selected it and a url is configured
+  /// (frigate-exclusive), blindbit only as the default backend, and an
+  /// explicit [FrigateUnavailable] idle when frigate is selected but
+  /// unusable — never a silent fallback. This is settings-only and cheap;
+  /// reachability is checked by the consumers (probe / monitor start).
+  Future<BackendResolution> resolveBackend() async {
+    final backend = await settingsRepository.getFrigateBackend();
+    if (backend != frigateBackendFrigate) {
+      final network = await walletRepository.readNetwork();
+      return BlindbitBackend(await settingsRepository.getBlindbitUrl() ??
+          network.defaultBlindbitUrl);
+    }
+    final url = (await settingsRepository.getFrigateUrl())?.trim();
+    if (url == null || url.isEmpty) {
+      return const FrigateUnavailable(
+          'frigate backend selected but no url configured');
+    }
+    return FrigateBackend(url);
+  }
+
   /// Phase-2/3 wiring: keep a continuous frigate subscription (the
   /// [FrigateMonitor]) alive while the foreground service runs.
   ///
@@ -301,19 +355,23 @@ class SyncEngine {
       return;
     }
 
-    final url = (await settingsRepository.getFrigateUrl())?.trim();
-    final backend = await settingsRepository.getFrigateBackend();
-    final wantMonitor =
-        backend == frigateBackendFrigate && url != null && url.isNotEmpty;
+    final resolution = await resolveBackend();
 
-    // D9: a monitor must never outlive its backend selection.
-    if (!wantMonitor) {
+    // D9: a monitor must never outlive its backend selection. That covers
+    // both a blindbit resolution and a frigate-selected-but-unusable one —
+    // a monitor cannot run without a url, and the frigate-exclusive rule
+    // forbids keeping any frigate subscription in the idle state.
+    if (resolution is! FrigateBackend) {
       if (_frigateMonitorRunning) {
-        Logger().i('[$_logTag] backend left frigate, stopping monitor');
+        final why = resolution is FrigateUnavailable
+            ? resolution.reason
+            : 'backend left frigate';
+        Logger().i('[$_logTag] $why, stopping monitor');
         await stopFrigateMonitor();
       }
       return;
     }
+    final url = resolution.url;
 
     if (_frigateMonitorRunning) {
       if (await frigateMonitorActive()) {
@@ -409,79 +467,84 @@ class SyncEngine {
       }
 
       final network = await walletRepository.readNetwork();
-      final blindbitUrl = await settingsRepository.getBlindbitUrl() ??
-          network.defaultBlindbitUrl;
 
-      // Explicit backend selection (D9): the frigate backend runs only when
-      // the user picked it AND a URL is configured. An unset backend or an
-      // unset/empty URL keeps the blindbit path byte-identical (blindbit
-      // stays the default).
-      final frigateUrl = (await settingsRepository.getFrigateUrl())?.trim();
-      final backend = await settingsRepository.getFrigateBackend();
-      final useFrigate = backend == frigateBackendFrigate &&
-          frigateUrl != null &&
-          frigateUrl.isNotEmpty;
-      if (backend == frigateBackendFrigate && !useFrigate) {
-        Logger().w('[$_logTag] frigate backend selected but no url '
-            'configured, falling back to blindbit');
-      }
+      // Single backend resolution for this wake cycle (owner ruling
+      // 2026-11-12): every consumer — trySync, ensureFrigateMonitor, the
+      // spend broadcast — shares one decision, and frigate-selected never
+      // degrades into a blindbit scan (different third party, different
+      // disclosure).
+      final resolution = await resolveBackend();
 
       int? tip;
       String? probeTipHash;
-      if (useFrigate) {
-        // The monitor covers the live tail while it holds the subscription
-        // (phase 2): the wake one-shot must not re-subscribe on top of it
-        // (D3: no duplicate subscription, no wake-cycle re-disclosure). A
-        // dead monitor is restarted by the service's liveness pass, and the
-        // phase-1 recovery path below runs whenever no monitor is live.
-        if (_frigateMonitorRunning) {
-          Logger().i('[$_logTag] frigate monitor live, wake scan skipped');
-          await walletRepository.touchFrigateScanBeat();
+      switch (resolution) {
+        case FrigateUnavailable(:final reason):
+          // Frigate-exclusive idle: no scan, no blindbit, checkpoint
+          // untouched; the user sees why via the D8 transient path. The
+          // next wake auto-resumes once a url is configured.
+          Logger().w('[$_logTag] $reason — staying idle, no blindbit '
+              'fallback (frigate-exclusive)');
+          onTransientOffline?.call(frigateNoUrlMsg);
           return;
-        }
 
-        // A scan lock present while this engine is not syncing was left by a
-        // killed process (D2): clear it and resume from lastSync — the
-        // scanner start_height prevents history re-sweeping.
-        await _clearStaleFrigateScanLock();
-
-        // Server-authoritative catch-up (D3): fetch the chain tip keylessly
-        // before anything else — before watch-set collection, before bar
-        // activation. Failure maps to the D8 transient-offline path: no
-        // subscribe, no scan, no watch-set disclosure, checkpoint untouched;
-        // the next wake auto-resumes.
-        try {
-          final probe = await frigateProbe(url: frigateUrl);
-          // Chain-consistency: a backend indexing another chain must never
-          // be scanned and must never advance the checkpoint — refuse with
-          // an explicit message naming both networks (the user-facing fix
-          // for the wedged-discovery finding).
-          if (probe.network != network) {
-            Logger().w('[$_logTag] frigate backend on a foreign chain '
-                '(backend=${probe.network.name}, wallet=${network.name}), '
-                'refusing to scan');
-            onTransientOffline?.call('Frigate backend is on a different chain '
-                '(${probe.network.name}) — this wallet is on '
-                '${network.name}. Nothing was scanned; set a frigate url '
-                "for the wallet's own network.");
+        case FrigateBackend(:final url):
+          // The monitor covers the live tail while it holds the
+          // subscription (phase 2): the wake one-shot must not re-subscribe
+          // on top of it (D3: no duplicate subscription, no wake-cycle
+          // re-disclosure). Liveness consults the persisted scan-session
+          // (D2) in addition to the isolate-local flag, so a monitor start
+          // still in flight — here or in another isolate — is visible even
+          // before its Dart flag is set (t_733de20c / t_3c4c44d3).
+          if (await _frigateMonitorLive()) {
+            Logger().i('[$_logTag] frigate monitor live, wake scan skipped');
+            await walletRepository.touchFrigateScanBeat();
             return;
           }
-          tip = probe.tipHeight;
-          probeTipHash = probe.tipHash;
-        } catch (e) {
-          Logger().w('[$_logTag] frigate unreachable: $e');
-          onTransientOffline?.call(frigateOfflineMsg);
-          return;
-        }
-      } else {
-        final correctNetwork =
-            await networkCheckFn(blindbitUrl: blindbitUrl, network: network);
-        if (!correctNetwork) {
-          Logger().w('[$_logTag] wrong network, skipping');
-          return;
-        }
 
-        tip = await chainHeightFn(blindbitUrl: blindbitUrl);
+          // A scan lock present here is stale (a live session was handled
+          // above): it was left by a killed process (D2) — clear it and
+          // resume from lastSync; the scanner start_height prevents history
+          // re-sweeping.
+          await _clearStaleFrigateScanLock();
+
+          // Server-authoritative catch-up (D3): fetch the chain tip keylessly
+          // before anything else — before watch-set collection, before bar
+          // activation. Failure maps to the D8 transient-offline path: no
+          // subscribe, no scan, no watch-set disclosure, checkpoint untouched;
+          // the next wake auto-resumes.
+          try {
+            final probe = await frigateProbe(url: url);
+            // Chain-consistency: a backend indexing another chain must never
+            // be scanned and must never advance the checkpoint — refuse with
+            // an explicit message naming both networks (the user-facing fix
+            // for the wedged-discovery finding).
+            if (probe.network != network) {
+              Logger().w('[$_logTag] frigate backend on a foreign chain '
+                  '(backend=${probe.network.name}, wallet=${network.name}), '
+                  'refusing to scan');
+              onTransientOffline?.call('Frigate backend is on a different '
+                  'chain (${probe.network.name}) — this wallet is on '
+                  '${network.name}. Nothing was scanned; set a frigate url '
+                  "for the wallet's own network.");
+              return;
+            }
+            tip = probe.tipHeight;
+            probeTipHash = probe.tipHash;
+          } catch (e) {
+            Logger().w('[$_logTag] frigate unreachable: $e');
+            onTransientOffline?.call(frigateOfflineMsg);
+            return;
+          }
+
+        case BlindbitBackend(:final blindbitUrl):
+          final correctNetwork =
+              await networkCheckFn(blindbitUrl: blindbitUrl, network: network);
+          if (!correctNetwork) {
+            Logger().w('[$_logTag] wrong network, skipping');
+            return;
+          }
+
+          tip = await chainHeightFn(blindbitUrl: blindbitUrl);
       }
 
       var lastSync = await walletRepository.readLastSync();
@@ -511,7 +574,7 @@ class SyncEngine {
       // arrive (D4).
       onSyncStarted(lastSync + 1, tip);
 
-      if (useFrigate) {
+      if (resolution case FrigateBackend(url: final frigateUrl)) {
         // Single-writer (D2): only this isolate, which runs the scan, writes
         // the session keys.
         await walletRepository.beginFrigateScan(pid: pid);
@@ -575,6 +638,10 @@ class SyncEngine {
           ...unspentOutpoints
         ];
 
+        final blindbitUrl = switch (resolution) {
+          BlindbitBackend(:final blindbitUrl) => blindbitUrl,
+          _ => throw StateError('unreachable: blindbit branch on $resolution'),
+        };
         await wallet.syncToHeight(
             fromHeight: lastSync + 1,
             toHeight: tip,
@@ -595,12 +662,31 @@ class SyncEngine {
     }
   }
 
+  /// Monitor liveness for the wake decision (D2/D3): this isolate's flag
+  /// covers a started monitor; the persisted scan-session covers a monitor
+  /// whose start is still in flight or that lives in another isolate — the
+  /// Dart bool alone is isolate-local (t_3c4c44d3). A stale lock is an
+  /// orphan, not a live monitor.
+  Future<bool> _frigateMonitorLive() async {
+    if (_frigateMonitorRunning) {
+      return true;
+    }
+    final lock = await walletRepository.readFrigateScanLock();
+    return lock != null && !lock.isStale(currentPid: pid);
+  }
+
   /// Clears a frigate scan lock found at wake time. Since [trySync] runs the
   /// scan synchronously in this isolate, any lock present here is by
-  /// construction orphaned (its process died, or its beat went stale).
+  /// construction orphaned (its process died, or its beat went stale) — the
+  /// live-session case is excluded by [_frigateMonitorLive], and a fresh
+  /// lock reaching this point is still never cleared (a monitor start may
+  /// have taken the session between the two checks).
   Future<void> _clearStaleFrigateScanLock() async {
     final lock = await walletRepository.readFrigateScanLock();
     if (lock == null) return;
+    if (!lock.isStale(currentPid: pid)) {
+      return;
+    }
     Logger().w('[$_logTag] clearing stale frigate scan lock '
         '(pid=${lock.pid}, stale=${lock.isStale(currentPid: pid)})');
     await walletRepository.endFrigateScan();

@@ -48,11 +48,11 @@ class SyncOrchestrator {
         Logger().i("Successfully started foreground sync service");
       } else {
         Logger().w("Starting in-process service as a fallback");
-        _service.startInProcess();
+        await _service.startInProcess();
       }
     } else {
       // for non-android platforms, we always start the sync service in-process
-      _service.startInProcess();
+      await _service.startInProcess();
       Logger().i("Successfully started in-process sync service");
     }
     _running = true;

@@ -336,10 +336,12 @@ class WalletState extends ChangeNotifier {
               .postTransaction(signedTx);
           break;
         case Network.regtest:
-          // Broadcast through the configured backend (D9): frigate when the
-          // user selected it AND a url is configured, else blindbit
-          // (configured or default). A frigate server speaks Electrum
-          // JSON-RPC over TCP, so the blindbit HTTP path cannot reach it.
+          // Broadcast through the selected backend (frigate-exclusive,
+          // owner ruling 2026-11-12): frigate when the user selected it —
+          // an unconfigured url blocks the spend with an explicit error,
+          // never a blindbit fallback — else blindbit (configured or
+          // default). A frigate server speaks Electrum JSON-RPC over TCP,
+          // so the blindbit HTTP path cannot reach it.
           final broadcastTarget = resolveSpendBroadcastTarget(
             frigateBackend:
                 await SettingsRepository.instance.getFrigateBackend(),
@@ -358,6 +360,10 @@ class WalletState extends ChangeNotifier {
         default:
           throw Exception("Unsupported network");
       }
+    } on SpendBroadcastBackendError {
+      // The backend-selection error is the user-facing message (explicit,
+      // frigate-exclusive): rethrow verbatim, no generic wrap-up.
+      rethrow;
     } catch (e) {
       Logger().e('Failed to broadcast transaction: $e');
       throw Exception(

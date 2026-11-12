@@ -69,7 +69,14 @@ class SynchronizationTaskHandler extends TaskHandler {
     // subscription for the mempool tail (decision-record amendment
     // 2026-11-10) while the app runs; the wake-cycle one-shot below stays
     // the phase-1 catch-up.
-    unawaited(_engine!.ensureFrigateMonitor());
+    //
+    // Ordered startup (owner ruling 2026-11-12): the backend/monitor
+    // resolution completes BEFORE the one-shot fires, so trySync can never
+    // race a monitor start (no double subscribe, no mid-start session
+    // clear). On a blindbit resolution ensureFrigateMonitor is a no-op; on
+    // frigate-selected-but-unusable it stops any stale monitor and trySync
+    // below lands in the explicit idle state.
+    await _engine!.ensureFrigateMonitor();
     unawaited(_engine!.trySync());
   }
 

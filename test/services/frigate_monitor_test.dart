@@ -32,6 +32,14 @@ void main() {
   int scanCalls = 0;
   final scanStartsWith = <int>[];
 
+  // When set with parksRemaining > 0, the first N watch-set collection
+  // calls park here: used to hold a monitor start mid-flight (after the
+  // session lock is taken, before the subscription is up) for the
+  // ordered-startup regression test, while later calls (a concurrent wake)
+  // proceed.
+  Completer<void>? watchGate;
+  int watchParksRemaining = 0;
+
   SyncEngine buildEngine() => SyncEngine(
         onSyncStarted: (start, end) {},
         onSyncComplete: (_) {},
@@ -45,6 +53,11 @@ void main() {
         },
         watchedOutputsFn: () async {
           watchCalls++;
+          final gate = watchGate;
+          if (gate != null && watchParksRemaining > 0) {
+            watchParksRemaining--;
+            await gate.future;
+          }
           return const <WatchedOutput>[];
         },
         frigateScanFn: (
@@ -87,6 +100,8 @@ void main() {
     watchCalls = 0;
     scanCalls = 0;
     scanStartsWith.clear();
+    watchGate = null;
+    watchParksRemaining = 0;
     settings.backend = frigateBackendFrigate;
     settings.frigateUrl = '192.168.1.44:50002';
     wallet.lastSync = 599;
@@ -131,7 +146,8 @@ void main() {
       expect(monitorStartCalls, 2);
     });
 
-    test('post-death recovery: dead monitor task is restarted from the '
+    test(
+        'post-death recovery: dead monitor task is restarted from the '
         'checkpoint (no receipt lost to monitor downtime)', () async {
       final engine = buildEngine();
       await engine.ensureFrigateMonitor();
@@ -152,7 +168,8 @@ void main() {
       expect(wallet.lock, isNotNull, reason: 'session re-established');
     });
 
-    test('wake is a no-op while the monitor is live (D3: no duplicate '
+    test(
+        'wake is a no-op while the monitor is live (D3: no duplicate '
         'subscription, no wake-cycle re-disclosure)', () async {
       final engine = buildEngine();
       await engine.ensureFrigateMonitor();
@@ -171,7 +188,8 @@ void main() {
           reason: 'no extra disclosure for an idle wake');
     });
 
-    test('monitor death with no monitor running: wake one-shot (phase 1) '
+    test(
+        'monitor death with no monitor running: wake one-shot (phase 1) '
         'recovers receipts from the checkpoint', () async {
       // monitor never started in this isolate (e.g. service killed with the
       // process): the wake-cycle one-shot is the recovery path
@@ -196,6 +214,60 @@ void main() {
       expect(monitorStopCalls, 1,
           reason: 'the subscription must not outlive the backend selection');
       expect(wallet.lock, isNull);
+    });
+  });
+
+  group('ordered startup (owner ruling 2026-11-12)', () {
+    test(
+        'monitor start in flight when trySync fires: trySync neither '
+        'subscribes nor clears the live session (t_733de20c regression)',
+        () async {
+      final engine = buildEngine();
+      // Park the monitor start inside the watch-set collection: the session
+      // lock is already taken (D2) but the subscription is not up yet and
+      // the engine flag is not set — exactly the in-flight window.
+      final gate = Completer<void>();
+      watchGate = gate;
+      watchParksRemaining = 1;
+
+      final starting = engine.ensureFrigateMonitor();
+      while (wallet.lock == null) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      // The wake fires while the monitor start is mid-flight.
+      await engine.trySync();
+
+      expect(scanCalls, 0,
+          reason: 'no one-shot subscribe on top of an in-flight monitor '
+              'start (D3: no duplicate subscription)');
+      expect(probeCalls, 0,
+          reason: 'the wake skips entirely while the monitor comes up');
+      expect(wallet.disclosures.length, 1,
+          reason: 'exactly the monitor subscribe, no wake re-disclosure');
+
+      gate.complete();
+      await starting;
+
+      expect(monitorStartCalls, 1);
+      expect(wallet.lock, isNotNull,
+          reason: 'the monitor session must survive the concurrent wake '
+              '(trySync must never endFrigateScan mid-monitor)');
+    });
+
+    test(
+        'frigate selected but no url: startup leaves no monitor and the wake '
+        'stays idle (frigate-exclusive)', () async {
+      settings.frigateUrl = null;
+      final engine = buildEngine();
+
+      await engine.ensureFrigateMonitor();
+      await engine.trySync();
+
+      expect(monitorStartCalls, 0, reason: 'no monitor without a usable url');
+      expect(wallet.lock, isNull);
+      expect(scanCalls, 0, reason: 'never a blindbit fallback scan');
+      expect(wallet.disclosures, isEmpty);
     });
   });
 }

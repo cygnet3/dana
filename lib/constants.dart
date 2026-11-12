@@ -66,6 +66,12 @@ const String bgKeyFrigateOffline = 'frigateOffline';
 // error, no blindbit fallback; cleared on the next successful sync.
 const String frigateOfflineMsg =
     'Frigate unreachable — will retry at next sync';
+// Frigate selected but no server url configured: explicit idle, never a
+// blindbit fallback (frigate-exclusive, owner ruling 2026-11-12); surfaced
+// via the same transient banner path (D8).
+const String frigateNoUrlMsg =
+    'Frigate backend selected but no server url configured — set one in '
+    'settings. Nothing was scanned.';
 const Color frigateOfflineColor = Color.fromARGB(255, 84, 110, 122);
 
 // Message keys sent to the background sync service from the main isolate.
