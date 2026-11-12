@@ -57,6 +57,10 @@ class ChainState extends ChangeNotifier {
       return false;
     }
 
+    // Keep the configured endpoint even when the initial request fails so
+    // reconnect attempts have a URL to retry.
+    _blindbitUrl = blindbitUrl;
+
     Logger().i('Connecting to blindbit: $blindbitUrl');
     try {
       final correctNetwork =
@@ -67,7 +71,6 @@ class ChainState extends ChangeNotifier {
         final tip = await getChainHeight(blindbitUrl: blindbitUrl);
 
         Logger().i('Successfully connected to blindbit, current tip: $tip');
-        _blindbitUrl = blindbitUrl;
         _tip = tip;
         notifyListeners();
         return true;
