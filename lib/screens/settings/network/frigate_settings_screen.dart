@@ -3,6 +3,7 @@ import 'package:danawallet/generated/rust/api/wallet/frigate.dart'
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
+import 'package:danawallet/screens/settings/network/frigate_url_dialog.dart';
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
 import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
@@ -127,7 +128,10 @@ class FrigateSettingsScreen extends StatelessWidget {
   }
 
   /// D10 save flow: parse -> probe -> warn (public) -> persist. Any failure
-  /// leaves the stored URL untouched.
+  /// leaves the stored URL untouched. Parse/probe/chain failures are
+  /// reported as a persistent inline error INSIDE the URL dialog (finding
+  /// t_3ba59c28): the dialog stays open, the entered text is preserved, and
+  /// the raw Rust exception never leaks into a transient snackbar.
   Future<void> _onSetFrigateUrl(BuildContext context) async {
     final settings = SettingsRepository.instance;
     final walletRepository = WalletRepository.instance;
@@ -135,8 +139,40 @@ class FrigateSettingsScreen extends StatelessWidget {
     controller.text = await settings.getFrigateUrl() ?? '';
 
     if (!context.mounted) return;
-    final value = await showInputAlertDialog(controller, TextInputType.url,
-        'Set frigate url', 'host:port or ssl://host:port');
+    final value = await showDialog<dynamic>(
+      context: context,
+      builder: (dialogContext) => FrigateUrlDialog(
+        controller: controller,
+        titleText: 'Set frigate url',
+        labelText: 'host:port or ssl://host:port',
+        validate: (input) async {
+          final parseError = validateFrigateUrl(input);
+          if (parseError != null) {
+            return 'Invalid frigate url: $parseError';
+          }
+
+          // D10 reachability probe — keyless by construction. On failure
+          // the URL is NOT persisted (the dialog stays open instead). The
+          // probe also identifies the chain the backend follows (genesis
+          // hash); a backend on another chain is refused with an explicit
+          // error — a foreign-chain frigate silently wedges payment
+          // discovery until the sync height is manually reset.
+          try {
+            final probe = await frigateTipProbe(url: input.trim());
+            final walletNetwork = await walletRepository.readNetwork();
+            if (probe.network != walletNetwork) {
+              return 'Frigate server is on ${probe.network.name} but this '
+                  'wallet is on ${walletNetwork.name}';
+            }
+            Logger().i('frigate probe ok, tip at ${probe.tipHeight} on '
+                '${probe.network.name}');
+            return null;
+          } catch (e) {
+            return frigateProbeFailureMessage(e);
+          }
+        },
+      ),
+    );
 
     if (value is bool && value) {
       Logger().i('resetting frigate url');
@@ -146,32 +182,6 @@ class FrigateSettingsScreen extends StatelessWidget {
       return;
     }
     if (value is! String) return;
-
-    final parseError = validateFrigateUrl(value);
-    if (parseError != null) {
-      displayWarning('Invalid frigate url: $parseError — not saved');
-      return;
-    }
-
-    // D10 reachability probe — keyless by construction. On failure the URL
-    // is NOT persisted. The probe also identifies the chain the backend
-    // follows (genesis hash); a backend on another chain is refused with an
-    // explicit error — a foreign-chain frigate silently wedges payment
-    // discovery until the sync height is manually reset.
-    try {
-      final probe = await frigateTipProbe(url: value.trim());
-      final walletNetwork = await walletRepository.readNetwork();
-      if (probe.network != walletNetwork) {
-        displayWarning('Frigate server is on ${probe.network.name} but this '
-            'wallet is on ${walletNetwork.name} — url not saved');
-        return;
-      }
-      Logger().i('frigate probe ok, tip at ${probe.tipHeight} on '
-          '${probe.network.name}');
-    } catch (e) {
-      displayWarning('Frigate unreachable ($e) — url not saved');
-      return;
-    }
 
     if (!context.mounted) return;
     final currentVisibility =
