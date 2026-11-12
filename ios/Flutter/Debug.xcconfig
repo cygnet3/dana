@@ -1,1 +1,5 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
 #include "Generated.xcconfig"
+IPHONEOS_DEPLOYMENT_TARGET = 15.5
+SUPPORTED_PLATFORMS = iphoneos iphonesimulator
+EXCLUDED_ARCHS[sdk=iphonesimulator*] = i386
