@@ -22,6 +22,7 @@ import 'api/structs/silent_payment_code.dart';
 import 'api/structs/state_update.dart';
 import 'api/structs/unsigned_transaction.dart';
 import 'api/wallet.dart';
+import 'api/wallet/challenge.dart';
 import 'api/wallet/coin_selection.dart';
 import 'api/wallet/setup.dart';
 import 'dart:async';

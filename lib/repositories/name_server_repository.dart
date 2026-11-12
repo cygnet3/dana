@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
+import 'package:danawallet/data/models/name_server_challenge_request.dart';
+import 'package:danawallet/data/models/name_server_challenge_response.dart';
 import 'package:danawallet/data/models/name_server_info_response.dart';
 import 'package:danawallet/data/models/name_server_lookup_response.dart';
 import 'package:danawallet/data/models/name_server_register_request.dart';
@@ -12,8 +14,46 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 
+/// Raised by [NameServerRepository.requestChallenge] on any non-200
+/// response from `POST /challenge` (401/429/400 all land here; callers
+/// branch on [status]).
+class ChallengeRejectedException implements Exception {
+  ChallengeRejectedException(this.status, this.body);
+
+  /// HTTP status code returned by the name server.
+  final int status;
+
+  /// Raw response body as delivered by the name server.
+  final String body;
+
+  @override
+  String toString() => 'ChallengeRejectedException(HTTP $status): $body';
+}
+
+/// Raised by [NameServerRepository.registerDanaAddress] when the name
+/// server rejects a registration with HTTP 401 (missing/invalid challenge
+/// proof).
+class RegisterRejectedException implements Exception {
+  RegisterRejectedException(this.status, this.message);
+
+  /// HTTP status code returned by the name server.
+  final int status;
+
+  /// Server-provided `message` field when the body parsed as JSON with a
+  /// string `message`, else the raw response body.
+  final String message;
+
+  @override
+  String toString() => 'RegisterRejectedException(HTTP $status): $message';
+}
+
 class NameServerRepository {
   String baseUrl;
+
+  /// Injectable HTTP client seam: defaults to a fresh
+  ///  per request (identical production behavior); tests
+  /// assign a MockClient to intercept the challenge/registration wire.
+  http.Client Function() client = http.Client.new;
 
   NameServerRepository({required Network network})
       : baseUrl = (() {
@@ -35,9 +75,7 @@ class NameServerRepository {
   Future<NameServerInfoResponse> getInfo() async {
     Logger().d("Getting name server info");
 
-    final response = await http.Client().get(
-      Uri.parse('$baseUrl/info'),
-    );
+    final response = await client().get(Uri.parse('$baseUrl/info'));
 
     Logger().d('Info response body: ${response.body}');
     if (response.statusCode == 200) {
@@ -52,27 +90,34 @@ class NameServerRepository {
   /// [danaAddress] - The address to register.
   /// [paymentCode] - The silent payment code to register.
   /// [requestId] - The unique id for this request, can be useful for tracking requests.
+  /// [nonce] - Challenge nonce from a prior requestChallenge call; omitted
+  /// from the JSON body when null (server-side wire type is Option<String>).
+  /// [signature] - BIP-340 signature over the challenge message; same
+  /// omit-when-null rule as [nonce].
   ///
   /// Returns [NameServerRegisterResponse] with the created address or error details
   Future<Bip353Address> registerDanaAddress({
     required Bip353Address danaAddress,
     required SilentPaymentCode paymentCode,
     required String requestId,
+    String? nonce,
+    String? signature,
   }) async {
     final request = NameServerRegisterRequest(
       id: requestId,
       userName: danaAddress.username,
       domain: danaAddress.domain,
       spAddress: paymentCode.encode(),
+      nonce: nonce,
+      signature: signature,
     );
 
     Logger().d(
-        'Registering dana address: $danaAddress with request ID: $requestId');
-    final response = await http.Client().post(
+      'Registering dana address: $danaAddress with request ID: $requestId',
+    );
+    final response = await client().post(
       Uri.parse('$baseUrl/register'),
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: {'Content-Type': 'application/json'},
       body: jsonEncode(request.toJson()),
     );
 
@@ -87,21 +132,121 @@ class NameServerRepository {
       // Validate that we got the expected fields
       if (responseData.danaAddress == null || responseData.spAddress == null) {
         throw Exception(
-            'Server returned success but missing required fields. Response: ${response.body}');
+          'Server returned success but missing required fields. Response: ${response.body}',
+        );
       } else {
         Logger().i(
-            'Successfully registered dana address: ${responseData.danaAddress}');
+          'Successfully registered dana address: ${responseData.danaAddress}',
+        );
         return responseData.danaAddress!;
       }
     } else {
       // Server returned an error status
       Logger().e(
-          'Registration failed with HTTP ${response.statusCode} ${response.reasonPhrase ?? "Unknown"}');
+        'Registration failed with HTTP ${response.statusCode} ${response.reasonPhrase ?? "Unknown"}',
+      );
       Logger().e('Request URL: $baseUrl/register');
       Logger().e('Response body: ${response.body}');
 
-      // todo: throw custom error types based on status code
+      if (response.statusCode == 401) {
+        String serverMessage = response.body;
+        try {
+          final decodedError = jsonDecode(response.body);
+          if (decodedError is Map && decodedError['message'] is String) {
+            serverMessage = decodedError['message'] as String;
+          }
+        } catch (_) {
+          // non-JSON error body: fall back to the raw body
+        }
+        throw RegisterRejectedException(response.statusCode, serverMessage);
+      }
       throw Exception(response.body);
+    }
+  }
+
+  /// Requests a registration challenge from the external name_server.
+  ///
+  /// [userName] - The user part of the dana address being claimed.
+  /// [domain] - The domain part of the dana address being claimed.
+  /// [spAddress] - The Silent Payment address that will own the address.
+  /// [requestId] - The unique id for this request, can be useful for tracking requests.
+  ///
+  /// Returns [NameServerChallengeResponse] carrying the server-signed
+  /// message and nonce that must be proven via BIP-340 before registration.
+  /// Throws [ChallengeRejectedException] for any non-200 status
+  /// (401/429/400 all land there; callers branch on `status`).
+  Future<NameServerChallengeResponse> requestChallenge({
+    required String userName,
+    required String domain,
+    required String spAddress,
+    required String requestId,
+  }) async {
+    final request = NameServerChallengeRequest(
+      id: requestId,
+      userName: userName,
+      domain: domain,
+      spAddress: spAddress,
+    );
+
+    Logger().d(
+      'Requesting challenge for: $userName@$domain with request ID: $requestId',
+    );
+    final response = await client().post(
+      Uri.parse('$baseUrl/challenge'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(request.toJson()),
+    );
+
+    Logger().d('Challenge response status: ${response.statusCode}');
+    Logger().d('Challenge response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final NameServerChallengeResponse challenge;
+      try {
+        challenge = NameServerChallengeResponse.fromJson(
+          jsonDecode(response.body) as Map<String, dynamic>,
+        );
+      } catch (e) {
+        Logger().e('Failed to parse challenge response: $e');
+        Logger().e('Response body: ${response.body}');
+        throw FormatException(
+          'Failed to parse challenge response: $e '
+          '(status ${response.statusCode}, body ${response.body})',
+        );
+      }
+
+      // Binding validation: rebuild the message the nameserver must have
+      // produced for *this* request and require an exact match before the
+      // caller is handed anything the spend key could sign (see the Rust
+      // oracle, which enforces only CHALLENGE_PREFIX). The field order and
+      // prefix mirror the server's `challenge_message()`
+      // (dana-nameserver src/main.rs): `dana-register:{network_key}:{nonce}:
+      // {user_name}:{domain}`.
+      //
+      // This is validation-only: [NameServerChallengeResponse.message] stays
+      // the exact bytes the server returned and is what goes on to signing
+      // (via the wallet-held signer, SpWallet::sign_registration_challenge).
+      // A reassembled string must never reach the spend key.
+      if (challenge.networkKey == null) {
+        throw const FormatException(
+          'Challenge response missing network_key: cannot validate the '
+          'binding before signing',
+        );
+      }
+      final String expectedMessage = 'dana-register:'
+          '${challenge.networkKey}:${challenge.nonce}'
+          ':$userName:$domain';
+      if (challenge.message != expectedMessage) {
+        throw FormatException(
+          'Challenge message does not match the requested binding. '
+          'Server message: ${challenge.message} '
+          'Expected: $expectedMessage',
+        );
+      }
+
+      return challenge;
+    } else {
+      throw ChallengeRejectedException(response.statusCode, response.body);
     }
   }
 
@@ -113,29 +258,33 @@ class NameServerRepository {
   /// Returns an empty list if no addresses are found
   /// Throws an exception for network errors, invalid responses, or malformed data
   Future<List<Bip353Address>> lookupDanaAddresses(
-      SilentPaymentCode code, String requestId) async {
+    SilentPaymentCode code,
+    String requestId,
+  ) async {
     final stringified = code.encode();
     Logger().d(
-        'Looking up dana addresses for SP address: ${stringified.substring(0, 20)}... (request ID: $requestId)');
-    final response = await http.Client().get(
-      Uri.parse('$baseUrl/lookup').replace(queryParameters: {
-        'sp_address': stringified,
-        'id': requestId,
-      }),
+      'Looking up dana addresses for SP address: ${stringified.substring(0, 20)}... (request ID: $requestId)',
+    );
+    final response = await client().get(
+      Uri.parse(
+        '$baseUrl/lookup',
+      ).replace(queryParameters: {'sp_address': stringified, 'id': requestId}),
     );
 
     Logger().d('Lookup response status: ${response.statusCode}');
     Logger().d('Lookup response body: ${response.body}');
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      final parsed =
-          NameServerLookupResponse.fromJson(jsonDecode(response.body));
+      final parsed = NameServerLookupResponse.fromJson(
+        jsonDecode(response.body),
+      );
       return parsed.danaAddresses;
     } else if (response.statusCode == 404) {
       // a 404 status code means that this sp address has no associated dana addresses
       // we still parse the response struct to avoid a generic 404 error
-      final parsed =
-          NameServerLookupResponse.fromJson(jsonDecode(response.body));
+      final parsed = NameServerLookupResponse.fromJson(
+        jsonDecode(response.body),
+      );
 
       if (parsed.danaAddresses.isEmpty) {
         return parsed.danaAddresses;
@@ -151,14 +300,16 @@ class NameServerRepository {
   }
 
   Future<PrefixSearchResponse> searchDanaAddressesWithPrefix(
-      String prefix, String requestId) async {
+    String prefix,
+    String requestId,
+  ) async {
     Logger().d(
-        'Searching for dana addresses with prefix: $prefix (request ID: $requestId)');
-    final response = await http.Client().get(
-      Uri.parse('$baseUrl/search').replace(queryParameters: {
-        'prefix': prefix,
-        'id': requestId,
-      }),
+      'Searching for dana addresses with prefix: $prefix (request ID: $requestId)',
+    );
+    final response = await client().get(
+      Uri.parse(
+        '$baseUrl/search',
+      ).replace(queryParameters: {'prefix': prefix, 'id': requestId}),
     );
 
     Logger().d('Prefix search response status: ${response.statusCode}');
@@ -170,11 +321,13 @@ class NameServerRepository {
         final responseData = PrefixSearchResponse.fromJson(decoded);
 
         Logger().i(
-            'Found ${responseData.count} dana address(es) matching prefix "$prefix" (total: ${responseData.totalCount})');
+          'Found ${responseData.count} dana address(es) matching prefix "$prefix" (total: ${responseData.totalCount})',
+        );
         return responseData;
       } catch (e, stackTrace) {
         Logger().e(
-            'Failed to parse prefix search response (${response.statusCode}): $e');
+          'Failed to parse prefix search response (${response.statusCode}): $e',
+        );
         Logger().e('Response body: ${response.body}');
         Logger().e('Stack trace: $stackTrace');
         throw FormatException('Failed to parse prefix search response: $e');
@@ -192,7 +345,8 @@ class NameServerRepository {
     } else {
       // Server returned an error status
       Logger().e(
-          'Prefix search failed with HTTP ${response.statusCode} ${response.reasonPhrase ?? "Unknown"}');
+        'Prefix search failed with HTTP ${response.statusCode} ${response.reasonPhrase ?? "Unknown"}',
+      );
       Logger().e('Request URL: $baseUrl/search');
       Logger().e('Response body: ${response.body}');
 
@@ -208,7 +362,8 @@ class NameServerRepository {
         } else {
           // Parsed but no message - create our own
           throw Exception(
-              'Prefix search failed: HTTP ${response.statusCode}: ${response.reasonPhrase ?? "Unknown error"}');
+            'Prefix search failed: HTTP ${response.statusCode}: ${response.reasonPhrase ?? "Unknown error"}',
+          );
         }
       } catch (parseError) {
         // Failed to parse error response

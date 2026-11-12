@@ -63,9 +63,8 @@ impl FlutterLogger {
         // unwrap_or_else: recover from a poisoned lock.  The foreground service
         // can keep the process alive across builds, so a panic from an old
         // binary version that held this lock may still be present.
-        let mut guard = FLUTTER_LOGGER_STREAM_SINK
-            .write()
-            .unwrap_or_else(|e| e.into_inner());
+        let sink = &*FLUTTER_LOGGER_STREAM_SINK;
+        let mut guard = sink.write().unwrap_or_else(|e| e.into_inner());
         let overriding = guard.is_some();
 
         *guard = Some(stream_sink);
@@ -129,7 +128,8 @@ impl Log for FlutterLogger {
             //     rather than panicking, and the if-let simply skips the
             //     message.  A missed log line during the lock handover is an
             //     acceptable trade-off.
-            if let Ok(guard) = FLUTTER_LOGGER_STREAM_SINK.try_read() {
+            let sink = &*FLUTTER_LOGGER_STREAM_SINK;
+            if let Ok(guard) = sink.try_read() {
                 if let Some(sink) = &*guard {
                     let _ = sink.add(entry);
                 }
