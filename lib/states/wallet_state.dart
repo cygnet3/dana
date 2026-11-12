@@ -35,8 +35,8 @@ class WalletState extends ChangeNotifier {
 
   // variables that never change (unless wallet is reset)
   late Network network;
-  late SilentPaymentCode receivePaymentCode;
-  late SilentPaymentCode changePaymentCode;
+  late SilentPaymentCode receivingCode;
+  late SilentPaymentCode changeCode;
   DateTime? birthday; // birthday may not be known
 
   // variables that change
@@ -79,8 +79,8 @@ class WalletState extends ChangeNotifier {
     danaAddress = await walletRepository.readDanaAddress();
 
     // we calculate these based on our wallet data (scan key, spend key, network)
-    receivePaymentCode = wallet.getReceivingAddress();
-    changePaymentCode = wallet.getChangeAddress();
+    receivingCode = wallet.receivingCode();
+    changeCode = wallet.changeCode();
 
     await _updateWalletState();
 
@@ -115,8 +115,8 @@ class WalletState extends ChangeNotifier {
         setupResult, network, birthday, null);
 
     // fill current state variables
-    receivePaymentCode = wallet.getReceivingAddress();
-    changePaymentCode = wallet.getChangeAddress();
+    receivingCode = wallet.receivingCode();
+    changeCode = wallet.changeCode();
     this.birthday = birthday;
     this.network = network;
 
@@ -138,8 +138,8 @@ class WalletState extends ChangeNotifier {
         setupResult, network, now, currentTip);
 
     // fill current state variables
-    receivePaymentCode = wallet.getReceivingAddress();
-    changePaymentCode = wallet.getChangeAddress();
+    receivingCode = wallet.receivingCode();
+    changeCode = wallet.changeCode();
     birthday = now;
     this.network = network;
     lastSync = currentTip;
@@ -232,7 +232,7 @@ class WalletState extends ChangeNotifier {
     // in that case, we can get the unconfirmed change from the owned outputs repository,
     // but for now we have to look at the transaction recipients
     unconfirmedChange = await transactionsRepository.getUnconfirmedChange(
-        receivePaymentCode.encode(), changePaymentCode.encode());
+        receivingCode.encode(), changeCode.encode());
 
     // Cache outputs for spending and scanning
     unspentOutputs = await ownedOutputsRepository.getUnspentOutputs();
@@ -243,7 +243,7 @@ class WalletState extends ChangeNotifier {
 
     // Cache transactions for UI
     transactions = await transactionsRepository.getAllTransactions(
-        receivePaymentCode.encode(), changePaymentCode.encode());
+        receivingCode.encode(), changeCode.encode());
   }
 
   Future<void> saveNote(int transactionId, String note) async {
@@ -384,7 +384,7 @@ class WalletState extends ChangeNotifier {
     // Generate an available dana address (without registering yet)
     return await DanaAddressService(network: network)
         .generateAvailableDanaAddress(
-      paymentCode: receivePaymentCode,
+      paymentCode: receivingCode,
       maxRetries: 5,
     );
   }
@@ -396,7 +396,7 @@ class WalletState extends ChangeNotifier {
 
     Logger().i('Registering dana address with username: $username');
     final registeredAddress = await DanaAddressService(network: network)
-        .registerUser(username: username, paymentCode: receivePaymentCode);
+        .registerUser(username: username, paymentCode: receivingCode);
 
     // Registration successful
     Logger().i('Registration successful: $registeredAddress');
@@ -424,7 +424,7 @@ class WalletState extends ChangeNotifier {
       try {
         final bip321Uri = await Bip353Resolver.resolveParsed(danaAddress!);
         final resolved = bip321Uri.reusablePaymentCodeForNetwork(network);
-        if (resolved != null && receivePaymentCode.matches(other: resolved)) {
+        if (resolved != null && receivingCode.matches(other: resolved)) {
           Logger().i("Stored dana address is valid");
           return false;
         }
@@ -451,7 +451,7 @@ class WalletState extends ChangeNotifier {
     Logger().i("Attempting to look up dana address");
     try {
       final lookupResult = await DanaAddressService(network: network)
-          .lookupDanaAddress(receivePaymentCode);
+          .lookupDanaAddress(receivingCode);
       if (lookupResult != null) {
         Logger().i("Found dana address: $lookupResult");
         danaAddress = lookupResult;

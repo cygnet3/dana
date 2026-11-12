@@ -129,8 +129,8 @@ class ReadyToSendScreenState extends State<ReadyToSendScreen> {
 
     final selectionFee = widget.selection.fee;
     String displayEstimatedFee = selectionFee.display(bitcoinUnit);
-    String displayEstimatedFeeFiat = exchangeRate.displayFiat(
-        selectionFee, displayPreference.fiatCurrency);
+    String displayEstimatedFeeFiat =
+        exchangeRate.displayFiat(selectionFee, displayPreference.fiatCurrency);
 
     // show the actual fee rate, which may exceed the requested one
     // (e.g. when a changeless selection was used)

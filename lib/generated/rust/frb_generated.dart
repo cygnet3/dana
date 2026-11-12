@@ -88,7 +88,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 2069932724;
+  int get rustContentHash => -1460110781;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -169,6 +169,8 @@ abstract class RustLibApi extends BaseApi {
   Future<String> crateApiWalletSpWalletBroadcastUsingBlindbit(
       {required String blindbitUrl, required String tx});
 
+  SilentPaymentCode crateApiWalletSpWalletChangeCode({required SpWallet that});
+
   Uint8List crateApiWalletSpWalletCommitSpOutputs(
       {required SpWallet that, required List<int> psbt});
 
@@ -185,19 +187,13 @@ abstract class RustLibApi extends BaseApi {
   Uint8List crateApiWalletSpWalletFinalizeInputs(
       {required SpWallet that, required List<int> psbt});
 
-  SilentPaymentCode crateApiWalletSpWalletGetChangeAddress(
-      {required SpWallet that});
-
-  Network crateApiWalletSpWalletGetNetwork({required SpWallet that});
-
-  SilentPaymentCode crateApiWalletSpWalletGetReceivingAddress(
-      {required SpWallet that});
-
   ApiScanKey crateApiWalletSpWalletGetScanKey({required SpWallet that});
 
   ApiSpendKey crateApiWalletSpWalletGetSpendKey({required SpWallet that});
 
   void crateApiWalletSpWalletInterruptSync();
+
+  Network crateApiWalletSpWalletNetwork({required SpWallet that});
 
   SpWallet crateApiWalletSpWalletNew(
       {required ApiScanKey scanKey,
@@ -205,6 +201,9 @@ abstract class RustLibApi extends BaseApi {
       required Network network,
       Fingerprint? fingerprint,
       DerivationPath? derivationPath});
+
+  SilentPaymentCode crateApiWalletSpWalletReceivingCode(
+      {required SpWallet that});
 
   List<OwnedOutput> crateApiWalletSpWalletScanSignedTx(
       {required SpWallet that,
@@ -1041,6 +1040,32 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  SilentPaymentCode crateApiWalletSpWalletChangeCode({required SpWallet that}) {
+    return handler.executeSync(SyncTask(
+      callFfi: () {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSpWallet(
+            that, serializer);
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+      },
+      codec: SseCodec(
+        decodeSuccessData:
+            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentCode,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiWalletSpWalletChangeCodeConstMeta,
+      argValues: [that],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiWalletSpWalletChangeCodeConstMeta =>
+      const TaskConstMeta(
+        debugName: "SpWallet_change_code",
+        argNames: ["that"],
+      );
+
+  @override
   Uint8List crateApiWalletSpWalletCommitSpOutputs(
       {required SpWallet that, required List<int> psbt}) {
     return handler.executeSync(SyncTask(
@@ -1049,7 +1074,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSpWallet(
             that, serializer);
         sse_encode_list_prim_u_8_loose(psbt, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_list_prim_u_8_strict,
@@ -1084,7 +1109,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             apiRecipients, serializer);
         sse_encode_box_autoadd_input_selection(selection, serializer);
         sse_encode_network(network, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_created_psbt,
@@ -1117,7 +1142,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSpWallet(
             that, serializer);
         sse_encode_list_prim_u_8_loose(psbt, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1144,7 +1169,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSpWallet(
             that, serializer);
         sse_encode_list_prim_u_8_loose(psbt, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_list_prim_u_8_strict,
@@ -1163,92 +1188,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  SilentPaymentCode crateApiWalletSpWalletGetChangeAddress(
-      {required SpWallet that}) {
-    return handler.executeSync(SyncTask(
-      callFfi: () {
-        final serializer = SseSerializer(generalizedFrbRustBinding);
-        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSpWallet(
-            that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
-      },
-      codec: SseCodec(
-        decodeSuccessData:
-            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentCode,
-        decodeErrorData: null,
-      ),
-      constMeta: kCrateApiWalletSpWalletGetChangeAddressConstMeta,
-      argValues: [that],
-      apiImpl: this,
-    ));
-  }
-
-  TaskConstMeta get kCrateApiWalletSpWalletGetChangeAddressConstMeta =>
-      const TaskConstMeta(
-        debugName: "SpWallet_get_change_address",
-        argNames: ["that"],
-      );
-
-  @override
-  Network crateApiWalletSpWalletGetNetwork({required SpWallet that}) {
-    return handler.executeSync(SyncTask(
-      callFfi: () {
-        final serializer = SseSerializer(generalizedFrbRustBinding);
-        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSpWallet(
-            that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31)!;
-      },
-      codec: SseCodec(
-        decodeSuccessData: sse_decode_network,
-        decodeErrorData: null,
-      ),
-      constMeta: kCrateApiWalletSpWalletGetNetworkConstMeta,
-      argValues: [that],
-      apiImpl: this,
-    ));
-  }
-
-  TaskConstMeta get kCrateApiWalletSpWalletGetNetworkConstMeta =>
-      const TaskConstMeta(
-        debugName: "SpWallet_get_network",
-        argNames: ["that"],
-      );
-
-  @override
-  SilentPaymentCode crateApiWalletSpWalletGetReceivingAddress(
-      {required SpWallet that}) {
-    return handler.executeSync(SyncTask(
-      callFfi: () {
-        final serializer = SseSerializer(generalizedFrbRustBinding);
-        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSpWallet(
-            that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
-      },
-      codec: SseCodec(
-        decodeSuccessData:
-            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentCode,
-        decodeErrorData: null,
-      ),
-      constMeta: kCrateApiWalletSpWalletGetReceivingAddressConstMeta,
-      argValues: [that],
-      apiImpl: this,
-    ));
-  }
-
-  TaskConstMeta get kCrateApiWalletSpWalletGetReceivingAddressConstMeta =>
-      const TaskConstMeta(
-        debugName: "SpWallet_get_receiving_address",
-        argNames: ["that"],
-      );
-
-  @override
   ApiScanKey crateApiWalletSpWalletGetScanKey({required SpWallet that}) {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSpWallet(
             that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 33)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31)!;
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -1274,7 +1220,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSpWallet(
             that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 34)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -1298,7 +1244,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 33)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -1314,6 +1260,31 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(
         debugName: "SpWallet_interrupt_sync",
         argNames: [],
+      );
+
+  @override
+  Network crateApiWalletSpWalletNetwork({required SpWallet that}) {
+    return handler.executeSync(SyncTask(
+      callFfi: () {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSpWallet(
+            that, serializer);
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 34)!;
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_network,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiWalletSpWalletNetworkConstMeta,
+      argValues: [that],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiWalletSpWalletNetworkConstMeta =>
+      const TaskConstMeta(
+        debugName: "SpWallet_network",
+        argNames: ["that"],
       );
 
   @override
@@ -1333,7 +1304,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_network(network, serializer);
         sse_encode_opt_box_autoadd_fingerprint(fingerprint, serializer);
         sse_encode_opt_box_autoadd_derivation_path(derivationPath, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35)!;
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -1355,6 +1326,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "fingerprint",
           "derivationPath"
         ],
+      );
+
+  @override
+  SilentPaymentCode crateApiWalletSpWalletReceivingCode(
+      {required SpWallet that}) {
+    return handler.executeSync(SyncTask(
+      callFfi: () {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSpWallet(
+            that, serializer);
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36)!;
+      },
+      codec: SseCodec(
+        decodeSuccessData:
+            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSilentPaymentCode,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiWalletSpWalletReceivingCodeConstMeta,
+      argValues: [that],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiWalletSpWalletReceivingCodeConstMeta =>
+      const TaskConstMeta(
+        debugName: "SpWallet_receiving_code",
+        argNames: ["that"],
       );
 
   @override
@@ -4444,6 +4442,11 @@ class SpWalletImpl extends RustOpaque implements SpWallet {
   Uint8List addEcdhShares({required List<int> psbt}) => RustLib.instance.api
       .crateApiWalletSpWalletAddEcdhShares(that: this, psbt: psbt);
 
+  SilentPaymentCode changeCode() =>
+      RustLib.instance.api.crateApiWalletSpWalletChangeCode(
+        that: this,
+      );
+
   Uint8List commitSpOutputs({required List<int> psbt}) => RustLib.instance.api
       .crateApiWalletSpWalletCommitSpOutputs(that: this, psbt: psbt);
 
@@ -4477,20 +4480,6 @@ class SpWalletImpl extends RustOpaque implements SpWallet {
   Uint8List finalizeInputs({required List<int> psbt}) => RustLib.instance.api
       .crateApiWalletSpWalletFinalizeInputs(that: this, psbt: psbt);
 
-  SilentPaymentCode getChangeAddress() =>
-      RustLib.instance.api.crateApiWalletSpWalletGetChangeAddress(
-        that: this,
-      );
-
-  Network getNetwork() => RustLib.instance.api.crateApiWalletSpWalletGetNetwork(
-        that: this,
-      );
-
-  SilentPaymentCode getReceivingAddress() =>
-      RustLib.instance.api.crateApiWalletSpWalletGetReceivingAddress(
-        that: this,
-      );
-
   ApiScanKey getScanKey() =>
       RustLib.instance.api.crateApiWalletSpWalletGetScanKey(
         that: this,
@@ -4498,6 +4487,15 @@ class SpWalletImpl extends RustOpaque implements SpWallet {
 
   ApiSpendKey getSpendKey() =>
       RustLib.instance.api.crateApiWalletSpWalletGetSpendKey(
+        that: this,
+      );
+
+  Network network() => RustLib.instance.api.crateApiWalletSpWalletNetwork(
+        that: this,
+      );
+
+  SilentPaymentCode receivingCode() =>
+      RustLib.instance.api.crateApiWalletSpWalletReceivingCode(
         that: this,
       );
 
