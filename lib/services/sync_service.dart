@@ -36,7 +36,13 @@ class SyncService {
     this.syncOffline,
   })  : _chainState = chainState,
         _syncProgress = syncProgress,
-        _walletState = walletState;
+        _walletState = walletState {
+    // Single-producer chain tip (t_e67b63ae): the frigate session's tip
+    // stream (scan-progress Tip events) feeds the chain state's single
+    // chokepoint, which accepts it only while the frigate session is the
+    // active tip producer.
+    _syncProgress.onSessionTip = _chainState.applySessionTip;
+  }
 
   Future<bool> startForeground() async {
     if (!_callbacksRegistered) {
@@ -65,6 +71,7 @@ class SyncService {
       syncProgress: _syncProgress,
       walletState: _walletState,
       syncOffline: syncOffline,
+      chainState: _chainState,
     );
     // Ordered startup (owner ruling 2026-11-12): the backend/monitor
     // resolution completes before the poller fires any one-shot trySync.
@@ -108,6 +115,14 @@ class SyncService {
     // (t_find_banner_stale)
     if (data[bgKeyFrigateRecovered] == true) {
       syncOffline?.clear();
+    }
+
+    // Single-producer chain tip (t_e67b63ae): the BG engine's backend
+    // resolution classifies the tip producer on the main isolate too.
+    if (data[bgKeyTipProducer] is String) {
+      _chainState.setTipProducer(data[bgKeyTipProducer] == 'blindbit'
+          ? ChainTipProducer.blindbitPoller
+          : ChainTipProducer.frigateSession);
     }
 
     // walletState update

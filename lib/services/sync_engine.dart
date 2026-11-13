@@ -141,6 +141,12 @@ class SyncEngine {
   /// banner surface simply log.
   final void Function()? onRecovered;
 
+  /// Called after every [resolveBackend] so the host can keep the chain-
+  /// state tip producer aligned with the active backend (single-producer
+  /// rule, t_e67b63ae): blindbit resolution -> blindbit poller, anything
+  /// else -> the frigate session. Optional.
+  final void Function(BackendResolution resolution)? onBackendResolved;
+
   final String _logTag;
 
   bool _isSyncing = false;
@@ -188,6 +194,7 @@ class SyncEngine {
     required this.onStateUpdated,
     this.onTransientOffline,
     this.onRecovered,
+    this.onBackendResolved,
     String logTag = 'sync',
     WalletStore? walletRepository,
     SettingsStore? settingsRepository,
@@ -336,15 +343,22 @@ class SyncEngine {
     final backend = await settingsRepository.getFrigateBackend();
     if (backend != frigateBackendFrigate) {
       final network = await walletRepository.readNetwork();
-      return BlindbitBackend(await settingsRepository.getBlindbitUrl() ??
-          network.defaultBlindbitUrl);
+      final resolution = BlindbitBackend(
+          await settingsRepository.getBlindbitUrl() ??
+              network.defaultBlindbitUrl);
+      onBackendResolved?.call(resolution);
+      return resolution;
     }
     final url = (await settingsRepository.getFrigateUrl())?.trim();
     if (url == null || url.isEmpty) {
-      return const FrigateUnavailable(
-          'frigate backend selected but no url configured');
+      const resolution =
+          FrigateUnavailable('frigate backend selected but no url configured');
+      onBackendResolved?.call(resolution);
+      return resolution;
     }
-    return FrigateBackend(url);
+    final resolution = FrigateBackend(url);
+    onBackendResolved?.call(resolution);
+    return resolution;
   }
 
   /// Phase-2/3 wiring: keep a continuous frigate subscription (the

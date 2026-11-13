@@ -66,6 +66,12 @@ class SynchronizationTaskHandler extends TaskHandler {
           FlutterForegroundTask.sendDataToMain({bgKeyFrigateOffline: message}),
       onRecovered: () =>
           FlutterForegroundTask.sendDataToMain({bgKeyFrigateRecovered: true}),
+      // Single-producer chain tip (t_e67b63ae): the BG resolution classifies
+      // the tip producer on the main isolate too.
+      onBackendResolved: (resolution) => FlutterForegroundTask.sendDataToMain({
+        bgKeyTipProducer:
+            resolution is BlindbitBackend ? 'blindbit' : 'frigate',
+      }),
     );
     // Phase-2/3 wiring: the foreground service holds the continuous frigate
     // subscription for the mempool tail (decision-record amendment
