@@ -65,6 +65,10 @@ const String bgKeyFrigateOffline = 'frigateOffline';
 // after an offline window: clears the D8 transient banner (t_find_banner_stale).
 const String bgKeyFrigateRecovered = 'frigateRecovered';
 
+// Single-producer chain tip (t_e67b63ae): the BG engine's backend resolution
+// classifies the tip producer ('blindbit' | 'frigate') on the main isolate.
+const String bgKeyTipProducer = 'tipProducer';
+
 // Neutral transient banner for an unreachable frigate server (D8): no red
 // error, no blindbit fallback; cleared on the next successful sync.
 const String frigateOfflineMsg =

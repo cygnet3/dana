@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:danawallet/services/sync_engine.dart';
+import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/sync_offline_state.dart';
 import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
@@ -17,6 +18,7 @@ class InProcessSyncService {
     required SyncProgressState syncProgress,
     required WalletState walletState,
     SyncOfflineState? syncOffline,
+    ChainState? chainState,
   }) : _engine = SyncEngine(
           logTag: 'in-process',
           onSyncStarted: (start, end) {
@@ -27,6 +29,15 @@ class InProcessSyncService {
               walletState.refreshAfterSync(lastSyncOnly: lastSyncOnly),
           onTransientOffline: (message) => syncOffline?.setOffline(message),
           onRecovered: () => syncOffline?.clear(),
+          onBackendResolved: chainState == null
+              ? null
+              : (resolution) =>
+                  chainState.setTipProducer(resolution is BlindbitBackend
+                      ? ChainTipProducer.blindbitPoller
+                      // frigate backend (even unavailable): the session
+                      // owns the tip, and with no session tip it goes
+                      // stale — never a blindbit fallback (t_e67b63ae).
+                      : ChainTipProducer.frigateSession),
         );
 
   /// Test/alternate-host seam: run with a pre-built engine (injected fakes).

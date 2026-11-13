@@ -21,6 +21,12 @@ class SyncProgressState extends ChangeNotifier {
 
   late StreamSubscription syncProgressSubscription;
 
+  /// Session tip sink (single-producer rule, t_e67b63ae): Tip events are
+  /// forwarded here regardless of bar state — the chain tip must keep
+  /// flowing between scans too. The chain state's chokepoint decides
+  /// whether the frigate session is the active tip producer.
+  void Function(int height)? onSessionTip;
+
   // private constructor
   SyncProgressState._();
 
@@ -33,17 +39,20 @@ class SyncProgressState extends ChangeNotifier {
   /// library; the live FRB stream feeds the same method.
   @visibleForTesting
   void handleEvent(SyncProgressEvent event) {
-    // Only update progress while the bar is active. Ignoring events outside
-    // of an active scan prevents a trailing Rust event from re-activating the
-    // bar after deactivate() has already been called.
-    if (!isSyncing) return;
-
     switch (event) {
       case SyncProgressEvent_Tip(:final height):
-        // Scanner tip supersedes the wake-time probe tip (possible reorg
-        // between probe and scan): the bar's end follows the scanner.
+        // Session tip (single-producer rule): forward to the chain state's
+        // chokepoint even between scans — the tip must keep flowing while
+        // the bar is inactive. The bar's end still follows the scanner tip
+        // while a scan is active (possible reorg between probe and scan).
+        onSessionTip?.call(height);
+        if (!isSyncing) return;
         _endHeight = height;
       case SyncProgressEvent_Height(:final field0):
+        // Only update progress while the bar is active. Ignoring events
+        // outside of an active scan prevents a trailing Rust event from
+        // re-activating the bar after deactivate() has already been called.
+        if (!isSyncing) return;
         _onScannerHeight(field0);
     }
     notifyListeners();
