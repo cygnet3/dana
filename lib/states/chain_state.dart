@@ -69,10 +69,13 @@ class ChainState extends ChangeNotifier {
   void _writeTip(int? value, {required ChainTipProducer producer}) {
     if (producer != _tipProducer) {
       Logger().w(
-          'Rejected chain tip $value from $producer: active tip producer is $_tipProducer');
+          'Rejected chain tip $value from $producer: active tip producer is $_tipProducer (stored tip: $_tip)');
       return;
     }
     if (_tip == value) return;
+    // Tip provenance (debug-level only): every accepted tip-update log
+    // line names the backend that produced it.
+    Logger().d('Chain tip update: $value from $producer (previous tip: $_tip)');
     _tip = value;
     notifyListeners();
   }
@@ -212,7 +215,7 @@ class ChainState extends ChangeNotifier {
     try {
       final height = await chainHeightFn(blindbitUrl: _blindbitUrl!);
       _writeTip(height, producer: ChainTipProducer.blindbitPoller);
-      Logger().i('updating tip: $_tip');
+      Logger().i('updating tip: $_tip from ${ChainTipProducer.blindbitPoller}');
       notifyListeners();
       return true;
     } catch (e) {
