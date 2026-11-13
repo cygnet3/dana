@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:danawallet/constants.dart' show frigateOfflineMsg;
 import 'package:danawallet/generated/rust/api/structs/frigate_scan_outcome.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/generated/rust/api/structs/state_update.dart';
@@ -10,6 +11,7 @@ import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
 import 'package:danawallet/services/in_process_sync_service.dart';
 import 'package:danawallet/services/sync_engine.dart';
+import 'package:danawallet/states/sync_offline_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// PARTIAL-B regression (owner ruling 2026-11-12, item 4): the in-process
@@ -24,10 +26,12 @@ void main() {
   int monitorStopCalls = 0;
   bool monitorTaskAlive = false;
 
-  SyncEngine buildEngine() => SyncEngine(
+  SyncEngine buildEngine({SyncOfflineState? syncOffline}) => SyncEngine(
         onSyncStarted: (start, end) {},
         onSyncComplete: (_) {},
         onStateUpdated: (_) async {},
+        onTransientOffline: (message) => syncOffline?.setOffline(message),
+        onRecovered: () => syncOffline?.clear(),
         walletRepository: wallet,
         settingsRepository: settings,
         frigateProbe: ({required url}) async => const FrigateTipProbe(
@@ -93,6 +97,26 @@ void main() {
     expect(monitorStartCalls, 0,
         reason: 'blindbit is the default: no frigate monitor (D9)');
     expect(wallet.lock, isNull);
+  });
+
+  test('t_find_banner_stale: a recovered wake clears the offline banner',
+      () async {
+    final syncOffline = SyncOfflineState();
+    final service =
+        InProcessSyncService.withEngine(buildEngine(syncOffline: syncOffline));
+
+    // The offline window set the D8 transient banner...
+    syncOffline.setOffline(frigateOfflineMsg);
+    expect(syncOffline.message, frigateOfflineMsg);
+
+    // ...then frigate came back: the wake probe round-trip succeeds and the
+    // wallet is caught up (lastSync == tip) — exactly the on-device repro.
+    wallet.lastSync = 600; // fake probe tip is 600
+    await service.trySync();
+
+    expect(syncOffline.message, isNull,
+        reason: 'the banner must clear on the next successful frigate '
+            'round-trip');
   });
 
   test('dispose drops the monitor subscription and the session', () async {

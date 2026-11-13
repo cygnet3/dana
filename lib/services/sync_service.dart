@@ -104,6 +104,12 @@ class SyncService {
       syncOffline?.setOffline(data[bgKeyFrigateOffline] as String);
     }
 
+    // engine saw a successful frigate round-trip again: clear the banner
+    // (t_find_banner_stale)
+    if (data[bgKeyFrigateRecovered] == true) {
+      syncOffline?.clear();
+    }
+
     // walletState update
     if (data.containsKey(bgKeyRefresh)) {
       final lastSyncOnly = data[bgKeyRefresh] as bool;

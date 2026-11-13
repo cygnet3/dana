@@ -26,6 +26,7 @@ class InProcessSyncService {
           onStateUpdated: (lastSyncOnly) =>
               walletState.refreshAfterSync(lastSyncOnly: lastSyncOnly),
           onTransientOffline: (message) => syncOffline?.setOffline(message),
+          onRecovered: () => syncOffline?.clear(),
         );
 
   /// Test/alternate-host seam: run with a pre-built engine (injected fakes).

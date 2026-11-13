@@ -61,6 +61,9 @@ const String bgKeyFatalError = 'fatalError';
 // Sent when the frigate backend is unreachable (probe failure or a scan
 // that ended Disconnected): transient neutral banner, D8.
 const String bgKeyFrigateOffline = 'frigateOffline';
+// Sent when the sync engine observes a successful frigate round-trip again
+// after an offline window: clears the D8 transient banner (t_find_banner_stale).
+const String bgKeyFrigateRecovered = 'frigateRecovered';
 
 // Neutral transient banner for an unreachable frigate server (D8): no red
 // error, no blindbit fallback; cleared on the next successful sync.

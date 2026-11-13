@@ -134,6 +134,13 @@ class SyncEngine {
   /// banner surface simply log.
   final void Function(String message)? onTransientOffline;
 
+  /// Called when the engine observes a successful frigate round-trip again
+  /// after an offline window — a successful wake probe, a live monitor
+  /// subscription, or a completed sync — so the host can clear the D8
+  /// transient banner (t_find_banner_stale). Optional: hosts without a
+  /// banner surface simply log.
+  final void Function()? onRecovered;
+
   final String _logTag;
 
   bool _isSyncing = false;
@@ -180,6 +187,7 @@ class SyncEngine {
     required this.onSyncComplete,
     required this.onStateUpdated,
     this.onTransientOffline,
+    this.onRecovered,
     String logTag = 'sync',
     WalletStore? walletRepository,
     SettingsStore? settingsRepository,
@@ -498,6 +506,9 @@ class SyncEngine {
           if (await _frigateMonitorLive()) {
             Logger().i('[$_logTag] frigate monitor live, wake scan skipped');
             await walletRepository.touchFrigateScanBeat();
+            // A live subscription is a successful frigate round-trip: signal
+            // recovery so the host clears the D8 banner (t_find_banner_stale).
+            onRecovered?.call();
             return;
           }
 
@@ -530,6 +541,11 @@ class SyncEngine {
             }
             tip = probe.tipHeight;
             probeTipHash = probe.tipHash;
+            // The probe round-trip succeeded: frigate is reachable again —
+            // signal recovery so the host clears the D8 banner set during the
+            // offline window (t_find_banner_stale). A scan that then ends
+            // Disconnected re-raises the banner via onTransientOffline below.
+            onRecovered?.call();
           } catch (e) {
             Logger().w('[$_logTag] frigate unreachable: $e');
             onTransientOffline?.call(frigateOfflineMsg);
