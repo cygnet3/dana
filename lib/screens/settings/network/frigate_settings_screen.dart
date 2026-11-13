@@ -1,3 +1,4 @@
+import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/wallet/frigate.dart'
     show frigateTipProbe;
 import 'package:danawallet/global_functions.dart';
@@ -5,6 +6,8 @@ import 'package:danawallet/repositories/settings_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
 import 'package:danawallet/screens/settings/network/frigate_url_dialog.dart';
 import 'package:danawallet/screens/settings/widgets/settings_list_tile.dart';
+import 'package:danawallet/services/backend_switch_gate.dart';
+import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/widgets/skeletons/screen_skeleton.dart';
 import 'package:flutter/material.dart';
@@ -20,7 +23,11 @@ import 'package:provider/provider.dart';
 /// + `blockchain.headers.subscribe` only, no scan key anywhere on that path.
 /// [SyncEngine]'s `syncViaFrigate` is never reachable from here.
 class FrigateSettingsScreen extends StatelessWidget {
-  const FrigateSettingsScreen({super.key});
+  /// Backend-switch gate (t_47fd1638). Null wires the real gate; tests
+  /// inject stub probe functions.
+  final BackendSwitchGate? switchGate;
+
+  const FrigateSettingsScreen({super.key, this.switchGate});
 
   List<_FrigateSettingsItem> _buildItems(BuildContext context) {
     return [
@@ -69,6 +76,45 @@ class FrigateSettingsScreen extends StatelessWidget {
     );
 
     if (selected == null || selected == current) return;
+    if (!context.mounted) return;
+
+    // Backend-switch gate v1 (t_47fd1638): reconciliation is out of scope
+    // for v1 — refuse, don't reconcile. The gate consumes the single-
+    // producer tip of t_e67b63ae: switching with unconfirmed spends is
+    // blocked, and a switch is accepted only when the new backend's tip
+    // EXACTLY equals the stored tip (a freshly restarted trailing frigate
+    // is refused until caught up — correct behavior, not a bug).
+    final gate = switchGate ?? BackendSwitchGate();
+
+    // Read the stored tip before any await (no BuildContext across gaps).
+    int? storedTip;
+    try {
+      storedTip = Provider.of<ChainState>(context, listen: false).tip;
+    } catch (_) {
+      // No tip yet (fresh wallet or a stale session tip): there is no
+      // stored history to reconcile against, so the tip check is vacuous —
+      // the single-producer chokepoint still protects the tip afterwards.
+    }
+
+    final walletRepository = WalletRepository.instance;
+    final walletNetwork = await walletRepository.readNetwork();
+
+    final result = await gate.evaluate(
+      targetBackend: selected,
+      frigateUrl: await settings.getFrigateUrl(),
+      blindbitUrl:
+          await settings.getBlindbitUrl() ?? walletNetwork.defaultBlindbitUrl,
+      storedTip: storedTip,
+      network: walletNetwork,
+    );
+
+    if (!result.allowed) {
+      Logger().w('backend switch to $selected refused: ${result.error}');
+      if (!context.mounted) return;
+      await _showSwitchRefused(context, result.error!);
+      return; // Stay on the current backend — nothing is persisted.
+    }
+
     await settings.setFrigateBackend(selected);
     displayNotification('Sync backend set to $selected');
 
@@ -82,6 +128,25 @@ class FrigateSettingsScreen extends StatelessWidget {
         await syncProgress.interruptSync();
       }
     }
+  }
+
+  /// A refused switch surfaces its reason as a dialog the user must
+  /// dismiss — the transient snackbar is the t_3ba59c28 regression class
+  /// for error copy.
+  Future<void> _showSwitchRefused(BuildContext context, String message) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cannot switch backend'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<String?> _pickVisibility(BuildContext context, String current) async {
