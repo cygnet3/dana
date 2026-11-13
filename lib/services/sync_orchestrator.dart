@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:danawallet/services/sync_service.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/permission_state.dart';
+import 'package:danawallet/states/sync_offline_state.dart';
 import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:logger/logger.dart';
@@ -22,10 +23,12 @@ class SyncOrchestrator {
     required PermissionState permissionState,
     required SyncProgressState syncProgress,
     required WalletState walletState,
+    SyncOfflineState? syncOffline,
   })  : _service = SyncService(
           chainState: chainState,
           syncProgress: syncProgress,
           walletState: walletState,
+          syncOffline: syncOffline,
         ),
         _permissionState = permissionState {
     _permissionState.addListener(_onPermissionStateChanged);
@@ -45,11 +48,11 @@ class SyncOrchestrator {
         Logger().i("Successfully started foreground sync service");
       } else {
         Logger().w("Starting in-process service as a fallback");
-        _service.startInProcess();
+        await _service.startInProcess();
       }
     } else {
       // for non-android platforms, we always start the sync service in-process
-      _service.startInProcess();
+      await _service.startInProcess();
       Logger().i("Successfully started in-process sync service");
     }
     _running = true;

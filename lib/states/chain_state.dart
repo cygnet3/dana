@@ -8,6 +8,23 @@ import 'package:danawallet/services/chain_poller.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 
+/// Who may write the chain tip (single-producer rule, t_e67b63ae): exactly
+/// one active backend session owns tip writes — the blindbit poller while
+/// blindbit is the active backend, the frigate session (via the scan-
+/// progress tip stream) while a frigate backend is active. There is no
+/// fallback that substitutes another backend's value.
+enum ChainTipProducer { blindbitPoller, frigateSession }
+
+/// Blindbit chain height (`getChainHeight`). Injected so tests can serve a
+/// local stub second backend without the rust library.
+typedef ChainHeightFn = Future<int> Function({required String blindbitUrl});
+
+/// Blindbit network check (`checkNetwork`).
+typedef NetworkCheckFn = Future<bool> Function({
+  required String blindbitUrl,
+  required Network network,
+});
+
 class ChainState extends ChangeNotifier {
   ChainPoller? _foregroundChainPoller;
 
@@ -21,11 +38,72 @@ class ChainState extends ChangeNotifier {
   String? _blindbitUrl;
   int? _tip;
 
+  /// The active tip producer (single-producer rule, t_e67b63ae). Defaults
+  /// to the blindbit poller; the sync wiring re-classifies it from the
+  /// backend resolution at startup and every wake cycle.
+  ChainTipProducer _tipProducer = ChainTipProducer.blindbitPoller;
+
+  final ChainHeightFn chainHeightFn;
+  final NetworkCheckFn networkCheckFn;
+
+  /// Whether the blindbit tip poller timer is currently running.
+  @visibleForTesting
+  bool get pollerRunning => _foregroundChainPoller?.running ?? false;
+
+  ChainTipProducer get tipProducer => _tipProducer;
+
   bool get initiated => _network != null && _foregroundChainPoller != null;
 
-  bool get available => initiated && _blindbitUrl != null && _tip != null;
+  bool get available => initiated && _tip != null;
 
-  ChainState();
+  ChainState({ChainHeightFn? chainHeightFn, NetworkCheckFn? networkCheckFn})
+      : chainHeightFn = chainHeightFn ?? getChainHeight,
+        networkCheckFn = networkCheckFn ?? checkNetwork;
+
+  /// THE single tip-write chokepoint (single-producer rule, t_e67b63ae):
+  /// every tip value entering this state passes through here, tagged with
+  /// the producer it came from. A write from any producer other than the
+  /// active one is rejected and logged — a second backend serving a foreign
+  /// tip never moves the tip, and there is no fallback that substitutes
+  /// another backend's value.
+  void _writeTip(int? value, {required ChainTipProducer producer}) {
+    if (producer != _tipProducer) {
+      Logger().w(
+          'Rejected chain tip $value from $producer: active tip producer is $_tipProducer (stored tip: $_tip)');
+      return;
+    }
+    if (_tip == value) return;
+    // Tip provenance (debug-level only): every accepted tip-update log
+    // line names the backend that produced it.
+    Logger().d('Chain tip update: $value from $producer (previous tip: $_tip)');
+    _tip = value;
+    notifyListeners();
+  }
+
+  /// Tip from the active frigate session (the scan-progress tip stream).
+  /// The only way a session tip enters the chain state, and it is accepted
+  /// only while the frigate session is the active tip producer.
+  void applySessionTip(int height) =>
+      _writeTip(height, producer: ChainTipProducer.frigateSession);
+
+  /// Re-classifies the active tip producer from the backend resolution
+  /// (single-producer rule, t_e67b63ae). Switching to the frigate session
+  /// stops the blindbit poller and marks the tip stale until the session
+  /// delivers one; switching back re-arms the poller (the caller starts it).
+  void setTipProducer(ChainTipProducer producer) {
+    if (producer == _tipProducer) return;
+    Logger().i('Tip producer switching: $_tipProducer -> $producer');
+    _tipProducer = producer;
+    if (producer == ChainTipProducer.frigateSession) {
+      // The blindbit url poller no longer runs for the tip in this mode.
+      stopChainPoller();
+      // No session tip yet: the tip goes unknown/stale — no fallback
+      // substitutes another backend's value, and scanning pauses until the
+      // session speaks.
+      _writeTip(null, producer: ChainTipProducer.frigateSession);
+    }
+    notifyListeners();
+  }
 
   void initialize(Network network) {
     Logger().i('Initializing chain state');
@@ -38,6 +116,13 @@ class ChainState extends ChangeNotifier {
   void startChainPoller(bool immediate,
       {Future<void> Function()? onTipUpdated,
       bool Function()? shouldSkipTick}) {
+    if (_tipProducer == ChainTipProducer.frigateSession) {
+      // Single-producer rule: the frigate session owns the tip; the
+      // blindbit url poller no longer runs for the tip in that mode.
+      Logger()
+          .i('Frigate session owns the chain tip; blindbit poller not started');
+      return;
+    }
     if (_foregroundChainPoller != null) {
       _foregroundChainPoller!.onTipUpdated = onTipUpdated;
       _foregroundChainPoller!.shouldSkipTick = shouldSkipTick;
@@ -60,15 +145,17 @@ class ChainState extends ChangeNotifier {
     Logger().i('Connecting to blindbit: $blindbitUrl');
     try {
       final correctNetwork =
-          await checkNetwork(blindbitUrl: blindbitUrl, network: _network!);
+          await networkCheckFn(blindbitUrl: blindbitUrl, network: _network!);
 
       if (correctNetwork) {
         Logger().i('Network correct');
-        final tip = await getChainHeight(blindbitUrl: blindbitUrl);
+        final tip = await chainHeightFn(blindbitUrl: blindbitUrl);
 
         Logger().i('Successfully connected to blindbit, current tip: $tip');
         _blindbitUrl = blindbitUrl;
-        _tip = tip;
+        // Blindbit-sourced tip: the chokepoint rejects it while the frigate
+        // session is the active producer (single-producer rule).
+        _writeTip(tip, producer: ChainTipProducer.blindbitPoller);
         notifyListeners();
         return true;
       } else {
@@ -97,7 +184,8 @@ class ChainState extends ChangeNotifier {
   void reset() {
     _foregroundChainPoller?.stop();
     _foregroundChainPoller = null;
-    _tip = null;
+    _tipProducer = ChainTipProducer.blindbitPoller;
+    _writeTip(null, producer: ChainTipProducer.blindbitPoller);
     _blindbitUrl = null;
     _network = null;
   }
@@ -125,13 +213,17 @@ class ChainState extends ChangeNotifier {
     }
 
     try {
-      _tip = await getChainHeight(blindbitUrl: _blindbitUrl!);
-      Logger().i('updating tip: $_tip');
+      final height = await chainHeightFn(blindbitUrl: _blindbitUrl!);
+      _writeTip(height, producer: ChainTipProducer.blindbitPoller);
+      Logger().i('updating tip: $_tip from ${ChainTipProducer.blindbitPoller}');
       notifyListeners();
       return true;
     } catch (e) {
       Logger().e('Failed to update chain tip: $e');
-      _tip = null;
+      // Blindbit-sourced staleness: rejected while the frigate session is
+      // the active producer — a blindbit failure must never stale the
+      // session's tip.
+      _writeTip(null, producer: ChainTipProducer.blindbitPoller);
       notifyListeners();
       return false;
     }

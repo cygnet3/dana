@@ -62,7 +62,29 @@ class SynchronizationTaskHandler extends TaskHandler {
       },
       onStateUpdated: (lastSyncOnly) async =>
           FlutterForegroundTask.sendDataToMain({bgKeyRefresh: lastSyncOnly}),
+      onTransientOffline: (message) =>
+          FlutterForegroundTask.sendDataToMain({bgKeyFrigateOffline: message}),
+      onRecovered: () =>
+          FlutterForegroundTask.sendDataToMain({bgKeyFrigateRecovered: true}),
+      // Single-producer chain tip (t_e67b63ae): the BG resolution classifies
+      // the tip producer on the main isolate too.
+      onBackendResolved: (resolution) => FlutterForegroundTask.sendDataToMain({
+        bgKeyTipProducer:
+            resolution is BlindbitBackend ? 'blindbit' : 'frigate',
+      }),
     );
+    // Phase-2/3 wiring: the foreground service holds the continuous frigate
+    // subscription for the mempool tail (decision-record amendment
+    // 2026-11-10) while the app runs; the wake-cycle one-shot below stays
+    // the phase-1 catch-up.
+    //
+    // Ordered startup (owner ruling 2026-11-12): the backend/monitor
+    // resolution completes BEFORE the one-shot fires, so trySync can never
+    // race a monitor start (no double subscribe, no mid-start session
+    // clear). On a blindbit resolution ensureFrigateMonitor is a no-op; on
+    // frigate-selected-but-unusable it stops any stale monitor and trySync
+    // below lands in the explicit idle state.
+    await _engine!.ensureFrigateMonitor();
     unawaited(_engine!.trySync());
   }
 
@@ -74,12 +96,17 @@ class SynchronizationTaskHandler extends TaskHandler {
 
   Future<void> _onRepeatEventAsync() async {
     await _ensureInit();
+    // Re-check monitor liveness / backend selection each heartbeat (cheap:
+    // the rust-side probe is a sync flag read), then run the wake cycle.
+    await _engine?.ensureFrigateMonitor();
     unawaited(_engine?.trySync());
   }
 
   @override
   Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
     Logger().i('[BG] service destroyed (isTimeout: $isTimeout)');
+    // Drop the monitor subscription cleanly before the engine goes away.
+    await _engine?.stopFrigateMonitor();
     if (_engine?.isSyncing == true) {
       SpWallet.interruptSync();
       if (!isTimeout) {

@@ -1,4 +1,6 @@
 pub mod coin_selection;
+pub(crate) mod frigate;
+pub(crate) mod frigate_confirm;
 mod info;
 pub mod setup;
 mod sync;
@@ -17,18 +19,27 @@ pub struct SpWallet {
     client: SpClient,
     #[allow(unused)]
     wallet_fingerprint: WalletFingerprint,
+    /// The wallet's own network — the reference side of the frigate
+    /// chain-consistency gate (scan paths refuse a backend on another chain).
+    network: spdk_wallet::bitcoin::Network,
 }
 
 impl SpWallet {
     #[frb(sync)]
     pub fn new(scan_key: ApiScanKey, spend_key: ApiSpendKey, network: Network) -> Result<Self> {
-        let client = SpClient::new(scan_key.into(), spend_key.into(), network.into())?;
+        let bitcoin_network = spdk_wallet::bitcoin::Network::from(network);
+        let client = SpClient::new(
+            scan_key.into(),
+            spend_key.into(),
+            bitcoin_network,
+        )?;
 
         let wallet_fingerprint = client.client_fingerprint()?;
 
         Ok(Self {
             client,
             wallet_fingerprint,
+            network: bitcoin_network,
         })
     }
 

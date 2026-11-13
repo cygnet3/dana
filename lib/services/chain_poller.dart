@@ -18,6 +18,9 @@ class ChainPoller {
   Timer? _timer;
   bool _running = false;
 
+  /// Whether the poll timer is currently running (test seam).
+  bool get running => _running;
+
   ChainPoller({required this.chainState, this.onTipUpdated});
 
   void start() {
