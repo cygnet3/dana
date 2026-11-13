@@ -64,6 +64,8 @@ class SynchronizationTaskHandler extends TaskHandler {
           FlutterForegroundTask.sendDataToMain({bgKeyRefresh: lastSyncOnly}),
       onTransientOffline: (message) =>
           FlutterForegroundTask.sendDataToMain({bgKeyFrigateOffline: message}),
+      onRecovered: () =>
+          FlutterForegroundTask.sendDataToMain({bgKeyFrigateRecovered: true}),
     );
     // Phase-2/3 wiring: the foreground service holds the continuous frigate
     // subscription for the mempool tail (decision-record amendment

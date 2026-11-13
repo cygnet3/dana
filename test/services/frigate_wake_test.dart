@@ -27,6 +27,7 @@ void main() {
   int chainHeightCalls = 0;
   int networkCheckCalls = 0;
   final banners = <String>[];
+  int recoveredCalls = 0;
   int? syncStartedEnd;
   bool? completedWith;
 
@@ -47,6 +48,7 @@ void main() {
         onSyncComplete: (success) => completedWith = success,
         onStateUpdated: (_) async {},
         onTransientOffline: (message) => banners.add(message),
+        onRecovered: () => recoveredCalls++,
         walletRepository: wallet,
         settingsRepository: settings,
         frigateProbe: ({required url}) async {
@@ -89,6 +91,7 @@ void main() {
     chainHeightCalls = 0;
     networkCheckCalls = 0;
     banners.clear();
+    recoveredCalls = 0;
     syncStartedEnd = null;
     completedWith = null;
     settings.backend = frigateBackendFrigate;
@@ -165,6 +168,7 @@ void main() {
         onSyncComplete: (success) => completedWith = success,
         onStateUpdated: (_) async {},
         onTransientOffline: (message) => banners.add(message),
+        onRecovered: () => recoveredCalls++,
         walletRepository: wallet,
         settingsRepository: settings,
         frigateProbe: ({required url}) async => const FrigateTipProbe(
@@ -193,6 +197,60 @@ void main() {
       expect(completedWith, true,
           reason: 'Disconnected is a normal outcome, not an error path');
       expect(wallet.lock, isNull, reason: 'scan lock cleared');
+    });
+  });
+
+  group('offline banner recovery (t_find_banner_stale)', () {
+    test('probe failure does not signal recovery', () async {
+      wallet.lastSync = 600;
+      setProbeTip(null); // probe will throw
+
+      await buildEngine().trySync();
+
+      expect(banners, [frigateOfflineMsg]);
+      expect(recoveredCalls, 0,
+          reason: 'no successful frigate round-trip happened');
+    });
+
+    test('up-to-date wake after a probe failure signals recovery', () async {
+      wallet.lastSync = 600;
+      setProbeTip(null);
+      await buildEngine().trySync();
+      expect(banners, [frigateOfflineMsg]);
+
+      // Frigate is back: the next periodic wake probes successfully and is
+      // caught up — the on-device repro logged
+      // 'up to date (lastSync=852 tip=852)' while the banner stayed on screen.
+      setProbeTip(600);
+      await buildEngine().trySync();
+
+      expect(recoveredCalls, 1,
+          reason: 'the idle wake must signal recovery so the host clears '
+              'the banner');
+    });
+
+    test('a successful scan signals recovery', () async {
+      wallet.lastSync = 599;
+
+      await buildEngine().trySync();
+
+      expect(completedWith, true);
+      expect(recoveredCalls, 1,
+          reason: 'a completed sync clears the banner (D8 contract)');
+    });
+
+    test('a live monitor wake signals recovery', () async {
+      wallet.lastSync = 600;
+      final engine = buildEngine();
+      // A monitor in this isolate holds a fresh scan-session: the wake
+      // one-shot is skipped, but the subscription is a live round-trip.
+      wallet.lock = FrigateScanLock(pid: engine.pid, beat: DateTime.now());
+
+      await engine.trySync();
+
+      expect(probeCalls, 0, reason: 'monitor live, wake scan skipped');
+      expect(recoveredCalls, 1,
+          reason: 'a live monitor subscription proves frigate is reachable');
     });
   });
 
