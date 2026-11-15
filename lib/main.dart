@@ -85,9 +85,9 @@ void main() async {
     final blindbitUrl = await SettingsRepository.instance.getBlindbitUrl() ??
         network.defaultBlindbitUrl;
 
-    chainState.initialize(network);
+    chainState.initialize(network, blindbitUrl);
 
-    await chainState.connect(blindbitUrl);
+    await chainState.connect();
 
     final addressRegistrationNeeded =
         await walletState.checkDanaAddressRegistrationNeeded();

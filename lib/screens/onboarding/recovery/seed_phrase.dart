@@ -83,11 +83,10 @@ class SeedPhraseScreenState extends State<SeedPhraseScreen> {
 
       await walletState.restoreWallet(widget.network, mnemonic, birthday);
 
-      chainState.initialize(widget.network);
+      chainState.initialize(widget.network, widget.network.defaultBlindbitUrl);
 
       // Try to connect, but continue even if it fails (offline mode)
-      final connected =
-          await chainState.connect(widget.network.defaultBlindbitUrl);
+      final connected = await chainState.connect();
       if (!connected) {
         // Connection failed, but continue anyway - sync will happen when network is available
         if (context.mounted) {

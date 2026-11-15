@@ -21,17 +21,21 @@ class ChainState extends ChangeNotifier {
   String? _blindbitUrl;
   int? _tip;
 
-  bool get initiated => _network != null && _foregroundChainPoller != null;
+  bool get initiated =>
+      _network != null &&
+      _foregroundChainPoller != null &&
+      _blindbitUrl != null;
 
-  bool get available => initiated && _blindbitUrl != null && _tip != null;
+  bool get available => initiated && _tip != null;
 
   ChainState();
 
-  void initialize(Network network) {
+  void initialize(Network network, String blindbitUrl) {
     Logger().i('Initializing chain state');
     Logger().i('Network: $network');
-    // network is not yet verified in this state, it gets vetified in 'connect'
+    // network is not yet verified in this state, it gets verified in 'connect'
     _network = network;
+    _blindbitUrl = blindbitUrl;
     _foregroundChainPoller = ChainPoller(chainState: this);
   }
 
@@ -52,22 +56,33 @@ class ChainState extends ChangeNotifier {
   }
 
   /// Try connecting to blindbit service
-  Future<bool> connect(String blindbitUrl) async {
+  Future<bool> connect({String? newUrl}) async {
     if (!initiated) {
       return false;
     }
 
-    Logger().i('Connecting to blindbit: $blindbitUrl');
+    String url;
+
+    if (newUrl != null) {
+      url = newUrl;
+    } else {
+      url = _blindbitUrl!;
+    }
+
+    Logger().i('Connecting to blindbit: $url');
     try {
       final correctNetwork =
-          await checkNetwork(blindbitUrl: blindbitUrl, network: _network!);
+          await checkNetwork(blindbitUrl: url, network: _network!);
 
       if (correctNetwork) {
         Logger().i('Network correct');
-        final tip = await getChainHeight(blindbitUrl: blindbitUrl);
+        final tip = await getChainHeight(blindbitUrl: url);
 
         Logger().i('Successfully connected to blindbit, current tip: $tip');
-        _blindbitUrl = blindbitUrl;
+        if (newUrl != null) {
+          // if attempting to update, store the new url
+          _blindbitUrl = url;
+        }
         _tip = tip;
         notifyListeners();
         return true;
@@ -82,10 +97,10 @@ class ChainState extends ChangeNotifier {
   }
 
   Future<bool> reconnect() async {
-    if (_blindbitUrl != null) {
-      return await connect(_blindbitUrl!);
+    if (initiated) {
+      return await connect();
     } else {
-      Logger().w("Attempted to reconnect, but no blindbit url is known");
+      Logger().w("Attempted to reconnect, but chain state is not initiated!");
       return false;
     }
   }
@@ -147,7 +162,7 @@ class ChainState extends ChangeNotifier {
     Logger().i('Updating blindbit url');
     Logger().i('Old blindbit url: $_blindbitUrl');
     Logger().i('New blindbit url: $newUrl');
-    return await connect(newUrl);
+    return await connect(newUrl: newUrl);
   }
 
   Future<RecommendedFeeResponse> getCurrentFeeRates() async {
