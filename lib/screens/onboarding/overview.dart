@@ -53,8 +53,8 @@ class _OverviewScreenState extends State<OverviewScreen> {
 
     final blindbitUrl = network.defaultBlindbitUrl;
 
-    chainState.initialize(network);
-    final connected = await chainState.connect(blindbitUrl);
+    chainState.initialize(network, blindbitUrl);
+    final connected = await chainState.connect();
 
     // if we are connected, get the current block height
     // if we're not connected, we'll fetch the block height later in the chain sync serivce
