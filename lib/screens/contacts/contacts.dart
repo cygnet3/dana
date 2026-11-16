@@ -54,19 +54,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   Widget _buildContactItem(Contact contact) {
     final displayName = contact.displayName ?? '?';
-    final initial = contact.displayNameInitial ?? '?';
-    final avatarColor = contact.avatarColor;
 
     return ListTile(
-        leading: CircleAvatar(
-          radius: 24,
-          backgroundColor: avatarColor,
-          child: Text(
-            initial,
-            style:
-                BitcoinTextStyle.body3(Bitcoin.white).apply(fontWeightDelta: 2),
-          ),
-        ),
+        leading: contact.avatar(24),
         title: Text(
           displayName,
           style:

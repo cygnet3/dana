@@ -45,6 +45,7 @@ dependencies:
   package_info_plus: ^10.2.2
   intl: ^0.19.0
   flutter_foreground_task: ^9.2.1
+  jdenticon_dart: ^2.0.0
 
 dev_dependencies:
   flutter_test:
