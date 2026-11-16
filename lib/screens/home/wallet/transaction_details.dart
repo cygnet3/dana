@@ -133,15 +133,7 @@ class TransactionDetailsScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: contact.avatarColor,
-              child: Text(
-                contact.displayNameInitial ?? '?',
-                style: BitcoinTextStyle.body4(Bitcoin.white)
-                    .apply(fontWeightDelta: 2),
-              ),
-            ),
+            contact.avatar(20),
             const SizedBox(width: 12),
             Expanded(
               child: Text(

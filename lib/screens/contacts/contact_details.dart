@@ -25,6 +25,8 @@ import 'package:danawallet/widgets/sheets/show_app_bottom_sheet.dart';
 import 'package:danawallet/widgets/text/scrollable_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/svg.dart';
+import 'package:jdenticon_dart/jdenticon_dart.dart';
 import 'package:provider/provider.dart';
 
 class ContactDetailsScreen extends StatelessWidget {
@@ -444,16 +446,7 @@ class ContactDetailsScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const SizedBox(height: 20),
-            // Avatar
-            CircleAvatar(
-              radius: 50,
-              backgroundColor: contact.avatarColor,
-              child: Text(
-                contact.displayNameInitial ?? '?',
-                style: BitcoinTextStyle.body1(Bitcoin.white)
-                    .apply(fontWeightDelta: 2, fontSizeDelta: 3),
-              ),
-            ),
+            contact.avatar(50),
             const SizedBox(height: 20),
             // Name in bold
             Text(

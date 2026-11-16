@@ -263,14 +263,7 @@ class WalletScreenState extends State<WalletScreen> {
             final contact =
                 contactsState.getContactByPaymentCode(silentPaymentCode);
             if (contact != null) {
-              leadingWidget = CircleAvatar(
-                  radius: 20,
-                  backgroundColor: contact.avatarColor,
-                  child: Text(
-                    contact.displayNameInitial ?? '?',
-                    style: BitcoinTextStyle.body4(Bitcoin.white)
-                        .apply(fontWeightDelta: 2),
-                  ));
+              leadingWidget = contact.avatar(20);
               title = contact.displayName;
             }
           }

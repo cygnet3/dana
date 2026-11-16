@@ -1,7 +1,10 @@
+import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
 import 'package:danawallet/data/models/contact_field.dart';
 import 'package:danawallet/generated/rust/api/structs/silent_payment_code.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
+import 'package:jdenticon_dart/jdenticon_dart.dart';
 
 class Contact {
   int? id;
@@ -18,15 +21,6 @@ class Contact {
     required this.paymentCode,
     this.customFields,
   });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'name': name,
-      'bip353Address': bip353Address?.toString(),
-      'paymentCode': paymentCode.encode(),
-    };
-  }
 
   factory Contact.fromMap(Map<String, dynamic> map) {
     final String? bip353Address = map['bip353Address'];
@@ -46,9 +40,32 @@ class Contact {
     return name ?? bip353Address?.toString();
   }
 
-  String? get displayNameInitial {
-    return displayName?[0].toUpperCase();
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    if (other.runtimeType != runtimeType) {
+      return false;
+    }
+    // check equivalency based on ID only
+    return other is Contact && other.id == id;
   }
+
+  CircleAvatar avatar(double radius) => CircleAvatar(
+      radius: radius,
+      backgroundColor: avatarColor,
+      child: CircleAvatar(
+          radius: radius - (10 * radius / 100),
+          backgroundColor: Bitcoin.neutral1,
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: SvgPicture.string(Jdenticon.toSvg(paymentCode.encode()),
+                fit: BoxFit.fill, width: 200, height: 200),
+          )));
 
   Color get avatarColor {
     // Generate a consistent color based on the static payment code
@@ -68,18 +85,12 @@ class Contact {
     return colors[hash.abs() % colors.length];
   }
 
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) {
-      return true;
-    }
-    if (other.runtimeType != runtimeType) {
-      return false;
-    }
-    // check equivalency based on ID only
-    return other is Contact && other.id == id;
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'bip353Address': bip353Address?.toString(),
+      'paymentCode': paymentCode.encode(),
+    };
   }
-
-  @override
-  int get hashCode => id.hashCode;
 }

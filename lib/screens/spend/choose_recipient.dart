@@ -50,15 +50,7 @@ class ChooseRecipientScreenState extends State<ChooseRecipientScreen> {
   Widget _buildContactSuggestionItem(Contact contact) {
     return ListTile(
       dense: true,
-      leading: CircleAvatar(
-        radius: 16,
-        backgroundColor: contact.avatarColor,
-        child: Text(
-          contact.displayNameInitial ?? '?',
-          style:
-              BitcoinTextStyle.body5(Bitcoin.white).apply(fontWeightDelta: 2),
-        ),
-      ),
+      leading: contact.avatar(16),
       title: Text(
         contact.displayName ?? '?',
         style: BitcoinTextStyle.body5(Bitcoin.black),
