@@ -2,6 +2,7 @@ import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/constants.dart';
 import 'package:danawallet/data/enums/amount_display_unit.dart';
 import 'package:danawallet/data/models/bip353_address.dart';
+import 'package:danawallet/data/models/contact.dart';
 import 'package:danawallet/extensions/api_amount.dart';
 import 'package:danawallet/extensions/payment_code.dart';
 import 'package:danawallet/extensions/network.dart';
@@ -595,8 +596,11 @@ class WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  AppBar buildAppBar(Color networkColor) {
+  AppBar buildAppBar(Contact youContact, Color networkColor) {
     return AppBar(
+      toolbarHeight: 70,
+      leadingWidth: 70,
+      leading: Center(child: youContact.avatar(20)),
       forceMaterialTransparency: true,
       title: Row(
         children: [
@@ -618,11 +622,14 @@ class WalletScreenState extends State<WalletScreen> {
   @override
   Widget build(BuildContext context) {
     final walletState = Provider.of<WalletState>(context);
+    final contacts = Provider.of<ContactsState>(context, listen: false);
     final exchangeRate = Provider.of<FiatExchangeRateState>(context);
     final syncProgress = Provider.of<SyncProgressState>(context);
     final chainState = Provider.of<ChainState>(context);
     final displayPreference = Provider.of<DisplayPreferencesState>(context);
     final danaAddress = walletState.danaAddress;
+
+    final youContact = contacts.getYouContact();
 
     Amount amount = walletState.amount + walletState.unconfirmedChange;
 
@@ -635,7 +642,7 @@ class WalletScreenState extends State<WalletScreen> {
     bool showFundingScreen = isBalanceZero && !hasTransactionHistory;
 
     return MainScreenSkeleton(
-      appBar: buildAppBar(walletState.network.toColor),
+      appBar: buildAppBar(youContact, walletState.network.toColor),
       body: showFundingScreen
           ? buildFundingScreen(
               walletState.receivePaymentCode.encode(),
