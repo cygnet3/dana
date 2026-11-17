@@ -91,10 +91,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
         floatingAction: _openAddContactSheet,
         body: Column(
           children: [
-            // 'You' contact at the top
-            _buildContactItem(contactsState.getYouContact()),
-            const SizedBox(height: 20),
-            // Search bar
             TextField(
               controller: _searchController,
               enabled: hasContacts,

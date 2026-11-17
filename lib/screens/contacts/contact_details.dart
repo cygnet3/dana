@@ -25,8 +25,6 @@ import 'package:danawallet/widgets/sheets/show_app_bottom_sheet.dart';
 import 'package:danawallet/widgets/text/scrollable_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/svg.dart';
-import 'package:jdenticon_dart/jdenticon_dart.dart';
 import 'package:provider/provider.dart';
 
 class ContactDetailsScreen extends StatelessWidget {
@@ -423,21 +421,17 @@ class ContactDetailsScreen extends StatelessWidget {
       return const LoadingWidget();
     }
 
-    // if we're the 'you' contact, we don't show certain things
-    final isYouContact = contact == contacts.getYouContact();
-
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: const BackButtonWidget(),
         actions: [
-          if (!isYouContact)
-            IconButton(
-              icon: Icon(Icons.edit, color: Bitcoin.black),
-              onPressed: () {
-                _showEditContactSheet(context, contact);
-              },
-            ),
+          IconButton(
+            icon: Icon(Icons.edit, color: Bitcoin.black),
+            onPressed: () {
+              _showEditContactSheet(context, contact);
+            },
+          ),
         ],
       ),
       body: Padding(
@@ -479,31 +473,30 @@ class ContactDetailsScreen extends StatelessWidget {
               ),
             const SizedBox(height: 30),
             // Send Bitcoin button
-            if (!isYouContact)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                child: BitcoinButtonFilled(
-                  tintColor: danaBlue,
-                  body: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Send Bitcoin  ',
-                        style: BitcoinTextStyle.body3(Bitcoin.white),
-                      ),
-                      Image(
-                        image: const AssetImage("icons/send.png",
-                            package: "bitcoin_ui"),
-                        color: Bitcoin.white,
-                      ),
-                    ],
-                  ),
-                  cornerRadius: 6,
-                  onPressed: () {
-                    _onSendBitcoin(context, contact);
-                  },
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: BitcoinButtonFilled(
+                tintColor: danaBlue,
+                body: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Send Bitcoin  ',
+                      style: BitcoinTextStyle.body3(Bitcoin.white),
+                    ),
+                    Image(
+                      image: const AssetImage("icons/send.png",
+                          package: "bitcoin_ui"),
+                      color: Bitcoin.white,
+                    ),
+                  ],
                 ),
+                cornerRadius: 6,
+                onPressed: () {
+                  _onSendBitcoin(context, contact);
+                },
               ),
+            ),
             const SizedBox(height: 30),
             // List of items
             Expanded(
@@ -527,39 +520,37 @@ class ContactDetailsScreen extends StatelessWidget {
                           context, contact.paymentCode.encode());
                     },
                   ),
-                  if (!isYouContact) ...[
-                    const Divider(),
-                    // Sent item
-                    ListTile(
-                      title: Text(
-                        'Sent',
-                        style: BitcoinTextStyle.body3(Bitcoin.black)
-                            .apply(fontWeightDelta: 1),
-                      ),
-                      trailing:
-                          Icon(Icons.chevron_right, color: Bitcoin.neutral7),
-                      onTap: () {
-                        _showSentTransactionsSheet(context, contact);
-                      },
+                  const Divider(),
+                  // Sent item
+                  ListTile(
+                    title: Text(
+                      'Sent',
+                      style: BitcoinTextStyle.body3(Bitcoin.black)
+                          .apply(fontWeightDelta: 1),
                     ),
-                    const Divider(),
-                    // Custom Fields Section
-                    if (customFields != null && customFields.isNotEmpty) ...[
-                      ...customFields.map(
-                          (field) => _buildCustomFieldItem(context, field)),
-                    ],
-                    ListTile(
-                      leading: Icon(Icons.add, color: Bitcoin.blue),
-                      title: Text(
-                        'Add Field',
-                        style: BitcoinTextStyle.body3(Bitcoin.blue)
-                            .apply(fontWeightDelta: 1),
-                      ),
-                      onTap: () {
-                        _showAddFieldSheet(context, contactId);
-                      },
-                    ),
+                    trailing:
+                        Icon(Icons.chevron_right, color: Bitcoin.neutral7),
+                    onTap: () {
+                      _showSentTransactionsSheet(context, contact);
+                    },
+                  ),
+                  const Divider(),
+                  // Custom Fields Section
+                  if (customFields != null && customFields.isNotEmpty) ...[
+                    ...customFields
+                        .map((field) => _buildCustomFieldItem(context, field)),
                   ],
+                  ListTile(
+                    leading: Icon(Icons.add, color: Bitcoin.blue),
+                    title: Text(
+                      'Add Field',
+                      style: BitcoinTextStyle.body3(Bitcoin.blue)
+                          .apply(fontWeightDelta: 1),
+                    ),
+                    onTap: () {
+                      _showAddFieldSheet(context, contactId);
+                    },
+                  ),
                 ],
               ),
             ),
