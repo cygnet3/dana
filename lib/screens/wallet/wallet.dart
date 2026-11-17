@@ -9,6 +9,7 @@ import 'package:danawallet/extensions/network.dart';
 import 'package:danawallet/generated/rust/api/structs/amount.dart';
 import 'package:danawallet/data/models/recorded_transaction.dart';
 import 'package:danawallet/global_functions.dart';
+import 'package:danawallet/screens/home/user_overview.dart';
 import 'package:danawallet/widgets/sheets/app_bottom_sheet_shell.dart';
 import 'package:danawallet/widgets/sheets/sheet_handle_bar.dart';
 import 'package:danawallet/widgets/sheets/show_app_bottom_sheet.dart';
@@ -600,7 +601,17 @@ class WalletScreenState extends State<WalletScreen> {
     return AppBar(
       toolbarHeight: 70,
       leadingWidth: 70,
-      leading: Center(child: youContact.avatar(20)),
+      leading: GestureDetector(
+          onTap: () => showAppBottomSheet(
+              context: context,
+              builder: (_) => AppBottomSheetShell(
+                    child: UserOverviewScreen(
+                      youContact: youContact,
+                    ),
+                  )),
+
+          // onTap: () => mainScreenScaffold.currentState?.openDrawer(),
+          child: Center(child: youContact.avatar(20))),
       forceMaterialTransparency: true,
       title: Row(
         children: [
