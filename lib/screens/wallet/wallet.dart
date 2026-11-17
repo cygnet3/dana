@@ -73,56 +73,6 @@ class WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget buildDanaAddressBanner(Bip353Address danaAddress) {
-    return GestureDetector(
-      onTap: () {
-        Clipboard.setData(ClipboardData(text: danaAddress.toString()));
-        HapticFeedback.lightImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Bitcoin.white, size: 16),
-                const SizedBox(width: 8),
-                const Text('Dana address copied to clipboard'),
-              ],
-            ),
-            backgroundColor: Bitcoin.green.withValues(alpha: 0.8),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Bitcoin.blue.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Bitcoin.blue.withValues(alpha: 0.2)),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                children: [
-                  Text(
-                    'Your Dana Address',
-                    style: BitcoinTextStyle.body4(Bitcoin.neutral7).copyWith(
-                        fontFamily: 'Inter', fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 8),
-                  danaAddress.asRichText(15.0),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(Icons.copy,
-                size: 16, color: Bitcoin.blue.withValues(alpha: 0.6)),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget buildOfflineStatus(ChainState chainState) {
     return InlineWarningBanner(
       icon: Icons.cloud_off,
@@ -682,8 +632,6 @@ class WalletScreenState extends State<WalletScreen> {
                 buildAmountDisplay(amount, exchangeRate,
                     displayPreference.amountDisplayUnit, displayPreference),
                 const SizedBox(height: 20.0),
-                // Show Dana address banner if available
-                if (danaAddress != null) buildDanaAddressBanner(danaAddress),
                 const Spacer(),
                 buildTransactionHistory(walletState.transactions, exchangeRate,
                     displayPreference.amountDisplayUnit, displayPreference),
