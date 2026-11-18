@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:bitcoin_ui/bitcoin_ui.dart';
 import 'package:danawallet/extensions/network.dart';
-import 'package:danawallet/generated/rust/api/bip39.dart';
 import 'package:danawallet/generated/rust/api/structs/network.dart';
 import 'package:danawallet/global_functions.dart';
 import 'package:danawallet/screens/home/home.dart';
@@ -11,7 +10,7 @@ import 'package:danawallet/screens/onboarding/choose_network.dart';
 import 'package:danawallet/screens/onboarding/notification_permission_screen.dart';
 import 'package:danawallet/screens/onboarding/register_dana_address.dart';
 import 'package:danawallet/screens/onboarding/onboarding_skeleton.dart';
-import 'package:danawallet/screens/onboarding/recovery/seed_phrase.dart';
+import 'package:danawallet/screens/onboarding/recovery/restore_method_screen.dart';
 import 'package:danawallet/states/chain_state.dart';
 import 'package:danawallet/states/contacts_state.dart';
 import 'package:danawallet/services/sync_orchestrator.dart';
@@ -92,14 +91,17 @@ class _OverviewScreenState extends State<OverviewScreen> {
         (Route<dynamic> route) => false);
   }
 
-  Future<void> onRestoreMnemonic(BuildContext context) async {
-    Network network;
+  Future<void> onRestore(BuildContext context) async {
+    final Network network;
     // in dev environment, allow user to choose network
     if (isDevEnv) {
-      network = await Navigator.push(context,
+      final selected = await Navigator.push<Network>(context,
           MaterialPageRoute(builder: (context) => const ChooseNetworkScreen()));
+      if (!context.mounted || selected == null) {
+        return;
+      }
+      network = selected;
     } else {
-      // Get network from flavor
       network = getNetworkForFlavor;
     }
 
@@ -107,20 +109,11 @@ class _OverviewScreenState extends State<OverviewScreen> {
       return;
     }
 
-    // load bip39 words
-    final bip39Words = getEnglishWordlist();
-
-    // go to input seed phrase screen
-    if (context.mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (context) => SeedPhraseScreen(
-                  bip39Words: bip39Words,
-                  network: network,
-                )),
-      );
-    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (context) => RestoreMethodScreen(network: network)),
+    );
   }
 
   @override
@@ -168,7 +161,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
     final footer = Column(
       children: [
         FooterButtonOutlined(
-            title: 'Restore', onPressed: () => onRestoreMnemonic(context)),
+            title: 'Restore', onPressed: () => onRestore(context)),
         const SizedBox(
           height: 15,
         ),
