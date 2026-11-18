@@ -186,22 +186,24 @@ class FeeSelectionScreenState extends State<FeeSelectionScreen> {
               });
             }
           },
-          child: Column(children: [
-            const Divider(),
-            toListTile(
-                SelectedFee.fast, exchangeRate, bitcoinUnit, displayPreference),
-            const Divider(),
-            toListTile(SelectedFee.normal, exchangeRate, bitcoinUnit,
-                displayPreference),
-            const Divider(),
-            toListTile(
-                SelectedFee.slow, exchangeRate, bitcoinUnit, displayPreference),
-            const Divider(),
-            if (isDevEnv)
-              toListTile(SelectedFee.custom, exchangeRate, bitcoinUnit,
+          child: SingleChildScrollView(
+            child: Column(children: [
+              const Divider(),
+              toListTile(SelectedFee.fast, exchangeRate, bitcoinUnit,
                   displayPreference),
-            if (isDevEnv) const Divider(),
-          ])),
+              const Divider(),
+              toListTile(SelectedFee.normal, exchangeRate, bitcoinUnit,
+                  displayPreference),
+              const Divider(),
+              toListTile(SelectedFee.slow, exchangeRate, bitcoinUnit,
+                  displayPreference),
+              const Divider(),
+              if (isDevEnv)
+                toListTile(SelectedFee.custom, exchangeRate, bitcoinUnit,
+                    displayPreference),
+              if (isDevEnv) const Divider(),
+            ]),
+          )),
       footer: Column(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
