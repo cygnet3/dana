@@ -7,6 +7,7 @@ import '../frb_generated.dart';
 import '../lib.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'structs/amount.dart';
+import 'structs/frigate_scan_outcome.dart';
 import 'structs/input_selection.dart';
 import 'structs/network.dart';
 import 'structs/outpoint.dart';
@@ -14,6 +15,7 @@ import 'structs/owned_output.dart';
 import 'structs/recipient.dart';
 import 'structs/silent_payment_code.dart';
 import 'structs/unsigned_transaction.dart';
+import 'wallet/frigate.dart';
 import 'wallet/setup.dart';
 
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `from`, `from`
@@ -84,10 +86,45 @@ abstract class SpWallet implements RustOpaqueInterface {
   String signTransaction(
       {required SilentPaymentUnsignedTransaction unsignedTransaction});
 
+  /// Continuous frigate monitor for the foreground service: keeps the
+  /// subscription open and streams live block/mempool/tip/spend events
+  /// until `stopFrigateMonitor()` is called or the connection ends.
+  ///
+  /// Safe to call again: replaces any running monitor.
+  Future<void> startFrigateMonitor(
+      {required String frigateUrl,
+      required int fromHeight,
+      required BigInt dustLimit,
+      required List<WatchedOutput> watchedOutputs});
+
   Future<void> syncToHeight(
       {required int fromHeight,
       required int toHeight,
       required String blindbitUrl,
       required BigInt dustLimit,
       required List<OutPoint> ownedOutpoints});
+
+  /// One-shot frigate sync: subscribe from `from_height`, forward confirmed
+  /// discoveries and spends through the sync streams, and return once the
+  /// historical catch-up completes (checkpoint advanced to the tip).
+  ///
+  /// Returns a typed outcome instead of an error for connection loss: a
+  /// death before `CaughtUp` (including a silent channel close) maps to
+  /// [`FrigateScanOutcome::Disconnected`], not to `Err` — the checkpoint
+  /// already reflects every confirmed block the pump emitted (D8).
+  ///
+  /// Cancellation reuses the existing `KEEP_SYNCING` flag: the flag is
+  /// armed at entry and checked each loop iteration, so `interrupt_sync()`
+  /// (and its whole existing interrupt plumbing, IPC included) stops a
+  /// frigate scan without any new API. An interrupt returns
+  /// `Disconnected` *without* finalize.
+  ///
+  /// Drop-in for the hourly wake cycle; the scanner connection is closed on
+  /// return. The frigate server only learns the scan key — no address or
+  /// spend key ever crosses the wire.
+  Future<FrigateScanOutcome> syncViaFrigate(
+      {required String frigateUrl,
+      required int fromHeight,
+      required BigInt dustLimit,
+      required List<WatchedOutput> watchedOutputs});
 }

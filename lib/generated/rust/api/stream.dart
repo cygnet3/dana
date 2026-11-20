@@ -11,13 +11,14 @@ import 'structs/amount.dart';
 import 'structs/outpoint.dart';
 import 'structs/owned_output.dart';
 import 'structs/state_update.dart';
+import 'structs/sync_progress_event.dart';
 
 Stream<LogEntry> createLogStream(
         {required LogLevel level, required bool logDependencies}) =>
     RustLib.instance.api.crateApiStreamCreateLogStream(
         level: level, logDependencies: logDependencies);
 
-Stream<int> createSyncProgressStream() =>
+Stream<SyncProgressEvent> createSyncProgressStream() =>
     RustLib.instance.api.crateApiStreamCreateSyncProgressStream();
 
 Stream<StateUpdate> createSyncResultStream() =>
