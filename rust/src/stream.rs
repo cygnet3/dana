@@ -12,12 +12,14 @@ lazy_static! {
 }
 
 pub fn create_sync_progress_stream(s: StreamSink<u32>) {
-    let mut stream_sink = SCAN_PROGRESS_STREAM_SINK.lock().unwrap();
+    let sink = &*SCAN_PROGRESS_STREAM_SINK;
+    let mut stream_sink = sink.lock().unwrap();
     *stream_sink = Some(s);
 }
 
 pub fn create_sync_update_stream(s: StreamSink<StateUpdate>) {
-    let mut stream_sink = STATE_UPDATE_STREAM_SINK.lock().unwrap();
+    let sink = &*STATE_UPDATE_STREAM_SINK;
+    let mut stream_sink = sink.lock().unwrap();
     *stream_sink = Some(s);
 }
 
@@ -27,7 +29,8 @@ pub fn create_tx_broadcast_stream(s: StreamSink<String>) {
 }
 
 pub(crate) fn send_sync_progress(scan_progress: u32) {
-    let stream_sink = SCAN_PROGRESS_STREAM_SINK.lock().unwrap();
+    let sink = &*SCAN_PROGRESS_STREAM_SINK;
+    let stream_sink = sink.lock().unwrap();
     if let Some(stream_sink) = stream_sink.as_ref() {
         // Silently ignore send errors: the main isolate may have died (app closed
         // while service kept running) and its port is now closed.  The sink will
@@ -38,7 +41,8 @@ pub(crate) fn send_sync_progress(scan_progress: u32) {
 }
 
 pub(crate) fn send_sync_update(update: StateUpdate) -> anyhow::Result<()> {
-    let stream_sink = STATE_UPDATE_STREAM_SINK
+    let sink = &*STATE_UPDATE_STREAM_SINK;
+    let stream_sink = sink
         .try_lock()
         .map_err(|_| anyhow::Error::msg("Stream sink not available"))?;
     match stream_sink.as_ref() {

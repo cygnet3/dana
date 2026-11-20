@@ -106,13 +106,22 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<void> restoreWallet(
-      Network network, String mnemonic, DateTime? birthday) async {
+    Network network,
+    String mnemonic,
+    DateTime? birthday,
+  ) async {
     _initialized = false;
     final args = WalletSetupArgs(
-        setupType: WalletSetupType.mnemonic(mnemonic), network: network);
+      setupType: WalletSetupType.mnemonic(mnemonic),
+      network: network,
+    );
     final setupResult = SpWallet.setupWallet(setupArgs: args);
     final wallet = await walletRepository.setupWallet(
-        setupResult, network, birthday, null);
+      setupResult,
+      network,
+      birthday,
+      null,
+    );
 
     // fill current state variables
     receivePaymentCode = wallet.getReceivingAddress();
@@ -132,10 +141,16 @@ class WalletState extends ChangeNotifier {
     final now = DateTime.now().toUtc();
 
     final args = WalletSetupArgs(
-        setupType: const WalletSetupType.newWallet(), network: network);
+      setupType: const WalletSetupType.newWallet(),
+      network: network,
+    );
     final setupResult = SpWallet.setupWallet(setupArgs: args);
     final wallet = await walletRepository.setupWallet(
-        setupResult, network, now, currentTip);
+      setupResult,
+      network,
+      now,
+      currentTip,
+    );
 
     // fill current state variables
     receivePaymentCode = wallet.getReceivingAddress();
@@ -180,15 +195,17 @@ class WalletState extends ChangeNotifier {
       try {
         final mempoolApi = MempoolApiRepository(network: network);
         final block = await mempoolApi.getBlockForHash(
-            await mempoolApi.getBlockHashForHeight(blockHeight));
+          await mempoolApi.getBlockHashForHeight(blockHeight),
+        );
         final newBirthday = block.timestamp.toDate();
         Logger().i("Resolved block height $blockHeight to date $newBirthday");
         // store converted birthday in persistent storage before returning
         await walletRepository.saveBirthday(newBirthday);
         return newBirthday;
       } catch (e) {
-        Logger()
-            .w("Error resolving block height $blockHeight to timestamp: $e");
+        Logger().w(
+          "Error resolving block height $blockHeight to timestamp: $e",
+        );
         return null;
       }
     }
@@ -232,7 +249,9 @@ class WalletState extends ChangeNotifier {
     // in that case, we can get the unconfirmed change from the owned outputs repository,
     // but for now we have to look at the transaction recipients
     unconfirmedChange = await transactionsRepository.getUnconfirmedChange(
-        receivePaymentCode.encode(), changePaymentCode.encode());
+      receivePaymentCode.encode(),
+      changePaymentCode.encode(),
+    );
 
     // Cache outputs for spending and scanning
     unspentOutputs = await ownedOutputsRepository.getUnspentOutputs();
@@ -243,7 +262,9 @@ class WalletState extends ChangeNotifier {
 
     // Cache transactions for UI
     transactions = await transactionsRepository.getAllTransactions(
-        receivePaymentCode.encode(), changePaymentCode.encode());
+      receivePaymentCode.encode(),
+      changePaymentCode.encode(),
+    );
   }
 
   Future<void> saveNote(int transactionId, String note) async {
@@ -263,19 +284,24 @@ class WalletState extends ChangeNotifier {
   /// When [forceFeeRate] is set (the user explicitly chose a fee rate), the
   /// selection honoring the requested rate is preferred over a changeless
   /// one (which may exceed it).
-  Future<InputSelection> proposeCoinSelection(Recipient recipient, int feerate,
-      {bool forceFeeRate = false}) async {
+  Future<InputSelection> proposeCoinSelection(
+    Recipient recipient,
+    int feerate, {
+    bool forceFeeRate = false,
+  }) async {
     if (_isDrainPayment(recipient)) {
       return selectUtxosToDrain(
-          ownedOutputs: unspentOutputs,
-          recipientAddress: recipient.paymentCode,
-          feerate: feerate.toDouble());
+        ownedOutputs: unspentOutputs,
+        recipientAddress: recipient.paymentCode,
+        feerate: feerate.toDouble(),
+      );
     }
 
     final selections = await selectUtxosToSpend(
-        ownedOutputs: unspentOutputs,
-        recipient: recipient,
-        feerate: feerate.toDouble());
+      ownedOutputs: unspentOutputs,
+      recipient: recipient,
+      feerate: feerate.toDouble(),
+    );
     return pickDefaultSelection(selections, forceFeeRate: forceFeeRate);
   }
 
@@ -283,31 +309,38 @@ class WalletState extends ChangeNotifier {
   /// (see [proposeCoinSelection]), so the transaction signed is exactly the
   /// one whose fee was presented to the user.
   Future<SilentPaymentUnsignedTransaction> createUnsignedTxFromSelection(
-      Recipient recipient, InputSelection selection) async {
+    Recipient recipient,
+    InputSelection selection,
+  ) async {
     final wallet = await getWalletFromSecureStorage();
 
     if (_isDrainPayment(recipient)) {
       // The drain amount is only known after fee estimation: it is whatever
       // is left after paying the fee for spending all UTXOs.
-      final drainRecipient =
-          Recipient(paymentCode: recipient.paymentCode, amount: selection.sent);
+      final drainRecipient = Recipient(
+        paymentCode: recipient.paymentCode,
+        amount: selection.sent,
+      );
 
       return wallet.createTransactionFromSelection(
-          ownedOutputs: unspentOutputs,
-          recipient: drainRecipient,
-          selection: selection,
-          network: network);
+        ownedOutputs: unspentOutputs,
+        recipient: drainRecipient,
+        selection: selection,
+        network: network,
+      );
     }
 
     return wallet.createTransactionFromSelection(
-        ownedOutputs: unspentOutputs,
-        recipient: recipient,
-        selection: selection,
-        network: network);
+      ownedOutputs: unspentOutputs,
+      recipient: recipient,
+      selection: selection,
+      network: network,
+    );
   }
 
   Future<String> signAndBroadcastUnsignedTx(
-      SilentPaymentUnsignedTransaction unsignedTx) async {
+    SilentPaymentUnsignedTransaction unsignedTx,
+  ) async {
     final selectedOutputs = unsignedTx.selectedUtxos;
 
     List<OutPoint> selectedOutpoints =
@@ -315,8 +348,9 @@ class WalletState extends ChangeNotifier {
 
     final recipients = unsignedTx.recipients;
 
-    final finalizedTx =
-        SpWallet.finalizeTransaction(unsignedTransaction: unsignedTx);
+    final finalizedTx = SpWallet.finalizeTransaction(
+      unsignedTransaction: unsignedTx,
+    );
 
     final wallet = await getWalletFromSecureStorage();
 
@@ -331,15 +365,18 @@ class WalletState extends ChangeNotifier {
           txid = await SpWallet.broadcastTx(tx: signedTx, network: network);
           break;
         case Network.signet:
-          txid = await MempoolApiRepository(network: network)
-              .postTransaction(signedTx);
+          txid = await MempoolApiRepository(
+            network: network,
+          ).postTransaction(signedTx);
           break;
         case Network.regtest:
           final blindbitUrl =
               await SettingsRepository.instance.getBlindbitUrl() ??
                   Network.regtest.defaultBlindbitUrl;
           txid = await SpWallet.broadcastUsingBlindbit(
-              blindbitUrl: blindbitUrl, tx: signedTx);
+            blindbitUrl: blindbitUrl,
+            tx: signedTx,
+          );
           break;
         default:
           throw Exception("Unsupported network");
@@ -347,7 +384,8 @@ class WalletState extends ChangeNotifier {
     } catch (e) {
       Logger().e('Failed to broadcast transaction: $e');
       throw Exception(
-          'Unable to broadcast transaction. Please check your connection and try again.');
+        'Unable to broadcast transaction. Please check your connection and try again.',
+      );
     }
 
     await transactionsRepository.addOutgoingTransaction(
@@ -365,11 +403,21 @@ class WalletState extends ChangeNotifier {
 
   Future<String?> createSuggestedUsername() async {
     // Generate an available dana address (without registering yet)
-    return await DanaAddressService(network: network)
-        .generateAvailableDanaAddress(
+    return await DanaAddressService(
+      network: network,
+    ).generateAvailableDanaAddress(
       paymentCode: receivePaymentCode,
       maxRetries: 5,
     );
+  }
+
+  /// Signs a name-server registration challenge attestation with the
+  /// wallet-held spend key through the Rust bridge (the secret never crosses
+  /// the FFI boundary). Mirrors the signTransaction lookup+call shape in
+  /// signAndBroadcastUnsignedTx.
+  Future<String> signChallenge(String message) async {
+    final wallet = await getWalletFromSecureStorage();
+    return wallet.signRegistrationChallenge(message: message);
   }
 
   Future<void> registerDanaAddress(String username) async {
@@ -378,8 +426,12 @@ class WalletState extends ChangeNotifier {
     }
 
     Logger().i('Registering dana address with username: $username');
-    final registeredAddress = await DanaAddressService(network: network)
-        .registerUser(username: username, paymentCode: receivePaymentCode);
+    final registeredAddress =
+        await DanaAddressService(network: network).registerUser(
+      username: username,
+      paymentCode: receivePaymentCode,
+      signChallenge: signChallenge,
+    );
 
     // Registration successful
     Logger().i('Registration successful: $registeredAddress');
@@ -412,14 +464,16 @@ class WalletState extends ChangeNotifier {
           return false;
         }
         Logger().w(
-            "Stored dana address doesn't point to a valid payment code, removing");
+          "Stored dana address doesn't point to a valid payment code, removing",
+        );
         danaAddress = null;
       } on Bip353AddressNotRegisteredException {
         Logger().w("Stored dana address is no longer registered, removing");
         danaAddress = null;
       } on AmbiguousPaymentUriException {
-        Logger()
-            .w("Stored dana address points to multiple payment code, removing");
+        Logger().w(
+          "Stored dana address points to multiple payment code, removing",
+        );
         danaAddress = null;
       } on Bip353ResolveException catch (e) {
         // We couldn't reach the DNS resolver, so we can't confirm either way.
@@ -433,8 +487,9 @@ class WalletState extends ChangeNotifier {
     // but first, we check if the name server already has an address for us
     Logger().i("Attempting to look up dana address");
     try {
-      final lookupResult = await DanaAddressService(network: network)
-          .lookupDanaAddress(receivePaymentCode);
+      final lookupResult = await DanaAddressService(
+        network: network,
+      ).lookupDanaAddress(receivePaymentCode);
       if (lookupResult != null) {
         Logger().i("Found dana address: $lookupResult");
         danaAddress = lookupResult;
