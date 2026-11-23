@@ -34,3 +34,9 @@ impl From<Network> for bitcoin::Network {
         }
     }
 }
+
+impl From<Network> for &'static str {
+    fn from(value: Network) -> Self {
+        bitcoin::Network::from(value).to_core_arg()
+    }
+}
