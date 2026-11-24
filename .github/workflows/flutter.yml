@@ -1,20 +1,26 @@
-name: Flutter
+name: CI
 
 on:
   pull_request:
 
 jobs:
-  format:
+  flutter_format:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           flutter-version-file: .fvmrc
       - run: flutter pub get
-      - name: Check formatting
-        run: dart format --output=none --set-exit-if-changed lib
+      - run: dart format --output=none --set-exit-if-changed lib
+
+  flutter_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version-file: .fvmrc
+      - run: flutter test
