@@ -550,31 +550,30 @@ class WalletScreenState extends State<WalletScreen> {
   AppBar buildAppBar(Contact youContact, Color networkColor) {
     return AppBar(
       toolbarHeight: 70,
-      leadingWidth: 70,
-      leading: GestureDetector(
-          onTap: () => showAppBottomSheet(
-              context: context,
-              builder: (_) => AppBottomSheetShell(
-                    child: UserOverviewScreen(
-                      youContact: youContact,
-                    ),
-                  )),
-
-          // onTap: () => mainScreenScaffold.currentState?.openDrawer(),
-          child: Center(child: youContact.avatar(20))),
+      leading: isLiveEnv
+          ? null
+          : Center(
+              child: Image(
+              width: 45.0,
+              height: 45.0,
+              fit: BoxFit.fitHeight,
+              image: const AssetImage("icons/3.0x/bitcoin_circle.png",
+                  package: "bitcoin_ui"),
+              color: networkColor,
+            )),
       forceMaterialTransparency: true,
       title: Row(
         children: [
           const Spacer(),
-          SizedBox(
-              height: 30.0,
-              width: 30.0,
-              child: Image(
-                fit: BoxFit.contain,
-                image: const AssetImage("icons/3.0x/bitcoin_circle.png",
-                    package: "bitcoin_ui"),
-                color: networkColor,
-              )),
+          GestureDetector(
+              onTap: () => showAppBottomSheet(
+                  context: context,
+                  builder: (_) => AppBottomSheetShell(
+                        child: UserOverviewScreen(
+                          youContact: youContact,
+                        ),
+                      )),
+              child: Center(child: youContact.avatar(20))),
         ],
       ),
     );
