@@ -1,3 +1,4 @@
+pub mod challenge;
 pub mod coin_selection;
 mod info;
 pub mod setup;
@@ -40,6 +41,27 @@ impl SpWallet {
     #[frb(sync)]
     pub fn get_spend_key(&self) -> ApiSpendKey {
         ApiSpendKey(self.client.spend_key())
+    }
+
+    /// Signs a nameserver registration challenge attestation with the
+    /// wallet's own spend secret (BIP-340 schnorr, SHA-256-prehashed,
+    /// `CHALLENGE_PREFIX` enforced inside the shared core). The secret
+    /// never crosses the FFI boundary: Dart passes the message string in
+    /// and receives only the 64-byte signature hex.
+    ///
+    /// `SpendKey`->`SecretKey` route: the direct public accessor
+    /// `SpClient::try_secret_spend_key` (pinned spdk c1262f0,
+    /// spdk-wallet/src/client/client.rs:71) — it clones the held key and
+    /// errors on watch-only (`SpendKey::Public`) wallets, so the
+    /// base64/hex re-import fallback via `ApiSpendKey::encode` was not
+    /// needed. Shares the exact `challenge::sign_challenge_inner` core the
+    /// standalone `sign_challenge` oracle uses (byte-identical output by
+    /// construction).
+    #[frb(sync)]
+    pub fn sign_registration_challenge(&self, message: String) -> Result<String> {
+        let sk = self.client.try_secret_spend_key()?;
+        let sig = challenge::sign_challenge_inner(&sk, &message)?;
+        Ok(sig.serialize().iter().map(|b| format!("{b:02x}")).collect())
     }
 }
 
