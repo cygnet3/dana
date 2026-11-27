@@ -24,6 +24,7 @@ import 'package:danawallet/repositories/transactions_repository.dart';
 import 'package:danawallet/repositories/wallet_repository.dart';
 import 'package:danawallet/services/bip353_resolver.dart';
 import 'package:danawallet/services/dana_address_service.dart';
+import 'package:danawallet/services/spend_broadcast.dart';
 import 'package:danawallet/utils/coin_selection.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
@@ -335,15 +336,34 @@ class WalletState extends ChangeNotifier {
               .postTransaction(signedTx);
           break;
         case Network.regtest:
-          final blindbitUrl =
-              await SettingsRepository.instance.getBlindbitUrl() ??
-                  Network.regtest.defaultBlindbitUrl;
-          txid = await SpWallet.broadcastUsingBlindbit(
-              blindbitUrl: blindbitUrl, tx: signedTx);
+          // Broadcast through the selected backend (frigate-exclusive,
+          // owner ruling 2026-11-12): frigate when the user selected it —
+          // an unconfigured url blocks the spend with an explicit error,
+          // never a blindbit fallback — else blindbit (configured or
+          // default). A frigate server speaks Electrum JSON-RPC over TCP,
+          // so the blindbit HTTP path cannot reach it.
+          final broadcastTarget = resolveSpendBroadcastTarget(
+            frigateBackend:
+                await SettingsRepository.instance.getFrigateBackend(),
+            frigateUrl: await SettingsRepository.instance.getFrigateUrl(),
+            configuredBlindbitUrl:
+                await SettingsRepository.instance.getBlindbitUrl(),
+            defaultBlindbitUrl: Network.regtest.defaultBlindbitUrl,
+          );
+          if (broadcastTarget.isFrigate) {
+            txid = await broadcastViaFrigate(broadcastTarget.url, signedTx);
+          } else {
+            txid = await SpWallet.broadcastUsingBlindbit(
+                blindbitUrl: broadcastTarget.url, tx: signedTx);
+          }
           break;
         default:
           throw Exception("Unsupported network");
       }
+    } on SpendBroadcastBackendError {
+      // The backend-selection error is the user-facing message (explicit,
+      // frigate-exclusive): rethrow verbatim, no generic wrap-up.
+      rethrow;
     } catch (e) {
       Logger().e('Failed to broadcast transaction: $e');
       throw Exception(

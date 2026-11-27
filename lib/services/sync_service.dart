@@ -4,6 +4,7 @@ import 'package:danawallet/constants.dart';
 import 'package:danawallet/services/foreground_sync_service.dart';
 import 'package:danawallet/services/in_process_sync_service.dart';
 import 'package:danawallet/states/chain_state.dart';
+import 'package:danawallet/states/sync_offline_state.dart';
 import 'package:danawallet/states/sync_progress_state.dart';
 import 'package:danawallet/states/wallet_state.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -13,6 +14,10 @@ class SyncService {
   final ChainState _chainState;
   final SyncProgressState _syncProgress;
   final WalletState _walletState;
+
+  /// Optional surface for the transient frigate-offline banner (D8). Null in
+  /// hosts without a banner surface; the engine still logs.
+  final SyncOfflineState? syncOffline;
 
   /// Called when the background isolate sends [bgKeyFatalError]. The backend
   /// has already committed to the foreground-service path by the time this
@@ -28,9 +33,16 @@ class SyncService {
     required ChainState chainState,
     required SyncProgressState syncProgress,
     required WalletState walletState,
+    this.syncOffline,
   })  : _chainState = chainState,
         _syncProgress = syncProgress,
-        _walletState = walletState;
+        _walletState = walletState {
+    // Single-producer chain tip (t_e67b63ae): the frigate session's tip
+    // stream (scan-progress Tip events) feeds the chain state's single
+    // chokepoint, which accepts it only while the frigate session is the
+    // active tip producer.
+    _syncProgress.onSessionTip = _chainState.applySessionTip;
+  }
 
   Future<bool> startForeground() async {
     if (!_callbacksRegistered) {
@@ -54,17 +66,21 @@ class SyncService {
     return false;
   }
 
-  void startInProcess() {
+  Future<void> startInProcess() async {
     _inProcessSyncService = InProcessSyncService(
       syncProgress: _syncProgress,
       walletState: _walletState,
+      syncOffline: syncOffline,
+      chainState: _chainState,
     );
+    // Ordered startup (owner ruling 2026-11-12): the backend/monitor
+    // resolution completes before the poller fires any one-shot trySync.
+    await _inProcessSyncService!.start();
     _chainState.startChainPoller(
       true,
       onTipUpdated: _inProcessSyncService!.trySync,
       shouldSkipTick: () => _syncProgress.isSyncing,
     );
-    return;
   }
 
   void _onServiceData(Object data) {
@@ -84,6 +100,29 @@ class SyncService {
     } else if (data.containsKey(bgKeyComplete)) {
       bool success = data[bgKeyComplete] as bool;
       _syncProgress.deactivate(success);
+      // a successful sync clears the transient frigate-offline banner (D8)
+      if (success) {
+        syncOffline?.clear();
+      }
+    }
+
+    // transient frigate-offline banner (D8): neutral, auto-resumes next wake
+    if (data[bgKeyFrigateOffline] is String) {
+      syncOffline?.setOffline(data[bgKeyFrigateOffline] as String);
+    }
+
+    // engine saw a successful frigate round-trip again: clear the banner
+    // (t_find_banner_stale)
+    if (data[bgKeyFrigateRecovered] == true) {
+      syncOffline?.clear();
+    }
+
+    // Single-producer chain tip (t_e67b63ae): the BG engine's backend
+    // resolution classifies the tip producer on the main isolate too.
+    if (data[bgKeyTipProducer] is String) {
+      _chainState.setTipProducer(data[bgKeyTipProducer] == 'blindbit'
+          ? ChainTipProducer.blindbitPoller
+          : ChainTipProducer.frigateSession);
     }
 
     // walletState update
